@@ -20,6 +20,7 @@ h3 { font-size: 15px; margin: 16px 0 6px; color: var(--muted); }
 .meta, .note { color: var(--muted); }
 .note { font-size: 13px; margin: 2px 0 12px; }
 .scroll { overflow-x: auto; }
+.diagram { margin: 8px 0; overflow-x: auto; }
 table { border-collapse: collapse; margin: 6px 0; font-size: 14px; }
 th, td { border: 1px solid var(--line); padding: 3px 8px; vertical-align: top; text-align: left; }
 th { background: var(--head); white-space: nowrap; }
@@ -64,6 +65,52 @@ document.querySelectorAll("table.sortable").forEach(t => {
     rows.forEach(row => t.tBodies[0].appendChild(row));
   }));
 });
+
+// Draws each ```mermaid block of the Markdown as a diagram with the copy of
+// mermaid.js in static/ (the version mmdc uses), fetched only by pages that
+// have such a block. The colors follow the light or dark scheme, also when it
+// changes. A block that does not parse keeps its text, with Mermaid's error above.
+{
+  const blocks = Array.from(document.querySelectorAll("pre > code.language-mermaid"), code => {
+    const div = document.createElement("div");
+    div.className = "diagram";
+    code.parentElement.before(div);
+    return {div, pre: code.parentElement, text: code.textContent};
+  });
+  const dark = matchMedia("(prefers-color-scheme: dark)");
+  let draws = 0;
+  const showError = (b, message) => {
+    const pre = document.createElement("pre");
+    pre.className = "error";
+    pre.textContent = message;
+    b.div.replaceChildren(pre);
+    b.pre.hidden = false;
+  };
+  const draw = async () => {
+    const n = ++draws;
+    mermaid.initialize({startOnLoad: false, securityLevel: "strict", suppressErrorRendering: true,
+                        theme: dark.matches ? "dark" : "default"});
+    for (const [i, b] of blocks.entries()) {
+      try {
+        // A new id each draw: Mermaid first removes any element with the id it is given.
+        const {svg} = await mermaid.render(`lab-diagram-${n}-${i}`, b.text);
+        if (n !== draws) return;  // a newer draw has started
+        b.div.innerHTML = svg;
+        b.pre.hidden = true;
+      } catch (e) {
+        if (n !== draws) return;
+        showError(b, `Mermaid could not draw this diagram:\n${e.message ?? e}`);
+      }
+    }
+  };
+  if (blocks.length) {
+    const script = document.createElement("script");
+    script.src = "{{ url_for('lab.static', filename='mermaid-11.17.2.min.js') }}";
+    script.onload = () => { draw(); dark.addEventListener("change", draw); };
+    script.onerror = () => blocks.forEach(b => showError(b, `mermaid.js did not load from ${script.src}`));
+    document.body.append(script);
+  }
+}
 </script>
 </body>
 </html>

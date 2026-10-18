@@ -10,7 +10,8 @@ import markdown
 from flask import Blueprint, abort, render_template, request, send_file
 from markupsafe import Markup
 
-blueprint = Blueprint("lab", __name__, url_prefix="/lab", template_folder="templates")
+blueprint = Blueprint("lab", __name__, url_prefix="/lab", template_folder="templates",
+                      static_folder="static")
 store = None  # set by create_app
 FILES = Path.home() / "claude-tables"
 ROWS = 1000  # rows shown per table

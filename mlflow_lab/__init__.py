@@ -1,6 +1,8 @@
 """Pages at /lab of the MLflow server: the records (decisions, findings,
 protocol rules, questions) with their evidence, lab.sql's views as tables, a
-read-only query box, and the experiment folders' files.
+read-only query box, and the experiment folders' files. Markdown (record texts,
+.md files) is shown as HTML, its ```mermaid blocks drawn as diagrams in the
+browser by the copy of mermaid.js in static/.
 
 `mlflow server --app-name lab` runs create_app, which adds the pages to
 MLflow's Flask app the way MLflow's login add-on (basic-auth) adds its own.
