@@ -1,5 +1,5 @@
-"""The /lab routes. Records and views come from lab.sql through Store; files
-come from ~/claude-tables only."""
+"""The /lab routes. Records and views come from the view files through Store;
+files come only from the folder lab.toml names."""
 import json
 import mimetypes
 import os
@@ -13,7 +13,7 @@ from markupsafe import Markup
 blueprint = Blueprint("lab", __name__, url_prefix="/lab", template_folder="templates",
                       static_folder="static")
 store = None  # set by create_app
-FILES = Path.home() / "claude-tables"
+FILES = None  # the folder /lab/file shows, set by create_app from lab.toml
 ROWS = 1000  # rows shown per table
 EVIDENCE_ROWS = 200
 CUT = 300  # characters shown per cell, except in the query box
@@ -166,19 +166,26 @@ def query_page():
     return render_template("lab/query.html", sql=sql, result=result, views=vs)
 
 
+def shown_path(path):
+    """path as ~/... under the home folder, else whole."""
+    return "~/" + str(path.relative_to(Path.home())) if path.is_relative_to(Path.home()) else str(path)
+
+
 @blueprint.get("/file")
 def file_page():
+    if FILES is None:
+        abort(404, "no files are shown: lab.toml, next to mlflow.db, names no files folder")
     path = Path(os.path.expanduser(request.args.get("path", str(FILES)))).resolve()
-    if not path.is_relative_to(FILES.resolve()):
-        abort(403, "only files under ~/claude-tables are shown")
+    if not path.is_relative_to(FILES):
+        abort(403, f"only files under {shown_path(FILES)} are shown")
     if not path.exists():
         abort(404, f"no file {path}")
-    shown = "~/" + str(path.relative_to(Path.home()))
+    shown = shown_path(path)
     if path.is_dir():
         entries = sorted(path.iterdir(), key=lambda p: (not p.is_dir(), p.name))
         items = [{"name": p.name + ("/" if p.is_dir() else ""), "path": f"{shown}/{p.name}",
                   "size": p.stat().st_size if p.is_file() else ""} for p in entries]
-        parent = "~/" + str(path.parent.relative_to(Path.home())) if path != FILES.resolve() else None
+        parent = shown_path(path.parent) if path != FILES else None
         return render_template("lab/folder.html", shown=shown, items=items, parent=parent)
     if path.suffix == ".md" and not request.args.get("raw"):
         return render_template("lab/markdown.html", shown=shown, text=md(path.read_text(errors="replace")))
