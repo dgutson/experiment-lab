@@ -1,0 +1,12 @@
+{
+  "name": "mlflow-lab",
+  "version": "0.1.0",
+  "description": "The experiment-db skill: Claude answers questions about experiments with one DuckDB SQL query (q) over the local MLflow server's database, and records decisions, findings, protocol rules and open questions with rec. Needs the mlflow-lab clone at ~/mlflow-lab, installed as the README says.",
+  "author": {
+    "name": "Daniel Gutson",
+    "url": "https://github.com/dgutson"
+  },
+  "homepage": "https://github.com/dgutson/mlflow-lab",
+  "repository": "https://github.com/dgutson/mlflow-lab",
+  "keywords": ["mlflow", "experiments", "duckdb", "sql", "decisions", "findings", "skill"]
+}
