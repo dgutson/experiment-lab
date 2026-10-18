@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Lab{% endblock %} · MLflow lab</title>
+<style>
+:root { --bg: #ffffff; --fg: #1f2328; --muted: #656d76; --line: #d0d7de; --head: #f6f8fa; --link: #0969da; --open: #9a6700; --bad: #cf222e; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0d1117; --fg: #e6edf3; --muted: #8d96a0; --line: #30363d; --head: #161b22; --link: #4493f8; --open: #d29922; --bad: #f85149; }
+}
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
+nav { display: flex; flex-wrap: wrap; gap: 16px; align-items: baseline; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--head); }
+main { padding: 16px; max-width: 1400px; }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+h1 { font-size: 22px; margin: 4px 0 8px; }
+h2 { font-size: 18px; margin: 24px 0 8px; }
+h3 { font-size: 15px; margin: 16px 0 6px; color: var(--muted); }
+.meta, .note { color: var(--muted); }
+.note { font-size: 13px; margin: 2px 0 12px; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; margin: 6px 0; font-size: 14px; }
+th, td { border: 1px solid var(--line); padding: 3px 8px; vertical-align: top; text-align: left; }
+th { background: var(--head); white-space: nowrap; }
+table.sortable th { cursor: pointer; user-select: none; }
+th[data-dir="up"]::after { content: " ▲"; }
+th[data-dir="down"]::after { content: " ▼"; }
+td.n { text-align: right; font-variant-numeric: tabular-nums; }
+pre, code { background: var(--head); font-family: ui-monospace, monospace; font-size: 13px; }
+pre { padding: 8px; white-space: pre-wrap; }
+tr.open td, span.open { color: var(--open); font-weight: 600; }
+tr.superseded td, span.superseded { color: var(--muted); text-decoration: line-through; }
+.error { color: var(--bad); white-space: pre-wrap; }
+textarea { box-sizing: border-box; width: 100%; font: 13px ui-monospace, monospace; background: var(--bg); color: var(--fg); border: 1px solid var(--line); padding: 6px; }
+</style>
+</head>
+<body>
+<nav>
+  <strong>Lab</strong>
+  <a href="{{ url_for('lab.index') }}">Records</a>
+  <a href="{{ url_for('lab.query_page') }}">Views and query</a>
+  <a href="{{ url_for('lab.file_page') }}">Files</a>
+  <a href="/">MLflow</a>
+</nav>
+<main>{% block main %}{% endblock %}</main>
+<script>
+// Click a heading of a sortable table to sort its rows; numbers sort as numbers.
+document.querySelectorAll("table.sortable").forEach(t => {
+  t.querySelectorAll("th").forEach((th, i) => th.addEventListener("click", () => {
+    const up = th.dataset.dir !== "up";
+    t.querySelectorAll("th").forEach(h => delete h.dataset.dir);
+    th.dataset.dir = up ? "up" : "down";
+    const key = row => {
+      const s = row.cells[i].innerText.trim();
+      return s !== "" && isFinite(s) ? Number(s) : s.toLowerCase();
+    };
+    const rows = Array.from(t.tBodies[0].rows);
+    rows.sort((a, b) => {
+      const x = key(a), y = key(b);
+      const c = typeof x === typeof y ? (x < y ? -1 : x > y ? 1 : 0) : (typeof x === "number" ? -1 : 1);
+      return up ? c : -c;
+    });
+    rows.forEach(row => t.tBodies[0].appendChild(row));
+  }));
+});
+</script>
+</body>
+</html>

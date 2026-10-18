@@ -1,0 +1,13 @@
+[project]
+name = "mlflow-lab"
+version = "0.1.0"
+description = "Pages at /lab of the MLflow server: records, lab.sql's views, a read-only query box, experiment files."
+requires-python = ">=3.12"
+dependencies = ["duckdb==1.5.6", "markdown==3.11"]
+
+[project.entry-points."mlflow.app"]
+lab = "mlflow_lab:create_app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

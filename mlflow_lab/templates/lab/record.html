@@ -1,0 +1,33 @@
+{% extends "lab/base.html" %}
+{% from "lab/table.html" import data_table %}
+{% block title %}{{ r.title }}{% endblock %}
+{% block main %}
+<h1>{{ r.title }}</h1>
+<p class="meta">{{ r.kind }} · <span class="{{ r.status }}">{{ r.status }}</span> · by {{ r.author or "?" }} · {{ r.time }} · {{ r.experiment }} ·
+  <a href="/#/experiments/{{ r.experiment_id }}/runs/{{ r.run }}">run in {{ r.container }}</a> · id {{ r.id }}</p>
+{% if answers %}<p>Answers <a href="{{ url_for('lab.record_page', rid=answers.id) }}">{{ answers.title }}</a> ({{ answers.kind }}, {{ answers.status }}).</p>{% endif %}
+{% for x in answered_by %}<p>Answered by <a href="{{ url_for('lab.record_page', rid=x.id) }}">{{ x.title }}</a> ({{ x.kind }}, {{ x.time }}).</p>{% endfor %}
+{{ text }}
+<h2>Evidence</h2>
+{% if not evidence %}<p>None listed.</p>{% endif %}
+{% for e in evidence %}
+{% if e.kind == "sql" %}
+<h3>Query</h3>
+<pre>{{ e.value }}</pre>
+{% if e.table.error %}<p class="error">{{ e.table.error }}</p>{% else %}{{ data_table(e.table) }}{% endif %}
+<p class="note"><a href="{{ url_for('lab.query_page', sql=e.value) }}">Open in the query box</a></p>
+{% elif e.kind == "mlflow" %}
+<p>MLflow run: {% if e.experiment_id %}<a href="/#/experiments/{{ e.experiment_id }}/runs/{{ e.value }}">{{ e.label }}</a>{% else %}{{ e.label }} (not found){% endif %}</p>
+{% elif e.kind == "file" %}
+<p>File: <a href="{{ url_for('lab.file_page', path=e.value) }}">{{ e.value }}</a></p>
+{% elif e.kind == "record" %}
+<p>Record: <a href="{{ url_for('lab.record_page', rid=e.value) }}">{{ e.label }}</a></p>
+{% else %}
+<p>{{ e.kind }}:{{ e.value }}</p>
+{% endif %}
+{% endfor %}
+{% if cited_by %}
+<h2>Cited by</h2>
+<ul>{% for x in cited_by %}<li><a href="{{ url_for('lab.record_page', rid=x.id) }}">{{ x.title }}</a> ({{ x.kind }})</li>{% endfor %}</ul>
+{% endif %}
+{% endblock %}

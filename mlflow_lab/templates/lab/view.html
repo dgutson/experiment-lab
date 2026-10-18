@@ -1,0 +1,8 @@
+{% extends "lab/base.html" %}
+{% from "lab/table.html" import data_table %}
+{% block title %}{{ name }}{% endblock %}
+{% block main %}
+<h1>{{ name }}</h1>
+<p class="meta">{{ count }} rows · <a href="{{ url_for('lab.query_page', sql='SELECT * FROM ' ~ name) }}">query it</a></p>
+{{ data_table(t) }}
+{% endblock %}
