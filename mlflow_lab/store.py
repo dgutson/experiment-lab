@@ -58,6 +58,7 @@ class Store:
         self.builds += 1
         database = os.path.join(self.folder, f"lab-{self.builds}.duckdb")
         con = duckdb.connect(database)
+        built = False
         try:
             con.execute(f"ATTACH '{snapshot}' AS ml (TYPE sqlite, READ_ONLY)")
             con.execute("CREATE SCHEMA mlflow")
@@ -67,9 +68,12 @@ class Store:
             for path in self.views:
                 for statement in con.extract_statements(path.read_text()):
                     con.execute(statement)
+            built = True
         finally:
             con.close()
             os.remove(snapshot)
+            if not built:  # a broken view file fails every request until it is fixed
+                os.remove(database)
         if self.database:
             os.remove(self.database)
         self.database, self.version = database, version

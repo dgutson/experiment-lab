@@ -31,6 +31,8 @@ record. MLflow cuts a text longer than 8000 characters.
 ```mermaid
 flowchart LR
     subgraph browser["Owner's browser"]
+        ui[["«component»<br/>MLflow UI"]]
+        labpage[["«component»<br/>/lab page"]]
         mermaid[["«component»<br/>mermaid.js"]]
     end
     shell(["Agent's shell"])
@@ -41,9 +43,9 @@ flowchart LR
         store[["«component»<br/>mlflow_lab Store"]]
     end
 
-    subgraph tools["bin/"]
-        q[["«component»<br/>q"]]
+    subgraph tools["Commands (bin/)"]
         rec[["«component»<br/>rec"]]
+        q[["«component»<br/>q, with its own<br/>in-memory DuckDB"]]
     end
 
     subgraph data["Data folder (~/mlflow)"]
@@ -56,20 +58,19 @@ flowchart LR
         end
     end
 
-    qdb[("q's database<br/>DuckDB, in memory")]
     views[/"lab.sql and view files"/]
     files[/"files folder"/]
 
-    browser -->|"HTTP /"| tracking
-    browser -->|"HTTP /lab"| pages
+    ui -->|"HTTP /"| tracking
+    labpage -->|"HTTP /lab"| pages
+    labpage --> mermaid
     mermaid -.->|"fetched from /lab/static/"| pages
-    shell --> q
     shell --> rec
+    shell --> q
     rec -->|"REST /api/2.0/mlflow"| tracking
     tracking -->|"reads, writes"| mlflowdb
     tracking -->|"reads, writes"| artifacts
-    q -->|"opens"| qdb
-    qdb -->|"ATTACH, read-only"| mlflowdb
+    q -->|"ATTACH, read-only"| mlflowdb
     q -.->|"reads"| toml
     q -.->|"reads"| views
     pages -->|"one connection at a time"| store
