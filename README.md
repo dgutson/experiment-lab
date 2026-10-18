@@ -106,7 +106,7 @@ It needs Linux (start.sh uses `setsid` and `ionice`), [uv](https://docs.astral.s
 access the first time q or the pages read the database, when DuckDB downloads its SQLite reader.
 
 ```sh
-git clone https://github.com/dgutson/mlflow-lab ~/mlflow-lab
+git clone https://github.com/dgutson/experiment-lab ~/mlflow-lab
 uv tool install mlflow==3.16.1 --with-editable ~/mlflow-lab --python 3.12
 ~/mlflow-lab/bin/start.sh
 MLFLOW_TRACKING_URI=http://127.0.0.1:5000 mlflow experiments create -n "my project"
@@ -123,7 +123,7 @@ parts of MLflow's server that other versions may change.
 For a Claude Code agent, install the plugin `mlflow-lab`:
 
 ```sh
-claude plugin marketplace add dgutson/mlflow-lab
+claude plugin marketplace add dgutson/experiment-lab
 claude plugin install mlflow-lab@mlflow-lab-marketplace
 ```
 

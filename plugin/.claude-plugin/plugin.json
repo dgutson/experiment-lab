@@ -6,7 +6,7 @@
     "name": "Daniel Gutson",
     "url": "https://github.com/dgutson"
   },
-  "homepage": "https://github.com/dgutson/mlflow-lab",
-  "repository": "https://github.com/dgutson/mlflow-lab",
+  "homepage": "https://github.com/dgutson/experiment-lab",
+  "repository": "https://github.com/dgutson/experiment-lab",
   "keywords": ["mlflow", "experiments", "duckdb", "sql", "decisions", "findings", "skill"]
 }
