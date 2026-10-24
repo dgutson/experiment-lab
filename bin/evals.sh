@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the eval cases of plugin/evals with this clone's code. Options go to
+# Runs the eval cases of evals/ with this clone's code. Options go to
 # claude plugin eval, e.g. bin/evals.sh --case dead-end --runs 1 --ablation none
 set -euo pipefail
 clone=$(cd "$(dirname "$0")/.." && pwd)
@@ -16,4 +16,14 @@ export PATH=$venv:$venv/bin:$PATH
 # so the runs' folders are made elsewhere.
 export TMPDIR=$cache/experiment-lab-evals
 mkdir -p "$TMPDIR"
-exec claude plugin eval "$clone/plugin" --scaffold --allow-tools Bash Write Edit --trust-plugin "$@"
+# claude plugin eval reads the cases from a folder inside the plugin's, with
+# no links, and they are kept out of plugin/ so that an installed plugin has
+# none: the run's plugin is a copy of plugin/ and evals/, and the results go
+# to evals/results/.
+run=$(mktemp -d)
+trap 'rm -rf "$run"' EXIT
+cp -r "$clone/plugin/." "$run/"
+mkdir "$run/evals"
+find "$clone/evals" -mindepth 1 -maxdepth 1 ! -name results -exec cp -r {} "$run/evals/" \;
+claude plugin eval "$run" --scaffold --allow-tools Bash Write Edit --trust-plugin \
+    --output-dir "$clone/evals/results/$(date -u +%Y-%m-%dT%H-%M-%S)" "$@"
