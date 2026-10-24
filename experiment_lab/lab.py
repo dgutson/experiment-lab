@@ -241,4 +241,7 @@ class Run:
 
 
 if __name__ == "__main__":  # makes the data folder's lab.db, for lab-server
-    Lab().close()
+    try:
+        Lab().close()
+    except (OSError, sqlite3.Error) as e:
+        raise SystemExit(f"error: {e}")

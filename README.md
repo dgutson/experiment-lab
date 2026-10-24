@@ -71,7 +71,8 @@ title and text. An experiment's text is its description; a run's is its note, th
 tags as `key=value` lines; a record's is its text. The search box on the Experiments page lists
 those of the picked project whose title or text holds every word searched for, in any letter case;
 with "only below" checked, only those of the experiment selected in the tree and the experiments
-below it. An agent searches the same view with q:
+below it. A search holds at most 200 characters, and a query in the query box at most 5000. An
+agent searches the same view with q:
 
 ```sh
 q "SELECT kind, id, experiment, title FROM texts WHERE project = 'my-project' AND contains(lower(title || ' ' || text), 'sample rate')"

@@ -96,6 +96,8 @@ Change these together:
 
 - The tables: `schema.sql`; the inserts in `lab.py`, `records.save` and `from_mlflow.Move.write`;
   the views in `lab.sql`.
+- The record kinds and statuses: the CHECKs in `schema.sql`, and `KINDS` (in the order the pages
+  show them) and `STATUSES` in `records.py`.
 - The evidence kinds: `EVIDENCE` in `records.py`, `record_page` in `pages.py` and
   `templates/lab/record.html`.
 - What rec prints after `rec project` (`project NAME, folder ...`) and `rec experiment`

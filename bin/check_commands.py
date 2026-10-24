@@ -68,6 +68,8 @@ q --max 0 "SELECT 1 AS x"
 q --max -1 "SELECT 1 AS x"
 EXPERIMENT_LAB_DATA=~/absent/lab-data q "SELECT 1"
 EXPERIMENT_LAB_PORT=abc lab-server
+EXPERIMENT_LAB_PORT=70000 lab-server
+EXPERIMENT_LAB_DATA=/proc/lab-data lab-server
 lab-from-mlflow ~/missing test --text "x"
 mkdir ~/old && touch ~/old/mlflow.db && lab-from-mlflow ~/old test --text "x"
 """.strip().splitlines()
