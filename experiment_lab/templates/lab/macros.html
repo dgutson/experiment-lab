@@ -16,6 +16,9 @@
 <ul>{% for x in rs %}<li><a href="/lab/record/{{ x.id }}">{{ x.title }}</a> ({{ x.kind }}, <span class="{{ x.status }}">{{ x.status }}</span>)</li>{% endfor %}</ul>
 {% endmacro %}
 
+{# An audio player or the image at src, for a file whose media (pages.media) is "audio" or "image". #}
+{% macro in_place(media, src) %}{% if media == "audio" %}<audio controls preload="none" src="{{ src }}"></audio>{% elif media == "image" %}<img class="media" src="{{ src }}" alt="" loading="lazy">{% endif %}{% endmacro %}
+
 {% macro dead_end_label(dead_end) %}{% if dead_end %} <span class="note">dead end</span>{% endif %}{% endmacro %}
 
 {# The errors of the view files' statements that failed (query.errors). #}

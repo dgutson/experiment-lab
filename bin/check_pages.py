@@ -3,13 +3,14 @@
 # dependencies = ["playwright==1.63.0"]
 # ///
 """Checks the /lab pages of a running lab server. For each project of the
-picker, every page reachable from /lab/ must return 200, except a file outside
-every project's files folder, which must return 403. Every page with a
-```mermaid block, and the first page of each kind for each project, is then
-opened in Chrome in the light and in the dark scheme: each block
-must be drawn or show Mermaid's error (the errors are printed), its background
-must follow the scheme, and it must make no request to another host. Pages with
-diagrams are saved as screenshots.
+picker, every page reachable from /lab/ must return 200; the pages link only
+files that /lab/file serves. Every page with a ```mermaid block, an audio player
+or an image shown in place, and the first page of each kind for each project,
+is then opened in Chrome in the light and in the dark scheme: each block must be
+drawn or show Mermaid's error (the errors are printed), each player must load
+its audio and each image must show, its background must follow the scheme, and
+it must make no request to another host. Pages with diagrams are saved as
+screenshots.
 
 usage: uv run --script bin/check_pages.py [--shots FOLDER] [URL]
 
@@ -34,6 +35,22 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 BACKGROUND = {"light": "rgb(255, 255, 255)", "dark": "rgb(13, 17, 23)"}  # --bg in base.html
+SHOWN = ('class="language-mermaid"', "<audio ", '<img class="media"')  # what Chrome must draw, play or show
+# The players' and images' sources that do not load, each after at most 30 s.
+NOT_LOADED = """() => {
+  const loads = (element, start, done) => Promise.race([
+    new Promise(ok => {
+      element.addEventListener(done, () => ok(null));
+      element.addEventListener("error", () => ok(element.src));
+      start();
+    }),
+    new Promise(ok => setTimeout(() => ok(element.src + " (no answer in 30 s)"), 30000))]);
+  const audio = Array.from(document.querySelectorAll("audio"),
+                           a => loads(a, () => { a.preload = "metadata"; a.load(); }, "loadedmetadata"));
+  const images = Array.from(document.querySelectorAll("img.media"), img => img.complete
+    ? (img.naturalWidth ? null : img.src) : loads(img, () => { img.loading = "eager"; }, "load"));
+  return Promise.all([...audio, ...images]).then(r => r.filter(Boolean));
+}"""
 
 
 class Links(HTMLParser):
@@ -81,14 +98,14 @@ def projects(base):
 
 def crawl(base, project):
     """Each page reachable from /lab/ with the project picked: its status and
-    whether it has a ```mermaid block."""
+    whether it has something of SHOWN."""
     found, frontier = {}, ["/lab/"]
     with concurrent.futures.ThreadPoolExecutor(8) as pool:
         while frontier:
             fetched = list(pool.map(lambda p: (p, fetch(base, p, project)), frontier))
             frontier = []
             for path, (status, content_type, body) in fetched:
-                found[path] = (status, 'class="language-mermaid"' in body)
+                found[path] = (status, any(s in body for s in SHOWN))
                 if status != 200 or content_type != "text/html":
                     continue
                 links = Links()
@@ -121,15 +138,19 @@ def draw(base, paths, shots):
                                            arg=blocks, timeout=30000)
                 drawn = page.locator(".diagram svg").count()
                 errors = page.locator(".diagram .error").all_inner_texts()
+                media, not_loaded = page.locator("audio, img.media").count(), page.evaluate(NOT_LOADED)
                 background = page.evaluate("getComputedStyle(document.body).backgroundColor")
                 outside = [url for url in requested if urllib.parse.urlsplit(url).netloc not in (host, "")]
-                print(f"{scheme:5}  {project}  {path}  diagrams {drawn}/{blocks}  background {background}")
+                print(f"{scheme:5}  {project}  {path}  diagrams {drawn}/{blocks}  "
+                      f"audio and images {media - len(not_loaded)}/{media}  background {background}")
                 for error in errors:
                     print("       " + error.replace("\n", "\n       "))
                 if drawn + len(errors) != blocks:
                     problems.append(f"{scheme} {project} {path}: {drawn} of {blocks} diagrams drawn, {len(errors)} errors")
                 if background != BACKGROUND[scheme]:
                     problems.append(f"{scheme} {project} {path}: background {background}")
+                if not_loaded:
+                    problems.append(f"{scheme} {project} {path}: these do not load: {not_loaded}")
                 if outside:
                     problems.append(f"{scheme} {project} {path}: requests to other hosts: {outside}")
                 if blocks and shots:
@@ -154,24 +175,22 @@ def main():
     counts = collections.Counter((project, kind(path), status) for (project, path), (status, _) in pages.items())
     for (project, k, status), n in sorted(counts.items(), key=str):
         print(f"{n:6}  {status}  {project}  {k}")
-    problems = [f"{status} {project} {path}" for (project, path), (status, _) in pages.items()
-                if status != 200 and not (status == 403 and kind(path) == "file")]
+    problems = [f"{status} {project} {path}" for (project, path), (status, _) in pages.items() if status != 200]
     first = {}
     for (project, path), (status, _) in pages.items():
         if status == 200 and kind(path) != "run file":
             first.setdefault((project, kind(path)), (project, path))
-    mermaid = {}  # each page with a diagram once, with the first project it was found with
+    drawn = {}  # each page with something of SHOWN once, with the first project it was found with
     for (project, path), (_, has) in pages.items():
         if has:
-            mermaid.setdefault(path, (project, path))
-    shown = sorted({*first.values(), *mermaid.values()}, key=str)
+            drawn.setdefault(path, (project, path))
+    shown = sorted({*first.values(), *drawn.values()}, key=str)
     problems += draw(base, shown, a.shots)
     for problem in problems:
         print("PROBLEM", problem)
     if problems:
         sys.exit(f"{len(problems)} problems")
-    print(f"all {len(pages)} pages return 200 or, for files outside the files folders, 403; "
-          f"{len(shown)} drawn in light and dark")
+    print(f"all {len(pages)} pages return 200; {len(shown)} drawn in light and dark")
 
 
 if __name__ == "__main__":

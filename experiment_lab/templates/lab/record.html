@@ -1,5 +1,5 @@
 {% extends "lab/base.html" %}
-{% from "lab/macros.html" import data_table, record_links %}
+{% from "lab/macros.html" import data_table, record_links, in_place %}
 {% block title %}{{ r.title }}{% endblock %}
 {% block main %}
 <h1>{{ r.title }}</h1>
@@ -19,11 +19,15 @@
 {% elif e.kind == "run" %}
 <p>Run: {% if e.label %}<a href="/lab/run/{{ e.value }}">{{ e.label }}</a>{% else %}{{ e.value }} (no such run){% endif %}</p>
 {% elif e.kind == "file" %}
-<p>File: <a href="/lab/file?path={{ e.value|urlencode }}">{{ e.value }}</a></p>
+{% set src = "/lab/file?path=" ~ e.value|urlencode %}
+<p>File: {% if e.served %}<a href="{{ src }}">{{ e.value }}</a>{% else %}{{ e.value }} (no such file under a project's folder or files folder){% endif %}</p>
+{{ in_place(e.media, src) }}
 {% elif e.kind == "record" %}
 <p>Record: {% if e.label %}<a href="/lab/record/{{ e.value }}">{{ e.label }}</a>{% else %}{{ e.value }} (no such record){% endif %}</p>
+{% elif e.kind == "url" %}
+<p><a href="{{ e.value }}">{{ e.value }}</a></p>
 {% else %}
-<p>{{ e.kind }}:{{ e.value }}</p>
+<p>{{ e.value }}</p>
 {% endif %}
 {% endfor %}
 {% if cited_by %}

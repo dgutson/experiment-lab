@@ -1,4 +1,5 @@
 {% extends "lab/base.html" %}
+{% from "lab/macros.html" import in_place %}
 {% block title %}{{ shown }}{% endblock %}
 {% block main %}
 <h1>{{ shown }}</h1>
@@ -6,7 +7,7 @@
 <table class="sortable">
 <thead><tr><th>Name</th><th>Bytes</th></tr></thead>
 <tbody>
-{% for i in items %}<tr><td><a href="/lab/file?path={{ i.path|urlencode }}">{{ i.name }}</a></td><td class="n">{{ i.size }}</td></tr>
+{% for i in items %}{% set src = "/lab/file?path=" ~ i.path|urlencode %}<tr><td><a href="{{ src }}">{{ i.name }}</a>{{ in_place(i.media, src) }}</td><td class="n">{{ i.size }}</td></tr>
 {% endfor %}
 </tbody>
 </table>

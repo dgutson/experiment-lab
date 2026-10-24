@@ -7,8 +7,8 @@ and records with one DuckDB SQL query; `rec` adds and changes projects, experime
 logging scripts write runs with the module `experiment_lab.lab`; pages at `/lab` show, for the
 project picked at the top, the records with their evidence, the experiment tree with a search of
 its texts, the experiments and their runs, the SQL views as tables, a read-only query box and the
-project's files. It is meant for a coding agent and a person working on the same experiments: the
-agent reads and writes with `q` and `rec`, the person reads the pages.
+files under the projects' folders. It is meant for a coding agent and a person working on the same
+experiments: the agent reads and writes with `q` and `rec`, the person reads the pages.
 
 | Path | What it is |
 |---|---|
@@ -56,6 +56,11 @@ answers, and its evidence: items `run:<run id>`, `file:<path>`, `sql:<query over
 given, and a record that answers an open question closes it. The view `records` has one row per
 record, with its project, and the label as its column `experiment`.
 
+A record's page links each item of its evidence to its page or file, and shows the rows of a `sql:`
+item. lab-from-mlflow copies mlflow-lab's evidence, which may be any text, as it is; the page shows
+such an item that is a `~/` or absolute path as a `file:` item, an `http(s)` URL as a link, and
+anything else as text.
+
 ## Searching
 
 The view `texts` has one row per experiment, run and record: its kind, id, project, experiment,
@@ -100,7 +105,7 @@ flowchart LR
     end
 
     views[/"lab.sql and the project's<br/>view files"/]
-    shown[/"the projects' files folders"/]
+    shown[/"the projects' folders<br/>and files folders"/]
 
     labpage -->|"HTTP /lab"| pages
     labpage --> mermaid
@@ -223,8 +228,7 @@ A project's settings are in its row of `lab.experiments`, and `rec project NAME`
 given:
 
 - `--folder F`: the project's folder, which tells rec, q and `lab.py` which project they are in.
-- `--files F`: the folder `/lab/file` shows, by default the project's folder. Nothing outside the
-  projects' files folders is shown.
+- `--files F`: the folder the Files page opens, by default the project's folder.
 - `--views FILE ...`: the project's view files, run after `lab.sql` in this order; `--views` alone
   clears them.
 
@@ -272,6 +276,17 @@ To change the version, take `package/dist/mermaid.min.js` and `package/LICENSE` 
 `npm pack mermaid@VERSION`, store them as `experiment_lab/static/mermaid-VERSION.min.js` and
 `mermaid-VERSION.LICENSE`, and change the file name in `experiment_lab/templates/lab/base.html`.
 
+## Files
+
+`/lab/file?path=P` shows the file or folder P, a `~/` or absolute path, when it is under a project's
+folder or files folder, and answers 404 for anything else. A folder is shown as a list of its files,
+a `.md` file as Markdown (`&raw=1` for its text), an HTML file with scripts off, a text file as plain
+text, and any other file as it is. The pages link to `/lab/file` each `file:` item of a record and
+each `~/` or absolute path in a Markdown text, also one that is all of a code span, when
+`/lab/file` serves it; a relative path is not linked. On a record's page, a folder's page and a
+run's page, an audio file has a player next to its link, which fetches nothing until it plays, and
+an image is shown next to its link.
+
 ## Checking the pages
 
 ```sh
@@ -279,11 +294,12 @@ uv run --script ~/experiment-lab/bin/check_pages.py [--shots FOLDER] [URL]
 ```
 
 It opens every page of the server at URL (default `http://127.0.0.1:$EXPERIMENT_LAB_PORT`) and
-fails unless each returns 200, or 403 for a file outside the projects' files folders. It visits the
-pages of every project, picking each with the cookie the project picker sets. It then opens
-the pages with diagrams in the installed Google Chrome, in the light and the dark scheme, and checks
-that each diagram is drawn or shows Mermaid's error, follows the scheme and fetches nothing from
-another host. With `--shots`, it saves screenshots of those pages.
+fails unless each returns 200. It visits the pages of every project, picking each with the cookie
+the project picker sets. It then opens the pages with diagrams, audio players or images, and the
+first page of each kind, in the installed Google Chrome, in the light and the dark scheme, and
+checks that each diagram is drawn or shows Mermaid's error, each player loads its audio, each image
+shows, the page follows the scheme and fetches nothing from another host. With `--shots`, it saves
+screenshots of the pages with diagrams.
 
 ## Changing the DuckDB version
 
