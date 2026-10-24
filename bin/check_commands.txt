@@ -1,0 +1,294 @@
+$ rec tree
+audio-codec  (~/audio-codec)
+  sample rate sweep
+  16-bit output
+    noise shaping
+  noise gate
+exit 0
+
+$ rec tree "16-bit output"
+audio-codec › 16-bit output
+  noise shaping
+exit 0
+
+$ rec open
+open in audio-codec (1):
+  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+exit 0
+
+$ rec project audio-codec --text "A lossy audio codec for voice recordings, at 48 kHz."
+project audio-codec, folder ~/audio-codec, files ~/audio-codec, views none
+exit 0
+
+$ rec experiment bitrate --in "sample rate sweep" --text "Lowers the bitrate at 48 kHz until accuracy drops."
+experiment audio-codec › sample rate sweep › bitrate
+exit 0
+
+$ rec experiment "noise gate" --dead-end
+experiment audio-codec › noise gate
+exit 0
+
+$ rec tree
+audio-codec  (~/audio-codec)
+  sample rate sweep
+    bitrate
+  16-bit output
+    noise shaping
+  noise gate  [dead end]
+exit 0
+
+$ rec add finding "64 kbit/s keeps the accuracy" --in bitrate --text "Accuracy stayed at 0.93." --time 2026-09-10T12:00 --evidence record:48-khz-is-the-most-accurate-rate "sql:SELECT name FROM runs WHERE experiment = 'bitrate'"
+64-kbit-s-keeps-the-accuracy: finding, closed: 64 kbit/s keeps the accuracy
+open in audio-codec (1):
+  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+exit 0
+
+$ rec add question "Where does accuracy drop?" --in bitrate --text "Not measured below 64 kbit/s."
+where-does-accuracy-drop: question, open: Where does accuracy drop?
+open in audio-codec (2):
+  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+  where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
+exit 0
+
+$ rec add decision "Ship 64 kbit/s" --in bitrate --experiment "the bitrate" --by owner --text "It keeps the accuracy." --answers where-does-accuracy-drop
+ship-64-kbit-s: decision, closed: Ship 64 kbit/s
+where-does-accuracy-drop: question, closed: Where does accuracy drop?
+open in audio-codec (1):
+  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+exit 0
+
+$ rec set where-does-accuracy-drop status=open
+where-does-accuracy-drop: question, open: Where does accuracy drop?
+open in audio-codec (2):
+  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+  where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
+exit 0
+
+$ rec set 64-kbit-s-keeps-the-accuracy "evidence=record:48-khz-is-the-most-accurate-rate; file:$HOME/audio-codec/tone.wav" "text=Accuracy stayed at 0.93 at 64 kbit/s."
+64-kbit-s-keeps-the-accuracy: finding, closed: 64 kbit/s keeps the accuracy
+open in audio-codec (2):
+  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+  where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
+exit 0
+
+$ rec add idea "An idea" --in bitrate --text "x"
+error: CHECK constraint failed: kind IN ('decision', 'finding', 'protocol', 'question')
+exit 1
+
+$ rec add finding "Lost" --in nowhere --text "x"
+error: no experiment 'nowhere'; make it with rec experiment or Lab.experiment
+exit 1
+
+$ rec add finding "Empty" --in bitrate --text ""
+error: a record needs a text: Empty
+exit 1
+
+$ rec add finding "Unsure" --in bitrate --text "x" --status maybe
+error: CHECK constraint failed: status IN ('open', 'closed', 'superseded')
+exit 1
+
+$ rec add finding "Odd evidence" --in bitrate --text "x" --evidence mlflow:123
+error: evidence 'mlflow:123' is not one of run:..., file:..., sql:..., record:...
+exit 1
+
+$ rec add finding "Bad time" --in bitrate --text "x" --time yesterday
+usage: rec add [-h] --in EXPERIMENT [--experiment EXPERIMENT] --text TEXT [--by BY]
+               [--status STATUS] [--answers ANSWERS] [--evidence [EVIDENCE ...]] [--id ID]
+               [--time TIME]
+               kind title
+rec add: error: argument --time: invalid fromisoformat value: 'yesterday'
+exit 2
+
+$ rec add finding "Taken" --in bitrate --text "x" --id keep-48-khz
+error: keep-48-khz exists; change it instead
+exit 1
+
+$ rec add finding "Elsewhere" --in "blur detector" --text "x"
+error: 'blur detector' is in the project vision, not in audio-codec, whose folder this is
+exit 1
+
+$ rec set no-such-record status=closed
+error: no record no-such-record
+exit 1
+
+$ rec set keep-48-khz color=red
+error: cannot set color; fields: kind, title, text, by, status, experiment, answers, evidence
+exit 1
+
+$ rec set keep-48-khz status=maybe
+error: CHECK constraint failed: status IN ('open', 'closed', 'superseded')
+exit 1
+
+$ rec experiment "blur detector" --text "x"
+error: 'blur detector' is in the project vision, not in audio-codec, whose folder this is
+exit 1
+
+$ rec tree "blur detector"
+vision › blur detector
+exit 0
+
+$ cd ~ && rec open
+open (2):
+  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+  where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
+exit 0
+
+$ rec project audio-codec --files ~/nowhere
+project audio-codec, folder ~/audio-codec, files ~/nowhere, views none
+exit 0
+
+$ mkdir ~/speech && cd ~/speech && rec project speech
+error: a new project needs a description: speech
+exit 1
+
+$ cd ~/speech && rec project speech --text "Detects speech in recordings."
+project speech, folder ~/speech, files ~/speech, views none
+exit 0
+
+$ cd ~/speech && rec experiment vad --text "Voice activity detection." && rec tree
+experiment speech › vad
+speech  (~/speech)
+  vad
+exit 0
+
+$ echo "CREATE VIEW broken AS SELECT nosuch FROM runs;" > ~/speech/views.sql
+exit 0
+
+$ cd ~/speech && rec project speech --views views.sql missing.sql && q .views
+project speech, folder ~/speech, files ~/speech, views FOLDER/home/speech/views.sql; FOLDER/home/speech/missing.sql
+views.sql: Binder Error: Referenced column "nosuch" not found in FROM clause!
+missing.sql: [Errno 2] No such file or directory: 'FOLDER/home/speech/missing.sql'
+experiments: name, project, parent, depth, path, dead_end, description, created
+records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
+runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, note
+texts: kind, id, project, experiment, title, text
+exit 0
+
+$ EXPERIMENT_LAB_DATA=~/missing/lab-data rec open
+open (0):
+exit 0
+
+$ EXPERIMENT_LAB_DATA=/proc/lab-data rec open
+Traceback: FileNotFoundError: [Errno 2] No such file or directory: '/proc/lab-data'
+
+During handling of the above exception, another exception occurred:
+
+Traceback: FileNotFoundError: [Errno 2] No such file or directory: '/proc/lab-data'
+exit 1
+
+$ q "SELECT name, status FROM runs WHERE experiment = 'sample rate sweep' ORDER BY name"
+name                    | status
+------------------------+---------
+rate 16000              | FINISHED
+rate 44100              | FINISHED
+rate 48000              | FINISHED
+rate 48000, listened to | FINISHED
+rate 96000              | FAILED
+(5 rows)
+exit 0
+
+$ q .views
+experiments: name, project, parent, depth, path, dead_end, description, created
+records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
+runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, note
+texts: kind, id, project, experiment, title, text
+exit 0
+
+$ q --project vision .views
+blur_scores: image, sharpness
+experiments: name, project, parent, depth, path, dead_end, description, created
+records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
+runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, note
+texts: kind, id, project, experiment, title, text
+exit 0
+
+$ q --project vision "FROM blur_scores"
+image       | sharpness
+------------+----------
+market.jpg  |      0.87
+tower.jpg   |      0.63
+harbour.jpg |      0.41
+(3 rows)
+exit 0
+
+$ q --max 2 "SELECT name FROM runs ORDER BY name"
+name
+-----------
+dither none
+dither tpdf
+(2 rows, more not shown (--max N shows more))
+exit 0
+
+$ q "SELECT id, text FROM records WHERE id = '48-khz-is-the-most-accurate-rate'"
+id                               | text
+---------------------------------+---------------------------------------------------------------------------------
+48-khz-is-the-most-accurate-rate | 48 kHz reached an accuracy of 0.93, against 0.88 at 44.1 kHz; the 96 kHz run ra…
+(1 rows)
+exit 0
+
+$ q --full "SELECT text FROM records WHERE id = '48-khz-is-the-most-accurate-rate'"
+text
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+48 kHz reached an accuracy of 0.93, against 0.88 at 44.1 kHz; the 96 kHz run ran out of memory. Next: keep 48 kHz and lower the bitrate, to find where accuracy starts to drop.
+(1 rows)
+exit 0
+
+$ echo "SELECT count(*) AS runs FROM runs" | q
+runs
+----
+  11
+(1 rows)
+exit 0
+
+$ q "CREATE TABLE t AS SELECT 1 AS x; SELECT x FROM t"
+x
+-
+1
+(1 rows)
+exit 0
+
+$ q "CREATE TABLE t (x INT)"
+Count
+-----
+(0 rows)
+exit 0
+
+$ q --project nosuch .views
+error: no project nosuch
+exit 1
+
+$ q "SELECT nosuch FROM runs"
+error: Binder Error: Referenced column "nosuch" not found in FROM clause!
+Candidate bindings: "note", "status", "project", "run"
+
+LINE 1: SELECT nosuch FROM runs
+               ^
+exit 1
+
+$ q --max 0 "SELECT 1 AS x"
+x
+-
+(0 rows, more not shown (--max N shows more))
+exit 0
+
+$ q --max -1 "SELECT 1 AS x"
+x
+-
+(0 rows, more not shown (--max N shows more))
+exit 0
+
+$ EXPERIMENT_LAB_DATA=~/absent/lab-data q "SELECT 1"
+error: no database FOLDER/home/absent/lab-data/lab.db; rec project or a logging script makes it
+exit 1
+
+$ EXPERIMENT_LAB_PORT=abc lab-server
+Traceback: ValueError: invalid literal for int() with base 10: 'abc'
+exit 1
+
+$ lab-from-mlflow ~/missing test --text "x"
+error: no FOLDER/home/missing/mlflow.db
+exit 1
+
+$ mkdir ~/old && touch ~/old/mlflow.db && lab-from-mlflow ~/old test --text "x"
+error: FOLDER/lab-data/lab.db exists; move it away first
+exit 1
