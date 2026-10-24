@@ -16,10 +16,11 @@ def split(evidence):
     return [item for item in (evidence or "").split("; ") if item]
 
 
-def check(r):
-    if not r["text"].strip():
+def check(r, fields=("text", "evidence")):
+    """Checks those of fields that are text (not empty) and evidence (items of EVIDENCE)."""
+    if "text" in fields and not r["text"].strip():
         raise ValueError(f"a record needs a text: {r['title']}")
-    for item in r["evidence"]:
+    for item in r["evidence"] if "evidence" in fields else []:
         kind, _, value = item.partition(":")
         if kind not in EVIDENCE or not value:
             raise ValueError(f"evidence {item!r} is not one of {', '.join(k + ':...' for k in EVIDENCE)}")
@@ -84,12 +85,13 @@ def add(lab, experiment, kind, title, *, text, label=None, author="agent", statu
 
 
 def change(lab, rid, **fields):
-    """Sets fields of the record (columns of records; evidence a list); returns it."""
+    """Sets fields of the record (columns of records; evidence a list) and
+    checks them, not the fields it keeps; returns it."""
     r = get(lab, rid)
     if r is None:
         raise ValueError(f"no record {rid}")
     r.update(fields)
-    check(r)
+    check(r, fields)
     with lab.write() as db:
         save(db, r)
     return r
