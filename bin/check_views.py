@@ -13,15 +13,28 @@ usage: uv run --script bin/check_views.py
 """
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 import duckdb
+from duckdb import DuckDBPyConnection
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # experiment_lab, with this script's DuckDB
 from experiment_lab import query
 from experiment_lab.settings import data_folder, database
 
 
-def read(copy, project):
+class Sum(NamedTuple):
+    rows: int
+    md5: str  # of the rows as text, sorted
+
+
+def checksum(con: DuckDBPyConnection, view: str) -> Sum:
+    (row,) = con.execute(f"SELECT count(*), md5(coalesce(string_agg(t::VARCHAR, '|' ORDER BY t::VARCHAR), ''))"
+                         f' FROM "{view}" t').fetchall()
+    return Sum(*row)
+
+
+def read(copy: bool, project: str | None) -> dict[str, Sum]:
     data = data_folder()
     if copy:
         con = duckdb.connect()
@@ -36,8 +49,7 @@ def read(copy, project):
         con, sources = query.connect(data, project)
     if query.errors(sources):
         sys.exit("\n".join(query.errors(sources)))
-    rows = {view: con.execute(f"SELECT count(*), md5(coalesce(string_agg(t::VARCHAR, '|' ORDER BY t::VARCHAR), ''))"
-                              f' FROM "{view}" t').fetchone() for view, _ in query.view_columns(con)}
+    rows = {view: checksum(con, view) for view, _ in query.view_columns(con)}
     con.close()
     return rows
 

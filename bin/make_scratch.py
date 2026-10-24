@@ -34,7 +34,7 @@ The rates were timed with {bench}.
 """
 
 
-def wav(path):
+def wav(path: Path) -> None:
     """One second of a 440 Hz tone."""
     with wave.open(str(path), "wb") as w:
         w.setnchannels(1)
@@ -44,17 +44,17 @@ def wav(path):
                                for i in range(8000)))
 
 
-def png(path):
+def png(path: Path) -> None:
     """A gradient of 64 by 16 pixels."""
-    def chunk(kind, data):
+    def chunk(kind: bytes, data: bytes) -> bytes:
         return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
     rows = b"".join(b"\0" + bytes(c for x in range(64) for c in (x * 4, 120, 255 - x * 4)) for _ in range(16))
     path.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 64, 16, 8, 2, 0, 0, 0))
                      + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
 
 
-def main(folder):
-    folder = Path(folder).resolve()
+def main(where: str) -> None:
+    folder = Path(where).resolve()
     (folder / "home").mkdir(parents=True)
     os.environ["HOME"] = str(folder / "home")
     os.environ["EXPERIMENT_LAB_DATA"] = str(folder / "lab-data")

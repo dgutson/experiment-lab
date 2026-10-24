@@ -16,7 +16,11 @@ jobs:
       - name: Type check
         run: |
           uv sync
-          uvx pyright@1.1.414 experiment_lab
+          uv run pyright
+      - name: Every function is annotated
+        run: uv run ruff check experiment_lab bin
+      - name: No annotation nests too deep
+        run: uv run pylint experiment_lab bin
       - name: DuckDB reads attached SQLite tables correctly
         run: uv run --script bin/sqlite_filter_bug.py
       - name: Commands print what bin/check_commands.txt holds

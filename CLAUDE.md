@@ -14,7 +14,15 @@ the evals, on every push and pull request, on a lab that `uv run python bin/make
 makes: the evals' lab with a run with tags and files, a record of every kind, evidence of every
 kind, a diagram, an audio file and an image. The checks:
 
-- `pyright experiment_lab` (it reads `.venv`, which `uv sync` makes, with the package editable).
+- `uv run pyright`: the types of `experiment_lab/` and `bin/`. `uv sync` installs pyright, ruff,
+  pylint, pylint-complex-struct and Playwright into `.venv` from the `dev` group of
+  `pyproject.toml`, with the package editable.
+- `uv run ruff check experiment_lab bin`: every function's parameters and return are annotated
+  (ruff's `ANN` rules only).
+- `uv run pylint experiment_lab bin`: pylint-complex-struct's messages only. An annotation nests at
+  most two levels, so a deeper type becomes a type alias (`type Spans = list[Span]`), a
+  `NamedTuple` or a `TypedDict`, and a function returns a `NamedTuple` rather than a tuple of
+  different types.
 - `uv run --script bin/check_views.py` and `uv run --script bin/sqlite_filter_bug.py`: the views
   read the same with `lab.db` attached as with its tables copied. They read the data folder's
   `lab.db`; run them while nothing is logged to it.
@@ -33,6 +41,9 @@ kind, a diagram, an audio file and an image. The checks:
   of its own and `evals/lab.sh` copies the package and DuckDB's SQLite extension into the run's home
   folder. `claude plugin eval` takes the cases only from a folder inside the plugin's, with no links,
   so `bin/evals.sh` runs a copy of `plugin/` with `evals/` copied into it.
+
+Every function in `experiment_lab/` and `bin/` has a cyclomatic complexity of B or less (at most
+10): `uvx radon cc experiment_lab bin -n C --show-closures` lists none.
 
 Try changes on a data folder and port of their own, with the commands of `.venv`:
 
@@ -106,6 +117,7 @@ Change these together:
 - The order of experiments below the same parent (`created, name`): `rec.tree`, `pages.tree` and
   the Branches list of `pages.experiment`.
 - The DuckDB version: `pyproject.toml`, `bin/check_views.py`, `bin/sqlite_filter_bug.py`.
+- The Playwright version: `bin/check_pages.py` and the `dev` group of `pyproject.toml`.
 - The usage of q, rec and `lab.py`, the record fields and the views' columns: the module docstrings
   of `q.py`, `rec.py` and `lab.py`, `README.md`, and `plugin/skills/experiment-db/SKILL.md`, which
   is what an agent using the lab reads.

@@ -50,16 +50,35 @@ COLUMNS = {"by": "author", "experiment": "label"}
 SETTABLE = ("kind", "title", "text", "by", "status", "experiment", "answers", "evidence")
 
 
-def show(r):
+def show(r: records.Record) -> None:
     print(f"{r['id']}: {r['kind']}, {r['status']}: {r['title']}")
 
 
-def shown(path):
+def shown(path: str) -> str:
     """path as ~/... under the home folder."""
     return "~/" + str(Path(path).relative_to(Path.home())) if Path(path).is_relative_to(Path.home()) else path
 
 
-def tree(lab, top):
+def show_open(lab: Lab) -> None:
+    rows = records.open_records(lab, lab.current)
+    print(f"open{' in ' + lab.current if lab.current else ''} ({len(rows)}):")
+    for rid, label, kind, title in rows:
+        print(f"  {rid} [{label}, {kind}] {title}")
+
+
+def run_project(lab: Lab, a: argparse.Namespace) -> None:
+    lab.project(a.name, a.text, folder=a.folder, files=a.files, views=a.views)
+    folder, files, views = lab.db.execute("SELECT folder, files, views FROM experiments WHERE name = ?",
+                                          (a.name,)).fetchone()
+    print(f"project {a.name}, folder {shown(folder)}, files {shown(files)}, views {views or 'none'}")
+
+
+def run_experiment(lab: Lab, a: argparse.Namespace) -> None:
+    print("experiment " + " › ".join(lab.experiment(a.name, a.text, parent=a.parent, dead_end=a.dead_end)))
+
+
+def run_tree(lab: Lab, a: argparse.Namespace) -> None:
+    top = a.top or lab.here()
     path = lab.path(top)
     folder = lab.db.execute("SELECT folder FROM experiments WHERE name = ?", (top,)).fetchone()[0]
     print(f"{top}  ({shown(folder)})" if folder else " › ".join(path))
@@ -67,7 +86,7 @@ def tree(lab, top):
     for name, parent, dead_end in lab.db.execute("SELECT name, parent, dead_end FROM experiments ORDER BY created, name"):
         children.setdefault(parent, []).append((name, dead_end))
 
-    def walk(name, depth):
+    def walk(name: str, depth: int) -> None:
         for child, dead_end in children.get(name, []):
             print("  " * depth + child + ("  [dead end]" if dead_end else ""))
             walk(child, depth + 1)
@@ -75,7 +94,27 @@ def tree(lab, top):
     walk(top, 1)
 
 
-def main():
+def run_add(lab: Lab, a: argparse.Namespace) -> None:
+    for r in records.add(lab, a.container, a.kind, a.title, label=a.experiment, text=a.text, author=a.by,
+                         status=a.status, answers=a.answers, evidence=a.evidence, rid=a.id,
+                         time=a.time and int(a.time.timestamp() * 1000)):
+        show(r)
+    show_open(lab)
+
+
+def run_set(lab: Lab, a: argparse.Namespace) -> None:
+    fields = {}
+    for assignment in a.assignments:
+        field, _, value = assignment.partition("=")
+        if field not in SETTABLE:
+            raise ValueError(f"cannot set {field}; fields: {', '.join(SETTABLE)}")
+        fields[COLUMNS.get(field, field)] = ([v.strip() for v in value.split(";") if v.strip()]
+                                             if field == "evidence" else value)
+    show(records.change(lab, a.id, **fields))
+    show_open(lab)
+
+
+def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     sub = p.add_subparsers(dest="command", required=True)
     project = sub.add_parser("project")
@@ -84,13 +123,16 @@ def main():
     project.add_argument("--folder")
     project.add_argument("--files")
     project.add_argument("--views", nargs="*")
+    project.set_defaults(run=run_project)
     exp = sub.add_parser("experiment")
     exp.add_argument("name")
     exp.add_argument("--text")
     exp.add_argument("--in", dest="parent", metavar="PARENT")
     exp.add_argument("--dead-end", action=argparse.BooleanOptionalAction)
-    tree_p = sub.add_parser("tree")
-    tree_p.add_argument("top", nargs="?", metavar="EXPERIMENT")
+    exp.set_defaults(run=run_experiment)
+    tree = sub.add_parser("tree")
+    tree.add_argument("top", nargs="?", metavar="EXPERIMENT")
+    tree.set_defaults(run=run_tree)
     add = sub.add_parser("add")
     add.add_argument("kind")
     add.add_argument("title")
@@ -103,45 +145,21 @@ def main():
     add.add_argument("--evidence", nargs="*", default=[])
     add.add_argument("--id")
     add.add_argument("--time", type=datetime.datetime.fromisoformat)
+    add.set_defaults(run=run_add)
     setp = sub.add_parser("set")
     setp.add_argument("id")
     setp.add_argument("assignments", nargs="+", metavar="FIELD=VALUE")
-    sub.add_parser("open")
-    a = p.parse_args()
+    setp.set_defaults(run=run_set)
+    sub.add_parser("open").set_defaults(run=lambda lab, _: show_open(lab))
+    return p
+
+
+def main() -> None:
+    a = parser().parse_args()
     try:
-        lab = Lab()
-        if a.command == "project":
-            lab.project(a.name, a.text, folder=a.folder, files=a.files, views=a.views)
-            folder, files, views = lab.db.execute("SELECT folder, files, views FROM experiments WHERE name = ?",
-                                                  (a.name,)).fetchone()
-            print(f"project {a.name}, folder {shown(folder)}, files {shown(files)}, views {views or 'none'}")
-            return
-        if a.command == "experiment":
-            print("experiment " + " › ".join(lab.experiment(a.name, a.text, parent=a.parent, dead_end=a.dead_end)))
-            return
-        if a.command == "tree":
-            tree(lab, a.top or lab.here())
-            return
-        if a.command == "add":
-            for r in records.add(lab, a.container, a.kind, a.title, label=a.experiment, text=a.text, author=a.by,
-                                 status=a.status, answers=a.answers, evidence=a.evidence, rid=a.id,
-                                 time=a.time and int(a.time.timestamp() * 1000)):
-                show(r)
-        elif a.command == "set":
-            fields = {}
-            for assignment in a.assignments:
-                field, _, value = assignment.partition("=")
-                if field not in SETTABLE:
-                    raise ValueError(f"cannot set {field}; fields: {', '.join(SETTABLE)}")
-                fields[COLUMNS.get(field, field)] = ([v.strip() for v in value.split(";") if v.strip()]
-                                                     if field == "evidence" else value)
-            show(records.change(lab, a.id, **fields))
-        rows = records.open_records(lab, lab.current)
+        a.run(Lab(), a)
     except (ValueError, OSError, sqlite3.Error) as e:
         sys.exit(f"error: {e}")
-    print(f"open{' in ' + lab.current if lab.current else ''} ({len(rows)}):")
-    for rid, label, kind, title in rows:
-        print(f"  {rid} [{label}, {kind}] {title}")
 
 
 if __name__ == "__main__":
