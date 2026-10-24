@@ -19,11 +19,12 @@ There is no test suite or build step. The checks:
   Chrome, light and dark.
 - `bin/evals.sh [--case NAME] [--model sonnet]`: the skill's eval cases, run by agents with and
   without the plugin; on Linux it needs `bubblewrap` and `socat`. The whole suite costs about $5 on
-  Sonnet; `plugin/evals/baseline.md` has the last full run. `--keep-temp` keeps each run's folder,
+  Sonnet; `evals/baseline.md` has the last full run. `--keep-temp` keeps each run's folder,
   with its `lab.db` and transcript. The runs' sandbox hides the repository that holds the plugin,
   the real home folder and the network, which is why `bin/evals.sh` installs the clone into a venv
-  of its own and `plugin/evals/lab.sh` copies the package and DuckDB's SQLite extension into the
-  run's home folder.
+  of its own and `evals/lab.sh` copies the package and DuckDB's SQLite extension into the run's home
+  folder. `claude plugin eval` takes the cases only from a folder inside the plugin's, with no links,
+  so `bin/evals.sh` runs a copy of `plugin/` with `evals/` copied into it.
 
 Try changes on a data folder and port of their own, with the commands of `.venv`:
 
@@ -47,7 +48,8 @@ which.
 
 An installed plugin is kept by its version: a change to `plugin/` reaches those who installed it
 only with a new `version` in `plugin/.claude-plugin/plugin.json`, since `claude plugin update`
-reports a copy of the same version as the latest. After the change is on `main`:
+reports a copy of the same version as the latest. Raise it when the skill or what the plugin does
+changes, not for evals, checks or CI. After the change is on `main`:
 `claude plugin marketplace update experiment-lab-marketplace`, then
 `claude plugin update experiment-lab@experiment-lab-marketplace`; a running session loads it with
 `/reload-plugins`.
@@ -86,7 +88,7 @@ Change these together:
 - The evidence kinds: `EVIDENCE` in `records.py`, `record_page` in `pages.py` and
   `templates/lab/record.html`.
 - What rec prints after `rec project` (`project NAME, folder ...`) and `rec experiment`
-  (`experiment PROJECT › ... › NAME`): `rec.py` and the graders in `plugin/evals/*/case.yaml`,
+  (`experiment PROJECT › ... › NAME`): `rec.py` and the graders in `evals/*/case.yaml`,
   which match it.
 - The order of experiments below the same parent (`created, name`): `rec.tree`, `pages.tree` and
   the Branches list of `pages.experiment`.
