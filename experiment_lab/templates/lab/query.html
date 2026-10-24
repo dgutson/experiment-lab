@@ -1,5 +1,5 @@
 {% extends "lab/base.html" %}
-{% from "lab/macros.html" import data_table %}
+{% from "lab/macros.html" import data_table, view_errors %}
 {% block title %}Query{% endblock %}
 {% block main %}
 <h1>Views and query</h1>
@@ -9,6 +9,8 @@
 </form>
 {% if result %}{% if result.error %}<p class="error">{{ result.error }}</p>{% else %}{{ data_table(result) }}{% endif %}{% endif %}
 <h2>Views</h2>
+<p class="note">lab.sql's views{% if project %} and those of {{ project }}'s view files{% endif %}. The query may also read the views of the other projects.</p>
+{{ view_errors(errors) }}
 <table>
 <thead><tr><th>View</th><th>Columns</th></tr></thead>
 <tbody>

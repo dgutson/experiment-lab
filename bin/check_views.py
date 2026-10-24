@@ -2,10 +2,10 @@
 # requires-python = ">=3.12"
 # dependencies = ["duckdb==1.5.6"]
 # ///
-"""Compares every view on the data folder's lab.db read two ways: with lab.db
-attached, as q and the pages read it, and with its tables copied into DuckDB
-first. Prints each view's row count and a checksum of its sorted rows; the two
-ways must agree. Before raising the DuckDB pin in pyproject.toml, set the new
+"""Compares every view of every project on the data folder's lab.db read two
+ways: with lab.db attached, as q and the pages read it, and with its tables
+copied into DuckDB first. Prints each view's row count and a checksum of its
+sorted rows; the two ways must agree. Before raising the DuckDB pin in pyproject.toml, set the new
 version above and run this and sqlite_filter_bug.py while nothing is logged
 to the lab.
 
@@ -21,7 +21,7 @@ from experiment_lab import query
 from experiment_lab.settings import data_folder, database
 
 
-def read(copy):
+def read(copy, project):
     data = data_folder()
     if copy:
         con = duckdb.connect()
@@ -31,20 +31,25 @@ def read(copy):
                                     " WHERE table_catalog = 'source'").fetchall():
             con.execute(f"CREATE TABLE lab.{table} AS FROM source.{table}")
         con.execute("DETACH source")
-        query.run_files(con, query.view_files(data), keep_going=False)
+        sources = query.make_views(con, project)
     else:
-        con = query.connect(data, keep_going=False)
+        con, sources = query.connect(data, project)
+    if query.errors(sources):
+        sys.exit("\n".join(query.errors(sources)))
     rows = {view: con.execute(f"SELECT count(*), md5(coalesce(string_agg(t::VARCHAR, '|' ORDER BY t::VARCHAR), ''))"
                               f' FROM "{view}" t').fetchone() for view, _ in query.view_columns(con)}
     con.close()
     return rows
 
 
-direct, copied = read(False), read(True)
-for name in direct:
-    same = "same" if direct[name] == copied[name] else "DIFFERENT"
-    print(f"duckdb {duckdb.__version__}  {name:16}  direct {direct[name][0]:5} {direct[name][1]:32}"
-          f"  copied {copied[name][0]:5} {copied[name][1]:32}  {same}")
-if direct != copied:
+same = True
+for project in [name for name, _ in query.projects(query.attach(data_folder()))] or [None]:
+    direct, copied = read(False, project), read(True, project)
+    for name in direct:
+        agree = "same" if direct[name] == copied[name] else "DIFFERENT"
+        print(f"duckdb {duckdb.__version__}  {project}  {name:16}  direct {direct[name][0]:5} {direct[name][1]:32}"
+              f"  copied {copied[name][0]:5} {copied[name][1]:32}  {agree}")
+    same &= direct == copied
+if not same:
     sys.exit("the two reads differ")
 print("the two reads agree")

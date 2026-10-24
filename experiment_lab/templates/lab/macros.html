@@ -15,3 +15,12 @@
 {% macro record_links(rs) %}
 <ul>{% for x in rs %}<li><a href="/lab/record/{{ x.id }}">{{ x.title }}</a> ({{ x.kind }}, <span class="{{ x.status }}">{{ x.status }}</span>)</li>{% endfor %}</ul>
 {% endmacro %}
+
+{% macro dead_end_label(dead_end) %}{% if dead_end %} <span class="note">dead end</span>{% endif %}{% endmacro %}
+
+{# The errors of the view files' statements that failed (query.errors). #}
+{% macro view_errors(errors) %}{% if errors %}<p class="error">A statement of a view file failed, so the views it makes are missing:
+{% for e in errors %}
+{{ e }}{% endfor %}</p>{% endif %}{% endmacro %}
+
+{% macro no_project() %}<p>No project yet. <code>rec project NAME --text "what the project is"</code>, run in the project's folder, makes one.</p>{% endmacro %}

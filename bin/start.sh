@@ -2,8 +2,8 @@
 # Starts the lab server, lab-server from the uv tool install of experiment-lab:
 # the pages at http://127.0.0.1:$EXPERIMENT_LAB_PORT/lab (default 5000). Its
 # files are in the data folder $EXPERIMENT_LAB_DATA (default ~/lab-data), made
-# if missing: the database lab.db, the runs' files in files/, settings in
-# lab.toml, the log in server.log. It runs at the lowest CPU and disk priority
+# if missing: the database lab.db, the runs' files in files/, the log in
+# server.log. It runs at the lowest CPU and disk priority
 # and outlives the shell that started it.
 data=${EXPERIMENT_LAB_DATA:-$HOME/lab-data}
 port=${EXPERIMENT_LAB_PORT:-5000}

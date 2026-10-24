@@ -2,9 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-`README.md` is the user documentation: the record format, the architecture diagram, the table of
-databases, setup, logging from Python, `lab.toml`, moving from mlflow-lab, and the steps for changing
-the Mermaid or DuckDB version. Read it before changing behavior. This file holds what a developer
+`README.md` is the user documentation: projects and the experiment tree, the record format, the
+architecture diagram, the table of databases, setup, logging from Python, a project's settings,
+moving from mlflow-lab, and the steps for changing the Mermaid or DuckDB version. Read it before changing behavior. This file holds what a developer
 needs beyond it.
 
 ## Commands
@@ -23,13 +23,14 @@ Try changes on a data folder and port of their own, with the commands of `.venv`
 ```sh
 export PATH=$PWD/.venv/bin:$PATH EXPERIMENT_LAB_DATA=$(mktemp -d) EXPERIMENT_LAB_PORT=5001
 bin/start.sh
-rec experiment test --text "Trying a change."
-rec add question "Which rate?" --in test --text "..."
+rec project test --text "Trying a change."    # its folder is this clone
+rec experiment first --text "What it tries."
+rec add question "Which rate?" --in first --text "..."
 q "SELECT id, kind, status, title FROM records"    # pages at http://127.0.0.1:5001/lab
 ```
 
 lab-server reads Python and templates when it starts, so restart it after changing them; a change
-to `lab.sql`, `lab.toml` or a view file shows without a restart. start.sh exits at once if a server
+to `lab.sql`, a view file or a project's list of view files shows without a restart. start.sh exits at once if a server
 already answers on the port. To stop a server, kill the process listening on its port
 (`ss -ltnp 'sport = :5001'`).
 
@@ -39,19 +40,23 @@ which.
 
 ## Architecture
 
-- Writers: `lab.py` (experiments and runs) and `records.py` (records) use only the standard
-  library and Python's sqlite3, so a logging script imports them with `PYTHONPATH` alone. Every
-  write is one `Lab.write()` transaction (`BEGIN IMMEDIATE`). `settings.py` and `__init__.py` must
-  stay importable without the package's dependencies too.
+- Projects are the rows of `lab.experiments` with no parent; only they have `folder`, `files` and
+  `views` (a CHECK in `schema.sql`). `lab.holding` finds the project of the current folder, for
+  `Lab.current` and q.
+- Writers: `lab.py` (projects, experiments and runs) and `records.py` (records) use only the
+  standard library and Python's sqlite3, so a logging script imports them with `PYTHONPATH` alone.
+  Every write is one `Lab.write()` transaction (`BEGIN IMMEDIATE`). `settings.py` and `__init__.py`
+  must stay importable without the package's dependencies too.
 - Readers: `query.py` attaches `lab.db` read-only to an in-memory DuckDB and runs `lab.sql`, then the
-  view files of `lab.toml`. q, the pages, `from_mlflow.py`'s check and `bin/check_views.py` all read
-  through it.
+  view files of one project, so that each project's views are in a database of their own and may
+  reuse names. q, the pages, `from_mlflow.py`'s check and `bin/check_views.py` all read through it.
 - No process may have `lab.db` open with Python's sqlite3 while DuckDB reads it, since the two copies
   of SQLite do not see each other's locks (`query.py`'s docstring). So lab-server makes a missing
   `lab.db` in a child process, and `from_mlflow.py` closes its sqlite3 connections before its check.
-- The pages (`pages.py`) keep one DuckDB database (`Views`), made again when the modification time
-  of `lab.toml`, `lab.sql` or a view file changes, and give each request its own cursor. Attaching
-  costs about 140 ms, since each new DuckDB database loads the SQLite extension again. File access
+- The pages (`pages.py`) keep one DuckDB database per project (`Views`), made again when
+  `query.version` changes (the modification time of `lab.sql` or a view file, or the list of view
+  files), and give each request a cursor of the project in the cookie `project`. Attaching costs
+  about 140 ms, since each new DuckDB database loads the SQLite extension again. File access
   is off and the configuration locked. SQL from the query box and from `sql:` evidence runs in a
   transaction that is rolled back; `REFUSED` lists the statement types that would act outside it.
 - `lab.sql` is the one set of views that q and the pages run. DuckDB 1.5.5 returned wrong rows for
@@ -66,6 +71,8 @@ Change these together:
   the views in `lab.sql`.
 - The evidence kinds: `EVIDENCE` in `records.py`, `record_page` in `pages.py` and
   `templates/lab/record.html`.
+- The order of experiments below the same parent (`created, name`): `rec.tree`, `pages.tree` and
+  the Branches list of `pages.experiment`.
 - The DuckDB version: `pyproject.toml`, `bin/check_views.py`, `bin/sqlite_filter_bug.py`.
 - The usage of q, rec and `lab.py`, the record fields and the views' columns: the module docstrings
   of `q.py`, `rec.py` and `lab.py`, `README.md`, and `plugin/skills/experiment-db/SKILL.md`, which

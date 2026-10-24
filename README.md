@@ -1,25 +1,50 @@
 # experiment-lab
 
-Experiments' runs, and the decisions, findings, protocol rules and open questions about them, in one
-SQLite database, `lab.db`. `q` answers questions about runs and records with one DuckDB SQL query;
-`rec` adds and changes records; logging scripts write runs with the module `experiment_lab.lab`;
-pages at `/lab` show the records with their evidence, the experiments and their runs, a search of
-their texts, the SQL views as tables, a read-only query box and the experiments' files. It is meant for a coding agent and a
-person working on the same experiments: the agent reads and writes with `q` and `rec`, the person
-reads the pages.
+Experiments' runs, and the decisions, findings, protocol rules and open questions about them, for
+several projects in one SQLite database, `lab.db`. A project's experiments form a tree: each one
+below the experiment that led to it, with the project at the top. `q` answers questions about runs
+and records with one DuckDB SQL query; `rec` adds and changes projects, experiments and records;
+logging scripts write runs with the module `experiment_lab.lab`; pages at `/lab` show, for the
+project picked at the top, the records with their evidence, the experiment tree with a search of
+its texts, the experiments and their runs, the SQL views as tables, a read-only query box and the
+project's files. It is meant for a coding agent and a person working on the same experiments: the
+agent reads and writes with `q` and `rec`, the person reads the pages.
 
 | Path | What it is |
 |---|---|
 | `experiment_lab/` | the package; its `__init__.py` lists what each module holds |
 | `experiment_lab/schema.sql` | the tables of `lab.db` |
-| `experiment_lab/lab.sql` | the views `runs` and `records`, which q and the pages query |
-| `experiment_lab/lab.py` | logging experiments and runs from Python, with the standard library only |
+| `experiment_lab/lab.sql` | the views `experiments`, `runs`, `records` and `texts`, which q and the pages query |
+| `experiment_lab/lab.py` | logging projects, experiments and runs from Python, with the standard library only |
 | `bin/start.sh` | starts the pages' server, `lab-server`, in the background |
 | `bin/check_pages.py` | opens every page of a running server and checks it |
 | `bin/check_views.py`, `bin/sqlite_filter_bug.py` | checks to run before changing the DuckDB version |
 | `plugin/` | a Claude Code plugin holding the skill `experiment-db`, which tells the agent how to use q, rec and `lab.py` |
 
 The commands, installed with the package: `q`, `rec`, `lab-server` and `lab-from-mlflow`.
+
+## Projects and the experiment tree
+
+A project is an experiment with no parent. `rec project NAME --text "what the project is"`, run
+once in the project's folder, makes it; its folder is the main worktree of the current git
+repository, else the current folder (`--folder` sets another). The project of the current folder is
+the one whose folder holds it, or holds the main worktree of its git repository, so that every
+worktree of a repository shares one project. rec, q and `lab.py` work in that project, and from a
+project's folder they refuse another project's experiments.
+
+`rec experiment NAME --text "what it measures and why"` makes an experiment directly below the
+project, or below an earlier experiment with `--in PARENT`; given again, `--in` moves it with the
+experiments below it. `--dead-end` marks an idea that failed, which keeps its runs and records so
+the reason can be found (a finding says why); `--no-dead-end` clears the mark. `rec tree` prints
+the project's experiments, one indented line each, with `[dead end]` after those marked so.
+Experiment names are unique across the lab.
+
+The Experiments page shows the tree with, for each experiment, its records, when its first run
+started (with no runs, when it was made), its processing duration (the sum of its runs' durations)
+and its clock duration (the time during which at least one of its runs was running, shorter when
+runs ran at the same time). Both say "not timed" when no run has a duration, and "running" while a
+run has not ended. The project's row covers all its experiments. A run measures its duration only when it is opened before the work starts, as a
+`with lab.run(...)` block around the work does.
 
 ## Records
 
@@ -29,17 +54,19 @@ a title, a text in Markdown, an author, a status (open, closed or superseded), t
 answers, and its evidence: items `run:<run id>`, `file:<path>`, `sql:<query over the views>` or
 `record:<id>`, joined by `; `. A new question is open and any other record closed unless a status is
 given, and a record that answers an open question closes it. The view `records` has one row per
-record, with the label as its column `experiment`.
+record, with its project, and the label as its column `experiment`.
 
 ## Searching
 
-The view `texts` has one row per experiment, run and record: its kind, id, experiment, title and
-text. An experiment's text is its description; a run's is its note, then its params and tags as
-`key=value` lines; a record's is its text. The search box on every page lists those whose title or
-text holds every word searched for, in any letter case. An agent searches the same view with q:
+The view `texts` has one row per experiment, run and record: its kind, id, project, experiment,
+title and text. An experiment's text is its description; a run's is its note, then its params and
+tags as `key=value` lines; a record's is its text. The search box on the Experiments page lists
+those of the picked project whose title or text holds every word searched for, in any letter case;
+with "only below" checked, only those of the experiment selected in the tree and the experiments
+below it. An agent searches the same view with q:
 
 ```sh
-q "SELECT kind, id, experiment, title FROM texts WHERE contains(lower(title || ' ' || text), 'sample rate')"
+q "SELECT kind, id, experiment, title FROM texts WHERE project = 'my-project' AND contains(lower(title || ' ' || text), 'sample rate')"
 ```
 
 So that the search finds them, a new experiment needs a description (what it measures and why) and
@@ -58,7 +85,7 @@ flowchart LR
 
     subgraph server["lab-server process (bin/start.sh)"]
         pages[["«component»<br/>pages<br/>FastAPI under uvicorn"]]
-        pagesdb[["«component»<br/>one in-memory DuckDB"]]
+        pagesdb[["«component»<br/>an in-memory DuckDB<br/>per project"]]
     end
 
     subgraph commands["Commands"]
@@ -70,11 +97,10 @@ flowchart LR
     subgraph data["Data folder (~/lab-data)"]
         labdb[("lab.db<br/>SQLite, WAL mode")]
         files[/"files/"/]
-        toml[/"lab.toml"/]
     end
 
-    views[/"lab.sql and view files"/]
-    shown[/"the folder lab.toml names"/]
+    views[/"lab.sql and the project's<br/>view files"/]
+    shown[/"the projects' files folders"/]
 
     labpage -->|"HTTP /lab"| pages
     labpage --> mermaid
@@ -86,12 +112,10 @@ flowchart LR
     lab -->|"sqlite3, writes"| labdb
     lab -->|"copies run files"| files
     q -->|"ATTACH, read-only"| labdb
-    q -.->|"reads"| toml
     q -.->|"reads"| views
     pages -->|"a cursor per request"| pagesdb
     pagesdb -->|"ATTACH, read-only"| labdb
     pagesdb -.->|"reads"| views
-    pages -.->|"reads"| toml
     pages -.->|"/lab/run/ID/file/"| files
     pages -.->|"/lab/file"| shown
 ```
@@ -102,8 +126,8 @@ it.
 | Database | Engine | Where | Written by | Read by | Lasts |
 |---|---|---|---|---|---|
 | `lab.db` | SQLite, WAL mode | data folder | `experiment_lab.lab` and `experiment_lab.records`, with Python's sqlite3: rec, the logging scripts, lab-from-mlflow | q and the pages, through DuckDB | always |
-| the pages' database | DuckDB, in memory | the lab-server process | the pages: `lab.db` attached read-only as the catalog `lab`, then the views | the pages, a cursor per request, with file access off | until `lab.sql`, `lab.toml` or a view file changes |
-| q's database | DuckDB, in memory | q's process | q: `lab.db` attached read-only as the catalog `lab`, then the views | the SQL given to q | one q call |
+| the pages' databases, one per project | DuckDB, in memory | the lab-server process | the pages: `lab.db` attached read-only as the catalog `lab`, then the views of `lab.sql` and of the project's view files | the pages, a cursor per request, with file access off | until `lab.sql`, one of the project's view files or its list of them changes |
+| q's database | DuckDB, in memory | q's process | q: `lab.db` attached read-only as the catalog `lab`, then the views of `lab.sql` and of the project's view files | the SQL given to q | one q call |
 
 Several processes may write at once and no server is needed for it: each write is one short
 transaction that starts with `BEGIN IMMEDIATE` and waits up to 60 s for another writer to finish.
@@ -124,8 +148,10 @@ access the first time q or the pages read the database, when DuckDB downloads it
 git clone https://github.com/dgutson/experiment-lab ~/experiment-lab
 uv tool install --editable ~/experiment-lab
 ~/experiment-lab/bin/start.sh
-rec experiment "my project" --text "What it measures."
-rec add question "Which sample rate do we keep?" --in "my project" --text "..."
+cd ~/src/my-project
+rec project my-project --text "What the project is, in one line."
+rec experiment "rate test" --text "What it measures."
+rec add question "Which sample rate do we keep?" --in "rate test" --text "..."
 q "SELECT id, kind, status, title FROM records"
 ```
 
@@ -144,8 +170,8 @@ claude plugin marketplace add dgutson/experiment-lab
 claude plugin install experiment-lab@experiment-lab-marketplace
 ```
 
-Its skill, `experiment-lab:experiment-db`, runs `q` and `rec` from the PATH and finds a project's
-views through `lab.toml`, so it needs no editing. Eval cases for the plugin go in `plugin/evals/`;
+Its skill, `experiment-lab:experiment-db`, runs `q` and `rec` from the PATH, which find the project
+from the current folder, so it needs no editing. Eval cases for the plugin go in `plugin/evals/`;
 run them with `claude plugin eval ~/experiment-lab/plugin`.
 
 ## Logging runs from Python
@@ -157,8 +183,9 @@ any Python 3.12 without installing anything: `PYTHONPATH=~/experiment-lab python
 from experiment_lab.lab import Lab
 
 lab = Lab()                                       # $EXPERIMENT_LAB_DATA, else ~/lab-data
-lab.experiment("my project", "What it measures and why.")      # a new one needs a description
-with lab.run("my project", "run 1", params={"rate": 48000}, note="Markdown") as run:
+lab.project("my-project", "What the project is.")  # once, from the project's folder
+lab.experiment("rate test", "What it measures and why.")       # parent="..." to put it below another
+with lab.run("rate test", "run 1", params={"rate": 48000}, note="Markdown") as run:
     run.log_metrics({"accuracy": 0.91}, step=3)   # every value is kept, with its step and time
     run.set_tags({"outcome": "pass"})
     run.log_file("plot.png")                      # copied to files/<run id>/plot.png
@@ -179,42 +206,47 @@ a `with` block, call `run.end()`. A script that logged with MLflow changes these
 To record a decision or finding from a script, `experiment_lab.records.add` does what `rec add`
 does.
 
-## The data folder and lab.toml
+## The data folder and a project's settings
 
 The lab's files are in the data folder, `$EXPERIMENT_LAB_DATA` (default `~/lab-data`): `lab.db`,
-the runs' files in `files/`, `lab.toml`, and start.sh's `server.log`. start.sh serves the pages on
-port `$EXPERIMENT_LAB_PORT` (default 5000) and exits at once if a server already answers there.
-There is no stop command: kill the `lab-server` process, which outlives the shell that started it.
+the runs' files in `files/`, and start.sh's `server.log`. start.sh serves the pages on port
+`$EXPERIMENT_LAB_PORT` (default 5000) and exits at once if a server already answers there. There is
+no stop command: kill the `lab-server` process, which outlives the shell that started it.
 
-`lab.toml` is optional:
+A project's settings are in its row of `lab.experiments`, and `rec project NAME` changes those
+given:
 
-```toml
-# The folder /lab/file shows; nothing outside it is shown. Without it, there is no files page.
-files = "~/experiments"
-# The project's views, run after lab.sql, in this order.
-views = ["~/experiments/views.sql"]
-```
+- `--folder F`: the project's folder, which tells rec, q and `lab.py` which project they are in.
+- `--files F`: the folder `/lab/file` shows, by default the project's folder. Nothing outside the
+  projects' files folders is shown.
+- `--views FILE ...`: the project's view files, run after `lab.sql` in this order; `--views` alone
+  clears them.
 
-Paths may start with `~`; others are taken relative to the data folder. q reads `lab.toml` each
-time it runs, the pages whenever it changes.
+Paths may start with `~`; others are taken relative to the current folder. Each project has its own
+DuckDB database in the pages and in q, so two projects may have views of the same name. q reads the
+view files each time it runs, the pages whenever one changes. A statement of a view file that fails
+is skipped: q prints its error on stderr, and the pages show it on the Records page and above the
+list of views.
 
-A view file holds DuckDB `CREATE VIEW` statements over the views `runs` and `records` and the tables
-of `lab.db` in the catalog `lab` (`lab.experiments`, `lab.runs`, `lab.params`, `lab.tags`,
-`lab.metrics`, `lab.records`). For example:
+A view file holds DuckDB `CREATE VIEW` statements over the views of `lab.sql` and the tables of
+`lab.db` in the catalog `lab` (`lab.experiments`, `lab.runs`, `lab.params`, `lab.tags`,
+`lab.metrics`, `lab.records`). The views of `lab.sql` hold every project's rows; their column
+`project` tells them apart. For example:
 
 ```sql
--- One row per finished run of "my project", with its accuracy.
+-- One row per finished run of "rate test", with its accuracy.
 CREATE VIEW accuracy AS SELECT name, metrics['accuracy'] AS accuracy
-    FROM runs WHERE experiment = 'my project' AND status = 'FINISHED';
+    FROM runs WHERE experiment = 'rate test' AND status = 'FINISHED';
 ```
 
 ## Moving from mlflow-lab
 
-`lab-from-mlflow OLD_DATA_FOLDER` copies a data folder of mlflow-lab, where an MLflow server kept
-the runs and records in `mlflow.db`, into a new `lab.db` in `$EXPERIMENT_LAB_DATA` (default
-`~/lab-data`), which must have none yet. It only reads the old folder, so the MLflow server may keep
-running, and it copies `lab.toml` when the new folder has none. Its docstring lists what is copied
-and what is left out. It then compares the copy with the old database, table by table and view by
+`lab-from-mlflow OLD_DATA_FOLDER PROJECT --text DESCRIPTION [--folder FOLDER]` copies a data folder
+of mlflow-lab, where an MLflow server kept the runs and records in `mlflow.db`, into a new `lab.db`
+in `$EXPERIMENT_LAB_DATA` (default `~/lab-data`), which must have none yet. The experiments go
+directly below a new project, PROJECT, whose files folder and view files are those of the old
+folder's `lab.toml`. It only reads the old folder, so the MLflow server may keep running. Its
+docstring lists what is copied and what is left out. It then compares the copy with the old database, table by table and view by
 view, and ends with "the copy agrees" or "the copy differs".
 
 The comparison runs the view files on both databases, so they must read only the views `runs` and
@@ -241,7 +273,8 @@ uv run --script ~/experiment-lab/bin/check_pages.py [--shots FOLDER] [URL]
 ```
 
 It opens every page of the server at URL (default `http://127.0.0.1:$EXPERIMENT_LAB_PORT`) and
-fails unless each returns 200, or 403 for a file outside the folder `lab.toml` names. It then opens
+fails unless each returns 200, or 403 for a file outside the projects' files folders. It visits the
+pages of every project, picking each with the cookie the project picker sets. It then opens
 the pages with diagrams in the installed Google Chrome, in the light and the dark scheme, and checks
 that each diagram is drawn or shows Mermaid's error, follows the scheme and fetches nothing from
 another host. With `--shots`, it saves screenshots of those pages.

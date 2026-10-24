@@ -2,10 +2,11 @@
 # requires-python = ">=3.12"
 # dependencies = ["playwright==1.63.0"]
 # ///
-"""Checks the /lab pages of a running lab server. Every page reachable from
-/lab/ must return 200, except a file outside the folder lab.toml names, which
-must return 403. Every page with a ```mermaid block, and the first page of each
-kind, is then opened in Chrome in the light and in the dark scheme: each block
+"""Checks the /lab pages of a running lab server. For each project of the
+picker, every page reachable from /lab/ must return 200, except a file outside
+every project's files folder, which must return 403. Every page with a
+```mermaid block, and the first page of each kind for each project, is then
+opened in Chrome in the light and in the dark scheme: each block
 must be drawn or show Mermaid's error (the errors are printed), its background
 must follow the scheme, and it must make no request to another host. Pages with
 diagrams are saved as screenshots.
@@ -20,7 +21,9 @@ so the crawl stays within the lab's own pages.
 import argparse
 import collections
 import concurrent.futures
+import html
 import os
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -57,20 +60,32 @@ def follow(source, target):
     return {"file": False, "run file": False, "run": kind(target) == "run file"}.get(kind(source), True)
 
 
-def fetch(base, path):
+def cookie(project):
+    """The cookie that picks the project, as the picker sets it."""
+    return f"project={urllib.parse.quote(project, safe='')}"
+
+
+def fetch(base, path, project):
+    request = urllib.request.Request(base + path, headers={"Cookie": cookie(project)} if project else {})
     try:
-        with urllib.request.urlopen(base + path, timeout=120) as response:
+        with urllib.request.urlopen(request, timeout=120) as response:
             return response.status, response.headers.get_content_type(), response.read().decode(errors="replace")
     except urllib.error.HTTPError as e:
         return e.code, e.headers.get_content_type(), ""
 
 
-def crawl(base):
-    """Each page reachable from /lab/: its status and whether it has a ```mermaid block."""
+def projects(base):
+    """The projects the picker offers."""
+    return [html.unescape(p) for p in re.findall(r"<option[^>]*>([^<]*)</option>", fetch(base, "/lab/", None)[2])]
+
+
+def crawl(base, project):
+    """Each page reachable from /lab/ with the project picked: its status and
+    whether it has a ```mermaid block."""
     found, frontier = {}, ["/lab/"]
     with concurrent.futures.ThreadPoolExecutor(8) as pool:
         while frontier:
-            fetched = list(pool.map(lambda p: (p, fetch(base, p)), frontier))
+            fetched = list(pool.map(lambda p: (p, fetch(base, p, project)), frontier))
             frontier = []
             for path, (status, content_type, body) in fetched:
                 found[path] = (status, 'class="language-mermaid"' in body)
@@ -86,14 +101,16 @@ def crawl(base):
 
 
 def draw(base, paths, shots):
-    """Problems found opening the pages in Chrome, light and dark."""
+    """Problems found opening the pages, (project, path) pairs, in Chrome, light and dark."""
     host = urllib.parse.urlsplit(base).netloc
     problems = []
     with sync_playwright() as p:
         browser = p.chromium.launch(channel="chrome")
         for scheme in ("light", "dark"):
             context = browser.new_context(color_scheme=scheme)
-            for path in paths:
+            for project, path in paths:
+                if project:
+                    context.add_cookies([{"name": "project", "value": cookie(project).partition("=")[2], "url": base}])
                 page = context.new_page()
                 requested = []
                 page.on("request", lambda r: requested.append(r.url))
@@ -106,15 +123,15 @@ def draw(base, paths, shots):
                 errors = page.locator(".diagram .error").all_inner_texts()
                 background = page.evaluate("getComputedStyle(document.body).backgroundColor")
                 outside = [url for url in requested if urllib.parse.urlsplit(url).netloc not in (host, "")]
-                print(f"{scheme:5}  {path}  diagrams {drawn}/{blocks}  background {background}")
+                print(f"{scheme:5}  {project}  {path}  diagrams {drawn}/{blocks}  background {background}")
                 for error in errors:
                     print("       " + error.replace("\n", "\n       "))
                 if drawn + len(errors) != blocks:
-                    problems.append(f"{scheme} {path}: {drawn} of {blocks} diagrams drawn, {len(errors)} errors")
+                    problems.append(f"{scheme} {project} {path}: {drawn} of {blocks} diagrams drawn, {len(errors)} errors")
                 if background != BACKGROUND[scheme]:
-                    problems.append(f"{scheme} {path}: background {background}")
+                    problems.append(f"{scheme} {project} {path}: background {background}")
                 if outside:
-                    problems.append(f"{scheme} {path}: requests to other hosts: {outside}")
+                    problems.append(f"{scheme} {project} {path}: requests to other hosts: {outside}")
                 if blocks and shots:
                     page.screenshot(path=shots / f"{kind(path)}-{abs(hash(path))}-{scheme}.png", full_page=True)
                 page.close()
@@ -130,23 +147,30 @@ def main():
     a = p.parse_args()
     if a.shots:
         a.shots.mkdir(parents=True, exist_ok=True)
-    pages = crawl(a.url.rstrip("/"))
-    counts = collections.Counter((kind(path), status) for path, (status, _) in pages.items())
-    for (k, status), n in sorted(counts.items()):
-        print(f"{n:6}  {status}  {k}")
-    problems = [f"{status} {path}" for path, (status, _) in pages.items()
+    base = a.url.rstrip("/")
+    pages = {}
+    for project in projects(base) or [None]:
+        pages.update({(project, path): found for path, found in crawl(base, project).items()})
+    counts = collections.Counter((project, kind(path), status) for (project, path), (status, _) in pages.items())
+    for (project, k, status), n in sorted(counts.items(), key=str):
+        print(f"{n:6}  {status}  {project}  {k}")
+    problems = [f"{status} {project} {path}" for (project, path), (status, _) in pages.items()
                 if status != 200 and not (status == 403 and kind(path) == "file")]
     first = {}
-    for path, (status, _) in pages.items():
+    for (project, path), (status, _) in pages.items():
         if status == 200 and kind(path) != "run file":
-            first.setdefault(kind(path), path)
-    shown = sorted({*first.values(), *(path for path, (_, mermaid) in pages.items() if mermaid)})
-    problems += draw(a.url.rstrip("/"), shown, a.shots)
+            first.setdefault((project, kind(path)), (project, path))
+    mermaid = {}  # each page with a diagram once, with the first project it was found with
+    for (project, path), (_, has) in pages.items():
+        if has:
+            mermaid.setdefault(path, (project, path))
+    shown = sorted({*first.values(), *mermaid.values()}, key=str)
+    problems += draw(base, shown, a.shots)
     for problem in problems:
         print("PROBLEM", problem)
     if problems:
         sys.exit(f"{len(problems)} problems")
-    print(f"all {len(pages)} pages return 200 or, for files outside the files folder, 403; "
+    print(f"all {len(pages)} pages return 200 or, for files outside the files folders, 403; "
           f"{len(shown)} drawn in light and dark")
 
 
