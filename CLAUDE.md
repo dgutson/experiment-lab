@@ -9,14 +9,17 @@ needs beyond it.
 
 ## Commands
 
-There is no test suite or build step. The checks:
+There is no test suite or build step. `.github/workflows/checks.yml` runs the checks below, except
+the evals, on every push and pull request, on a lab that `uv run python bin/make_scratch.py FOLDER`
+makes: the evals' lab with a run with tags and files, a record of every kind, evidence of every
+kind, a diagram, an audio file and an image. The checks:
 
 - `pyright experiment_lab` (it reads `.venv`, which `uv sync` makes, with the package editable).
 - `uv run --script bin/check_views.py` and `uv run --script bin/sqlite_filter_bug.py`: the views
   read the same with `lab.db` attached as with its tables copied. They read the data folder's
   `lab.db`; run them while nothing is logged to it.
-- `uv run --script bin/check_pages.py [URL]`: every page of a running server, and its diagrams in
-  Chrome, light and dark.
+- `uv run --script bin/check_pages.py [URL]`: every page of a running server, and its diagrams,
+  audio players and images in Chrome, light and dark.
 - `bin/evals.sh [--case NAME] [--model sonnet]`: the skill's eval cases, run by agents with and
   without the plugin; on Linux it needs `bubblewrap` and `socat`. The whole suite costs about $5 on
   Sonnet; `evals/baseline.md` has the last full run. `--keep-temp` keeps each run's folder,
@@ -36,6 +39,9 @@ rec experiment first --text "What it tries."
 rec add question "Which rate?" --in first --text "..."
 q "SELECT id, kind, status, title FROM records"    # pages at http://127.0.0.1:5001/lab
 ```
+
+For a lab with data already in it, make one with `bin/make_scratch.py` and set
+`EXPERIMENT_LAB_DATA=FOLDER/lab-data` instead.
 
 lab-server reads Python and templates when it starts, so restart it after changing them; a change
 to `lab.sql`, a view file or a project's list of view files shows without a restart. start.sh exits at once if a server
