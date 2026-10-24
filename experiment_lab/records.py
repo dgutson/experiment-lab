@@ -7,7 +7,7 @@ over the views> or record:<id>. Only the standard library, as lab.py.
 """
 import re
 
-from experiment_lab.lab import now
+from experiment_lab.lab import BELOW, now
 
 EVIDENCE = ("run", "file", "sql", "record")
 
@@ -36,8 +36,10 @@ def get(lab, rid):
     return r
 
 
-def open_records(lab):
-    return lab.db.execute("SELECT id, label, kind, title FROM records WHERE status = 'open' ORDER BY time").fetchall()
+def open_records(lab, project=None):
+    """The open records, only those of the project when one is given."""
+    return lab.db.execute(f"{BELOW} SELECT id, label, kind, title FROM records WHERE status = 'open'"
+                          " AND (? IS NULL OR experiment IN below) ORDER BY time", (project, project)).fetchall()
 
 
 def new_id(lab, title):

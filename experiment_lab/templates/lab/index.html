@@ -1,8 +1,11 @@
 {% extends "lab/base.html" %}
+{% from "lab/macros.html" import dead_end_label, view_errors, no_project %}
 {% block title %}Records{% endblock %}
 {% block main %}
 <h1>Records</h1>
-<p class="meta">Decisions, findings, protocol rules and questions, by the experiment they are filed in. Click a column heading to sort.</p>
+{% if not project %}{{ no_project() }}{% else %}
+<p class="meta">The decisions, findings, protocol rules and questions of {{ project }}, by the experiment they are filed in, in the order of the experiment tree. Click a column heading to sort.</p>
+{{ view_errors(errors) }}
 <h2>Open</h2>
 {% if open %}
 <table class="sortable">
@@ -13,10 +16,12 @@
 </tbody>
 </table>
 {% else %}<p>No open records.</p>{% endif %}
-{% for name, labels in groups %}
-<h2><a href="/lab/experiment/{{ name|urlencode }}">{{ name }}</a></h2>
+{% for e, labels in groups %}
+<div class="group" style="margin-left: {{ [e.above|length - 1, 0]|max * 16 }}px">
+{% if e.above|length > 1 %}<p class="path">{{ e.above[1:]|join(" › ") }} ›</p>{% endif %}
+<h2><a href="/lab/experiment/{{ e.name|urlencode }}">{{ e.name }}</a>{{ dead_end_label(e.dead_end) }}</h2>
 {% for label, rows in labels|dictsort %}
-{% if label != name %}<h3>{{ label }}</h3>{% endif %}
+{% if label != e.name %}<h3>{{ label }}</h3>{% endif %}
 <table class="sortable">
 <thead><tr><th>Kind</th><th>Status</th><th>Title</th><th>By</th><th>Time</th></tr></thead>
 <tbody>
@@ -25,5 +30,7 @@
 </tbody>
 </table>
 {% endfor %}
+</div>
 {% endfor %}
+{% endif %}
 {% endblock %}

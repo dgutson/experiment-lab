@@ -34,18 +34,29 @@ tr.open td, span.open { color: var(--open); font-weight: 600; }
 tr.superseded td, span.superseded { color: var(--muted); text-decoration: line-through; }
 .error { color: var(--bad); white-space: pre-wrap; }
 textarea { box-sizing: border-box; width: 100%; font: 13px ui-monospace, monospace; background: var(--bg); color: var(--fg); border: 1px solid var(--line); padding: 6px; }
-nav form { margin-left: auto; }
-nav input { font: inherit; background: var(--bg); color: var(--fg); border: 1px solid var(--line); padding: 2px 8px; width: 16em; max-width: 60vw; }
+nav select, input[type="search"] { font: inherit; background: var(--bg); color: var(--fg); border: 1px solid var(--line); padding: 2px 8px; }
+nav select { font-weight: 600; }
+.find { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 10px 0 4px; }
+.find input[type="search"] { width: 20em; max-width: 100%; }
+.path { color: var(--muted); font-size: 13px; margin: 0; }
+.group { border-left: 2px solid var(--line); padding: 2px 0 2px 12px; margin: 14px 0; }
+.group h2 { margin-top: 0; }
+td.tree { white-space: nowrap; }
+.branch { font-family: ui-monospace, monospace; color: var(--muted); white-space: pre; }
+tr.root td { background: var(--head); font-weight: 600; }
+tr.dead-end td { color: var(--muted); }
 </style>
 </head>
 <body>
 <nav>
   <strong>Lab</strong>
+  {% if projects %}<select aria-label="Project" onchange="document.cookie = 'project=' + encodeURIComponent(this.value) + '; path=/; max-age=31536000; samesite=lax'; location.reload()">
+    {% for p in projects %}<option{% if p == project %} selected{% endif %}>{{ p }}</option>{% endfor %}
+  </select>{% endif %}
   <a href="/lab/">Records</a>
   <a href="/lab/experiments">Experiments</a>
   <a href="/lab/query">Views and query</a>
   <a href="/lab/file">Files</a>
-  <form action="/lab/search"><input name="find" value="{{ find|default("") }}" placeholder="Search texts" aria-label="Search texts"></form>
 </nav>
 <main>{% block main %}{% endblock %}</main>
 <script>

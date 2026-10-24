@@ -1,6 +1,6 @@
 """DuckDB SQL over the lab's database, for q and the pages: lab.db attached
-read-only as the catalog lab, then the views of lab.sql and of the view files
-in the data folder's lab.toml.
+read-only as the catalog lab, then the views of lab.sql and of one project's
+view files, so that projects may use the same view names.
 
 DuckDB reads lab.db through its own copy of SQLite, and two copies of SQLite in
 one process do not see each other's locks
@@ -9,43 +9,70 @@ not have lab.db open with Python's sqlite3 while DuckDB reads it: q and the
 pages never open it with sqlite3, and the writers (lab.py) never use DuckDB.
 """
 import json
-import sys
 from pathlib import Path
 
 import duckdb
 
-from experiment_lab.settings import database, settings
+from experiment_lab.settings import database
 
 LAB_SQL = Path(__file__).with_name("lab.sql")
 
 
-def connect(data, keep_going=True):
-    """A new in-memory DuckDB database with the views. With keep_going, a
-    statement of a view file that fails is reported on stderr and the others
-    still run."""
+def connect(data, project=None):
+    """A new in-memory DuckDB database with lab.db attached and the views of
+    lab.sql and of the project's view files; returns it and make_views' sources."""
+    con = attach(data)
+    return con, make_views(con, project)
+
+
+def attach(data):
+    """A new in-memory DuckDB database with lab.db attached as the catalog lab."""
     path = database(data)
     if not path.exists():
-        raise FileNotFoundError(f"no database {path}; rec experiment or a logging script makes it")
+        raise FileNotFoundError(f"no database {path}; rec project or a logging script makes it")
     con = duckdb.connect()
     con.execute(f"ATTACH '{str(path).replace("'", "''")}' AS lab (TYPE sqlite, READ_ONLY)")
-    run_files(con, view_files(data), keep_going)
     return con
 
 
-def view_files(data):
-    """lab.sql, then the view files that the data folder's lab.toml lists."""
-    return [LAB_SQL, *settings(data)[1]]
+def projects(con):
+    """Each project's name and folder."""
+    return con.execute("SELECT name, folder FROM lab.experiments WHERE parent IS NULL ORDER BY name").fetchall()
 
 
-def run_files(con, paths, keep_going=True):
-    for path in paths:
-        for statement in con.extract_statements(path.read_text()):
-            try:
-                con.execute(statement)
-            except duckdb.Error as e:
-                if not keep_going:
-                    raise
-                print(f"{path.name}: {str(e).splitlines()[0]}", file=sys.stderr)
+def version(con, project):
+    """What the views are made from: lab.sql and the project's view files, each
+    with its modification time (0 if missing)."""
+    found = con.execute("SELECT views FROM lab.experiments WHERE name = ? AND parent IS NULL", [project]).fetchone()
+    paths = [LAB_SQL, *(Path(path) for path in (found[0] if found else "").split("; ") if path)]
+    return [(path, path.stat().st_mtime_ns if path.exists() else 0) for path in paths]
+
+
+def make_views(con, project):
+    """Runs lab.sql, then the project's view files. A statement that fails is
+    skipped and the others still run. Returns the sources: per file, its path,
+    modification time (read before the file) and the errors of its statements."""
+    return [{"path": path, "mtime": mtime, "errors": run_file(con, path)} for path, mtime in version(con, project)]
+
+
+def run_file(con, path):
+    """Runs the file's statements; returns the errors of those that failed."""
+    try:
+        statements = con.extract_statements(path.read_text())
+    except (OSError, duckdb.Error) as e:
+        return [str(e).splitlines()[0]]
+    errors = []
+    for statement in statements:
+        try:
+            con.execute(statement)
+        except duckdb.Error as e:
+            errors.append(str(e).splitlines()[0])
+    return errors
+
+
+def errors(sources):
+    """The errors of the sources, each as "file: error"."""
+    return [f"{s['path'].name}: {e}" for s in sources for e in s["errors"]]
 
 
 def run(con, sql):

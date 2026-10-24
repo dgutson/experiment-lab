@@ -1,14 +1,18 @@
 """Moves a data folder of mlflow-lab, whose runs and records an MLflow server
 kept in mlflow.db, into a new lab.db, then checks the copy.
 
-usage: lab-from-mlflow OLD_DATA_FOLDER
+usage: lab-from-mlflow OLD_DATA_FOLDER PROJECT --text DESCRIPTION [--folder FOLDER]
 
 The new data folder is $EXPERIMENT_LAB_DATA, else ~/lab-data; it must have no
 lab.db yet. mlflow.db and artifacts/ are only read, so the MLflow server may keep
 running; what it writes after the read starts is not copied. What is copied:
 
 - the experiments, with their descriptions (the experiment tag
-  mlflow.note.content), except MLflow's Default experiment when it has no runs;
+  mlflow.note.content), except MLflow's Default experiment when it has no runs,
+  directly below a new project, PROJECT, with the one-line DESCRIPTION. Its
+  folder is FOLDER, by default the current git repository's main worktree,
+  else the current folder; its files folder and view files are those of the
+  old folder's lab.toml (files, by default its folder, and views);
 - the runs, with their params, every metric value and their tags; the tag
   mlflow.note.content becomes the run's note, and mlflow.runName, a copy of the
   run's name, is dropped;
@@ -20,8 +24,7 @@ running; what it writes after the read starts is not copied. What is copied:
   (#/experiments/N and #/experiments/N/runs/ID) become links to the lab's pages;
 - a run's files under artifacts/ that have no other hard link, to
   files/<run id>/; a file with another hard link is left out, since the run's
-  own folder holds it;
-- lab.toml, when the new data folder has none.
+  own folder holds it.
 
 Deleted experiments and runs are left out. The check compares, per table, the
 rows the old database should give with the rows copied, and, through DuckDB,
@@ -38,6 +41,7 @@ import shutil
 import sqlite3
 import stat
 import sys
+import tomllib
 import urllib.parse
 from pathlib import Path
 
@@ -45,7 +49,7 @@ import duckdb
 
 from experiment_lab import query, records
 from experiment_lab.lab import Lab
-from experiment_lab.settings import data_folder, database, settings
+from experiment_lab.settings import data_folder, database
 
 NOTE, NAME = "mlflow.note.content", "mlflow.runName"
 LINK = re.compile(r"(?:https?://(?:127\.0\.0\.1|localhost):\d+/)?#/experiments/(\d+)(?:/runs/([0-9a-f]{32}))?")
@@ -74,6 +78,10 @@ class Move:
 
     def __init__(self, old):
         self.old = old
+        toml = old / "lab.toml"
+        settings = tomllib.loads(toml.read_text()) if toml.exists() else {}
+        self.files = settings.get("files") and str(old / Path(settings["files"]).expanduser())
+        self.views = [old / Path(path).expanduser() for path in settings.get("views", [])]
         db = sqlite3.connect(f"file:{old / 'mlflow.db'}?mode=ro", uri=True, isolation_level=None)
         db.execute("BEGIN")  # one snapshot for every read
         rows = db.execute("""SELECT e.experiment_id, e.name, coalesce(t.value, ''), coalesce(e.creation_time, 0),
@@ -98,7 +106,7 @@ class Move:
         params = per_run("SELECT run_uuid, key, value FROM params")
         metrics = per_run("SELECT run_uuid, key, CASE WHEN is_nan THEN NULL ELSE value END, step, timestamp FROM metrics")
         db.close()
-        self.runs, self.params, self.tags, self.metrics, self.records, self.files = [], [], [], [], [], []
+        self.runs, self.params, self.tags, self.metrics, self.records, self.run_files = [], [], [], [], [], []
         self.companions, self.left_out = set(), []
         for rid, (_, experiment, name, status, start, end, uri) in live.items():
             t = dict(tags[rid])
@@ -115,7 +123,7 @@ class Move:
             self.params += [(rid, k, v) for k, v in params[rid]]
             self.tags += [(rid, k, v) for k, v in other.items()]
             self.metrics += [(rid, *m) for m in metrics[rid]]
-            self.files += files
+            self.run_files += files
 
     def relink(self, text):
         def lab_page(m):
@@ -148,10 +156,12 @@ class Move:
                     self.left_out.append(path)
         return found
 
-    def write(self, data):
+    def write(self, data, project, description, folder):
         lab = Lab(data)
+        lab.project(project, description, folder=folder, files=self.files, views=self.views)
         with lab.write() as db:
-            db.executemany("INSERT INTO experiments (name, description, created) VALUES (?, ?, ?)", self.experiments)
+            db.executemany("INSERT INTO experiments (name, parent, description, created) VALUES (?, ?, ?, ?)",
+                           [(name, project, text, created) for name, text, created in self.experiments])
             db.executemany("INSERT INTO runs (id, experiment, name, status, start_time, end_time, note)"
                            " VALUES (?, ?, ?, ?, ?, ?, ?)", self.runs)
             db.executemany("INSERT INTO params (run, key, value) VALUES (?, ?, ?)", self.params)
@@ -160,11 +170,9 @@ class Move:
             for r in self.records:
                 records.save(db, r)
         lab.close()
-        for source, path in self.files:
+        for source, path in self.run_files:
             (data / "files" / path).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, data / "files" / path)
-        if not (data / "lab.toml").exists() and (self.old / "lab.toml").exists():
-            shutil.copy2(self.old / "lab.toml", data / "lab.toml")
 
 
 def evidence(text):
@@ -191,16 +199,20 @@ def compare(name, old_rows, new_rows):
     return old == new
 
 
-def check(move, data):
-    view_files = settings(data)[1]
+def check(move, data, project):
     old = duckdb.connect()
     old.execute(f"ATTACH '{move.old / 'mlflow.db'}' AS ml (TYPE sqlite, READ_ONLY)")
     old.execute("CREATE SCHEMA mlflow")
     for table in ("experiments", "experiment_tags", "runs", "tags", "params", "metrics", "latest_metrics"):
         old.execute(f"CREATE VIEW mlflow.{table} AS FROM ml.{table}")
     old.execute(OLD_VIEWS)
-    query.run_files(old, view_files, keep_going=False)
-    new = query.connect(data, keep_going=False)
+    failed = [f"old {path.name}: {e}" for path in move.views for e in query.run_file(old, path)]
+    new, sources = query.connect(data, project)
+    failed += [f"new {e}" for e in query.errors(sources)]
+    for error in failed:
+        print(error)
+    if failed:
+        return False
     old.execute("CREATE SCHEMA moved")  # out of main, so out of the views compared below
     old.execute("CREATE TABLE moved.companions AS SELECT unnest(?::VARCHAR[]) AS run", [sorted(move.companions)])
     old.execute("""CREATE VIEW moved.copied AS SELECT run FROM main.runs WHERE tags['record.id'] IS NULL
@@ -218,7 +230,8 @@ def check(move, data):
     print(f"{'table':20} {'expected':>8} {'copied':>8}")
     ok = True
     for table, n in zip(tables, expected):
-        copied = (new.execute(f"SELECT count(*) FROM lab.{table}").fetchone() or (0,))[0]
+        below = " WHERE parent IS NOT NULL" if table == "experiments" else ""  # not the project
+        copied = (new.execute(f"SELECT count(*) FROM lab.{table}{below}").fetchone() or (0,))[0]
         print(f"{table:20} {n:8} {copied:8}  {'same' if n == copied else 'DIFFERENT'}")
         ok &= n == copied
     print(f"\n{'view':20} {'old rows':>8} {'new rows':>8}")
@@ -240,7 +253,7 @@ def check(move, data):
         """SELECT e.name, t.value FROM mlflow.experiments e LEFT JOIN mlflow.experiment_tags t
            ON t.experiment_id = e.experiment_id AND t.key = 'mlflow.note.content' WHERE e.lifecycle_stage = 'active'
            AND (e.name <> 'Default' OR EXISTS (FROM runs WHERE experiment = e.name))""").fetchall()],
-        new.execute("SELECT name, description FROM lab.experiments").fetchall())
+        new.execute("SELECT name, description FROM lab.experiments WHERE parent IS NOT NULL").fetchall())
     for view, _ in query.view_columns(old):
         if view not in ("runs", "records"):
             ok &= compare(view, old.execute(f'FROM "{view}"').fetchall(), new.execute(f'FROM "{view}"').fetchall())
@@ -250,18 +263,24 @@ def check(move, data):
 def main():
     p = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     p.add_argument("old", type=Path, metavar="OLD_DATA_FOLDER")
-    old = p.parse_args().old.expanduser()
+    p.add_argument("project")
+    p.add_argument("--text", required=True)
+    p.add_argument("--folder")
+    a = p.parse_args()
+    old = a.old.expanduser()
     data = data_folder()
     if not (old / "mlflow.db").exists():
         sys.exit(f"error: no {old / 'mlflow.db'}")
     if database(data).exists():
         sys.exit(f"error: {database(data)} exists; move it away first")
     move = Move(old)
-    move.write(data)
+    if a.project in [name for name, *_ in move.experiments]:
+        sys.exit(f"error: {a.project} is the name of an old experiment; give the project another")
+    move.write(data, a.project, a.text, a.folder)
     print(f"{database(data)}: {len(move.experiments)} experiments, {len(move.runs)} runs "
           f"({len(move.companions)} of them a record's run too), {len(move.records)} records; "
-          f"{len(move.files)} files copied to {data / 'files'}, {len(move.left_out)} with other links left out\n")
-    if not check(move, data):
+          f"{len(move.run_files)} files copied to {data / 'files'}, {len(move.left_out)} with other links left out\n")
+    if not check(move, data, a.project):
         sys.exit("the copy differs")
     print("the copy agrees")
 

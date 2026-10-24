@@ -1,15 +1,22 @@
-"""Writing to the lab's database, lab.db in the data folder: experiments, and
-runs with their params, metrics, tags and files. It uses only Python's standard
-library, so a logging script can import it from any Python 3.12 with
-PYTHONPATH=<clone of experiment-lab>.
+"""Writing to the lab's database, lab.db in the data folder: projects, the
+experiments below them, and runs with their params, metrics, tags and files.
+It uses only Python's standard library, so a logging script can import it from
+any Python 3.12 with PYTHONPATH=<clone of experiment-lab>.
 
     from experiment_lab.lab import Lab
     lab = Lab()                                  # $EXPERIMENT_LAB_DATA, else ~/lab-data
-    lab.experiment("my project", description="What it measures.")
-    with lab.run("my project", "run 1", params={"rate": 48000}) as run:
+    lab.project("my-project", "What the project is.")   # once, from the project's folder
+    lab.experiment("rate test", "What it measures and why.")
+    with lab.run("rate test", "run 1", params={"rate": 48000}) as run:
         run.log_metrics({"accuracy": 0.91}, step=3)
         run.set_tags({"outcome": "pass"})
         run.log_file("plot.png")                 # copied to files/<run id>/plot.png
+
+The experiments form a tree whose roots are the projects. The project of the
+current folder is the one whose folder holds it, or holds the main worktree of
+its git repository; a new experiment goes directly below that project unless a
+parent is given, and from a project's folder only that project's experiments
+are used.
 
 A run ends FINISHED when its with block ends, FAILED on an exception, KILLED
 on Ctrl-C; without a with block, call end(). Several processes may write at
@@ -19,17 +26,47 @@ transaction, and a writer waits up to a minute for another's to end.
 import contextlib
 import shutil
 import sqlite3
+import subprocess
 import time
 import uuid
+from functools import cached_property
 from pathlib import Path
 
 from experiment_lab.settings import data_folder, database
 
 SCHEMA = Path(__file__).with_name("schema.sql")
+# the experiment given as the parameter, and those below it, as the table below
+BELOW = ("WITH RECURSIVE below(name) AS (SELECT ? UNION ALL"
+         " SELECT e.name FROM experiments e JOIN below ON e.parent = below.name)")
 
 
 def now():
     return int(time.time() * 1000)
+
+
+def working_folders():
+    """The current folder, then, inside a git repository, its main worktree,
+    so that the other worktrees of a repository share its project."""
+    here = Path.cwd().resolve()
+    try:
+        git = subprocess.run(["git", "worktree", "list", "--porcelain"], capture_output=True, text=True, check=True)
+    except (OSError, subprocess.CalledProcessError):
+        return [here]
+    return [here, Path(git.stdout.split("\n", 1)[0].removeprefix("worktree ")).resolve()]
+
+
+def holding(projects):
+    """Of the (name, folder) pairs of projects, the one whose folder holds the
+    current folder or its repository's main worktree, the innermost if several;
+    None if none."""
+    folders = working_folders()
+    found = [(len(Path(folder).parts), name) for name, folder in projects
+             if any(f.is_relative_to(folder) for f in folders)]
+    return max(found)[1] if found else None
+
+
+def absolute(path):
+    return str(Path(path).expanduser().resolve())
 
 
 class Lab:
@@ -56,21 +93,95 @@ class Lab:
             raise
         self.db.execute("COMMIT")
 
-    def experiment(self, name, description=None):
-        """Makes the experiment if there is none of that name, and sets its
-        description when one is given. A new experiment needs a description
-        (Markdown: what it measures and why), which is what finds it in a search."""
+    @cached_property
+    def current(self):
+        """The project of the current folder (holding); None if none."""
+        return holding(self.db.execute("SELECT name, folder FROM experiments WHERE parent IS NULL"))
+
+    def project(self, name, description=None, *, folder=None, files=None, views=None):
+        """Makes the project, an experiment with no parent, if there is none of
+        that name, or changes what is given. A new project needs a description
+        (one line: what the project is). Its folder is by default the main
+        worktree of the current git repository, else the current folder; files,
+        the folder its files page shows, is by default its folder; views lists
+        its view files."""
+        changes = {"description": description or None, "folder": folder and absolute(folder),
+                   "files": files and absolute(files), "views": None if views is None else "; ".join(map(absolute, views))}
         with self.write() as db:
-            if description:
-                db.execute("INSERT INTO experiments (name, description, created) VALUES (?, ?, ?)"
-                           " ON CONFLICT (name) DO UPDATE SET description = excluded.description",
-                           (name, description, now()))
-            elif not db.execute("SELECT 1 FROM experiments WHERE name = ?", (name,)).fetchone():
-                raise ValueError(f"a new experiment needs a description: {name}")
+            found = db.execute("SELECT parent FROM experiments WHERE name = ?", (name,)).fetchone()
+            if found is None:
+                if not description:
+                    raise ValueError(f"a new project needs a description: {name}")
+                changes["folder"] = changes["folder"] or str(working_folders()[-1])
+                changes["files"] = changes["files"] or changes["folder"]
+            elif found[0] is not None:
+                raise ValueError(f"{name} is an experiment below {found[0]}, not a project")
+            if changes["folder"]:
+                taken = db.execute("SELECT name FROM experiments WHERE folder = ? AND name <> ?",
+                                   (changes["folder"], name)).fetchone()
+                if taken:
+                    raise ValueError(f"{changes['folder']} is the folder of the project {taken[0]}")
+            if found is None:
+                db.execute("INSERT INTO experiments (name, created, folder, files) VALUES (?, ?, ?, ?)",
+                           (name, now(), changes["folder"], changes["files"]))
+            for column, value in changes.items():
+                if value is not None:
+                    db.execute(f"UPDATE experiments SET {column} = ? WHERE name = ?", (value, name))
+        self.__dict__.pop("current", None)
+
+    def experiment(self, name, description=None, *, parent=None, dead_end=None):
+        """Makes the experiment if there is none of that name, below parent (by
+        default the project of the current folder), or changes what is given:
+        its description (Markdown: what it measures and why, which a new
+        experiment needs and a search finds), its parent (moving it with the
+        experiments below it), whether it is a dead end (an idea that failed).
+        Returns the names from its project down to it."""
+        with self.write() as db:
+            found = db.execute("SELECT parent FROM experiments WHERE name = ?", (name,)).fetchone()
+            if found is None:
+                if not description:
+                    raise ValueError(f"a new experiment needs a description: {name}")
+                parent = parent or self.here()
+            else:
+                self.check_experiment(name)
+            if parent is not None:
+                self.check_experiment(parent)
+                if found is not None and found[0] is None:
+                    raise ValueError(f"{name} is a project, which has no parent")
+                if name in self.path(parent):
+                    raise ValueError(f"{parent} is {name} or below it")
+            if found is None:
+                db.execute("INSERT INTO experiments (name, parent, created) VALUES (?, ?, ?)", (name, parent, now()))
+            for column, value in (("parent", parent), ("description", description or None), ("dead_end", dead_end)):
+                if value is not None:
+                    db.execute(f"UPDATE experiments SET {column} = ? WHERE name = ?", (value, name))
+        return self.path(name)
+
+    def here(self):
+        """The project of the current folder; a ValueError if none holds it."""
+        if self.current is None:
+            folder = working_folders()[-1]
+            raise ValueError(f"no project holds {folder}; make it first:"
+                             f' rec project {folder.name} --text "what the project is, in one line"')
+        return self.current
+
+    def path(self, name):
+        """The names from the experiment's project down to it."""
+        names = []
+        while name is not None:
+            found = self.db.execute("SELECT parent FROM experiments WHERE name = ?", (name,)).fetchone()
+            if found is None:
+                raise ValueError(f"no experiment {name!r}; make it with rec experiment or Lab.experiment")
+            names.insert(0, name)
+            name = found[0]
+        return names
 
     def check_experiment(self, name):
-        if not self.db.execute("SELECT 1 FROM experiments WHERE name = ?", (name,)).fetchone():
-            raise ValueError(f"no experiment {name!r}; make it with Lab.experiment or rec experiment")
+        """Refuses an experiment that does not exist, or that is in another
+        project than the one of the current folder."""
+        project = self.path(name)[0]
+        if self.current and project != self.current:
+            raise ValueError(f"{name!r} is in the project {project}, not in {self.current}, whose folder this is")
 
     def run(self, experiment, name, *, note="", params=None, tags=None, start=None):
         """Starts a run, RUNNING, in an existing experiment."""

@@ -1,6 +1,6 @@
 ---
 name: experiment-db
-description: "Experiment data kept in the lab's database, lab.db: runs, parameters, metrics, decisions, findings, protocol rules and open questions. Use it to find past experiments by their text and answer any question about an experiment's state or numbers with one SQL call (q), to record a decision, finding, rule or question (rec), and to log runs from Python (experiment_lab.lab), before writing a script over result files."
+description: "Experiment data kept in the lab's database, lab.db: projects with their experiment trees, runs, parameters, metrics, decisions, findings, protocol rules and open questions. Use it to find past experiments by their text and answer any question about an experiment's state or numbers with one SQL call (q), to record a decision, finding, rule or question (rec), and to log runs from Python (experiment_lab.lab), before writing a script over result files."
 ---
 
 # Experiment database
@@ -11,14 +11,21 @@ subject, search the view `texts` first, then query the numbers of what it finds.
 - `q`, `rec` and `lab-server` are commands of experiment-lab, installed with `uv tool install` from the
   clone at `~/experiment-lab`. If `q` is not on the PATH, ask the owner where experiment-lab is.
   The data folder is `$EXPERIMENT_LAB_DATA`, default `~/lab-data`; the database is its `lab.db`.
-- `q "SQL"` runs DuckDB SQL over the views (those of `experiment_lab/lab.sql`, then those of the
-  files listed under `views` in the data folder's `lab.toml`) on `lab.db`, attached read-only as the
-  catalog `lab`, and prints at most 40 rows (`--max N`, `--full` for long cells). `q .views` lists
-  the views and their columns. The tables are `lab.experiments`, `lab.runs`, `lab.params`,
-  `lab.tags`, `lab.metrics` (every value logged, with `step` and `time`) and `lab.records`.
-- `rec experiment NAME --text DESCRIPTION` makes an experiment (or sets its description). A new
-  experiment needs a description, in Markdown: what it measures and why, in the words a later
-  search would use. `rec add KIND "TITLE" --in EXPERIMENT --text T [--experiment LABEL] --by WHO
+- The lab holds several projects. q, rec and `lab.py` work in the project of the current folder
+  (the one whose folder holds it or its git repository's main worktree). If rec says no project
+  holds the folder, make it once there: `rec project NAME --text "what the project is, in one line"`.
+- `q "SQL"` runs DuckDB SQL over the views (those of `experiment_lab/lab.sql`, then the project's
+  view files; `--project P` for another project's) on `lab.db`, attached read-only as the catalog
+  `lab`, and prints at most 40 rows (`--max N`, `--full` for long cells). `q .views` lists the views
+  and their columns. The views of `lab.sql` hold every project's rows; filter on their column
+  `project`. The tables are `lab.experiments`, `lab.runs`, `lab.params`, `lab.tags`, `lab.metrics`
+  (every value logged, with `step` and `time`) and `lab.records`.
+- `rec experiment NAME --text DESCRIPTION` makes an experiment directly below the project (or sets
+  its description). A new experiment needs a description, in Markdown: what it measures and why, in
+  the words a later search would use. When it follows from an earlier experiment's result, add
+  `--in PARENT`, picked from `rec tree`, which prints the project's experiments one per line. When an
+  idea fails, `rec experiment NAME --dead-end` and a finding saying why.
+  `rec add KIND "TITLE" --in EXPERIMENT --text T [--experiment LABEL] --by WHO
   [--answers ID] [--evidence ITEM ...]` records a decision, finding, protocol rule or question in an
   existing experiment; its text may not be empty, and `--answers` closes that question. `rec set ID FIELD=VALUE` (`status=closed`,
   `title=...`, `evidence=a;b`); `rec open`. Evidence items: `run:<run id>`, `file:<~ or absolute
@@ -30,17 +37,19 @@ subject, search the view `texts` first, then query the numbers of what it finds.
   ```python
   from experiment_lab.lab import Lab
   lab = Lab()
-  lab.experiment("my project", "What it measures and why.")   # a new one needs a description
-  with lab.run("my project", "run 1", params={"rate": 48000}, note="What this run tries") as run:
+  lab.experiment("rate test", "What it measures and why.")   # parent="..." as rec's --in
+  with lab.run("rate test", "run 1", params={"rate": 48000}, note="What this run tries") as run:
       run.log_metrics({"accuracy": 0.91}, step=0)  # every value is kept
       run.set_tags({"outcome": "pass"})
       run.log_file("table.html")                 # copied to the data folder's files/<run id>/
   ```
 
-  A run ends FINISHED when the `with` block ends and FAILED on an exception. To attach files or
+  Open the run before the work starts, with the work inside the `with` block, so that the lab
+  measures how long it took; the owner's pages add up an experiment's run durations. A run ends FINISHED
+  when the `with` block ends and FAILED on an exception. To attach files or
   numbers to a record, log them as a run and cite it as `run:<run id>`.
 - The owner reads the same records, experiments, runs and views at http://127.0.0.1:5000/lab, and
-  searches them there with a box that searches `texts` the same way.
+  searches them on its Experiments page, which searches `texts` the same way.
   Record texts, notes, descriptions and `.md` files there are Markdown; a ```` ```mermaid ```` block
   is drawn as a diagram by mermaid 11.17.2, the version mmdc uses, so check a diagram with
   `mmdc -i x.mmd -o x.svg` before recording it.
@@ -48,16 +57,17 @@ subject, search the view `texts` first, then query the numbers of what it finds.
 
 | View | One row per | Columns |
 |---|---|---|
-| `runs` | run | run, experiment, name, status, start_time (ms), tags, params, metrics (maps: `metrics['accuracy']` is the latest value, `params['lr']`), end_time, note |
-| `records` | record | id, time, experiment (the label it is shown under), kind, title, text, author, status, answers, evidence |
-| `texts` | experiment, run and record | kind (`experiment`, `run` or `record`), id, experiment, title, text: an experiment's description; a run's note, then its params and tags as `key=value` lines; a record's text |
+| `experiments` | experiment | name, project, parent, depth (0 for a project), path (`a › b › c`), dead_end, description, created |
+| `runs` | run | run, experiment, project, name, status, start_time (ms), tags, params, metrics (maps: `metrics['accuracy']` is the latest value, `params['lr']`), end_time, note |
+| `records` | record | id, time, project, experiment (the label it is shown under), kind, title, text, author, status, answers, evidence |
+| `texts` | experiment, run and record | kind (`experiment`, `run` or `record`), id, project, experiment, title, text: an experiment's description; a run's note, then its params and tags as `key=value` lines; a record's text |
 
-The project's own views are in the files that `lab.toml` lists under `views`; read those files for
-what each view holds.
+The project's own view files are listed in its row of `lab.experiments`, column `views`; read
+those files for what each view holds.
 
 ```sql
-SELECT kind, id, experiment, title FROM texts WHERE contains(lower(title || ' ' || text), 'sample rate');
-SELECT id, kind, status, title FROM records WHERE status = 'open' OR kind = 'decision' ORDER BY time;
-SELECT experiment, count(*) AS runs FROM runs GROUP BY ALL ORDER BY 2 DESC;
+SELECT kind, id, experiment, title FROM texts WHERE project = 'my-project' AND contains(lower(title || ' ' || text), 'sample rate');
+SELECT id, kind, status, title FROM records WHERE project = 'my-project' AND (status = 'open' OR kind = 'decision') ORDER BY time;
+SELECT experiment, count(*) AS runs FROM runs WHERE project = 'my-project' GROUP BY ALL ORDER BY 2 DESC;
 SELECT key, step, value FROM lab.metrics WHERE run = '<run id>' ORDER BY key, step;
 ```

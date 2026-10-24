@@ -1,12 +1,44 @@
 {% extends "lab/base.html" %}
+{% from "lab/macros.html" import dead_end_label, no_project %}
 {% block title %}Experiments{% endblock %}
 {% block main %}
 <h1>Experiments</h1>
+{% if not project %}{{ no_project() }}{% else %}
+<p class="meta">The experiments of {{ project }}, as a tree: each one below the experiment that led to it. Select one with the round button to search below it.</p>
+<form action="/lab/experiments">
+<div class="find">
+<input type="search" name="find" value="{{ find }}" placeholder="Search texts" aria-label="Search texts">
+<label><input type="checkbox" name="below" value="1"{% if below %} checked{% endif %}> only below <strong id="node-name">{{ node }}</strong></label>
+<button type="submit">Search</button>
+</div>
+<p class="note">The search finds the experiments, runs and records whose title or text holds every word searched for, in any letter case. The text is an experiment's description, a run's note, params and tags, or a record's text. In SQL, this is the view texts.</p>
+{% if hits is not none %}
+<h2>Found</h2>
+<p class="note">{% if more %}The first {{ hits|length }} found{% else %}{{ hits|length }} found{% endif %} {% if below %}in {{ node }} and below it{% else %}in {{ project }}{% endif %}.</p>
+{% if hits %}
 <table class="sortable">
-<thead><tr><th>Experiment</th><th>Runs</th><th>Records</th><th>Last run</th></tr></thead>
+<thead><tr><th>Kind</th><th>Title</th><th>Experiment</th><th>Text</th></tr></thead>
 <tbody>
-{% for name, runs, records, last_run in rows %}<tr><td><a href="/lab/experiment/{{ name|urlencode }}">{{ name }}</a></td><td class="n">{{ runs }}</td><td class="n">{{ records }}</td><td>{{ last_run or "" }}</td></tr>
+{% for h in hits %}<tr><td>{{ h.kind }}</td><td><a href="/lab/{{ h.kind }}/{{ h.id|urlencode }}">{{ h.title }}</a></td><td>{{ h.experiment }}</td><td>{{ h.snippet }}</td></tr>
 {% endfor %}
 </tbody>
 </table>
+{% endif %}
+{% endif %}
+<h2>Tree</h2>
+<div class="scroll"><table>
+<thead><tr><th></th><th>Experiment</th><th>Records</th><th>Started</th><th>Processing duration</th><th>Clock duration</th></tr></thead>
+<tbody>
+{% for e in nodes %}<tr class="{{ 'root' if not e.above }}{{ ' dead-end' if e.dead_end }}"><td><input type="radio" name="node" value="{{ e.name }}" aria-label="Select {{ e.name }}"{% if e.name == node %} checked{% endif %}></td><td class="tree"><span class="branch">{{ e.branch }}</span><a href="/lab/experiment/{{ e.name|urlencode }}">{{ e.name }}</a>{{ dead_end_label(e.dead_end) }}</td><td class="n">{{ e.records or "" }}</td><td>{{ e.started }}</td>{% for d in (e.processing, e.clock) %}<td class="n">{% if e.running %}<span class="note">running</span>{% elif d %}{{ d }}{% else %}<span class="note">not timed</span>{% endif %}</td>{% endfor %}</tr>
+{% endfor %}
+</tbody>
+</table></div>
+</form>
+<p class="note">Started is when the experiment's first run started, or when it was made if it has no runs. Processing duration is the sum of its runs' durations; clock duration is the time during which at least one of its runs was running, so it is shorter when runs ran at the same time. Both are not timed when no run has a duration (no runs, or runs logged after the work), and running while one of its runs has not ended. The project's row covers all its experiments. A dead end is an idea that failed, kept with its runs and records so the reason can be found.</p>
+<script>
+document.querySelectorAll('input[name="node"]').forEach(r => r.addEventListener("change", () => {
+  document.getElementById("node-name").textContent = r.value;
+}));
+</script>
+{% endif %}
 {% endblock %}
