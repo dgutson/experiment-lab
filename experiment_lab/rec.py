@@ -108,8 +108,8 @@ def main():
     setp.add_argument("assignments", nargs="+", metavar="FIELD=VALUE")
     sub.add_parser("open")
     a = p.parse_args()
-    lab = Lab()
     try:
+        lab = Lab()
         if a.command == "project":
             lab.project(a.name, a.text, folder=a.folder, files=a.files, views=a.views)
             folder, files, views = lab.db.execute("SELECT folder, files, views FROM experiments WHERE name = ?",
@@ -132,13 +132,13 @@ def main():
             for assignment in a.assignments:
                 field, _, value = assignment.partition("=")
                 if field not in SETTABLE:
-                    sys.exit(f"error: cannot set {field}; fields: {', '.join(SETTABLE)}")
+                    raise ValueError(f"cannot set {field}; fields: {', '.join(SETTABLE)}")
                 fields[COLUMNS.get(field, field)] = ([v.strip() for v in value.split(";") if v.strip()]
                                                      if field == "evidence" else value)
             show(records.change(lab, a.id, **fields))
-    except (ValueError, sqlite3.IntegrityError) as e:
+        rows = records.open_records(lab, lab.current)
+    except (ValueError, OSError, sqlite3.Error) as e:
         sys.exit(f"error: {e}")
-    rows = records.open_records(lab, lab.current)
     print(f"open{' in ' + lab.current if lab.current else ''} ({len(rows)}):")
     for rid, label, kind, title in rows:
         print(f"  {rid} [{label}, {kind}] {title}")
