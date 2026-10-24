@@ -45,6 +45,13 @@ The commands on the PATH come from `uv tool install --editable`, which may point
 clone than this one: the `editable` path in `$(uv tool dir)/experiment-lab/uv-receipt.toml` says
 which.
 
+An installed plugin is kept by its version: a change to `plugin/` reaches those who installed it
+only with a new `version` in `plugin/.claude-plugin/plugin.json`, since `claude plugin update`
+reports a copy of the same version as the latest. After the change is on `main`:
+`claude plugin marketplace update experiment-lab-marketplace`, then
+`claude plugin update experiment-lab@experiment-lab-marketplace`; a running session loads it with
+`/reload-plugins`.
+
 ## Architecture
 
 - Projects are the rows of `lab.experiments` with no parent; only they have `folder`, `files` and
