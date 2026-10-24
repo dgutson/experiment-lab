@@ -1,0 +1,40 @@
+# The checks of CLAUDE.md, "Commands", on every push and pull request, except
+# the evals, which cost money and are run by hand. A pull request from a branch
+# of this repository is checked by its push.
+name: checks
+on: [push, pull_request]
+
+jobs:
+  checks:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-24.04  # its image has Google Chrome, which check_pages.py opens
+    env:
+      EXPERIMENT_LAB_PORT: "5001"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2  # it has no major-version tag
+      - name: Type check
+        run: |
+          uv sync
+          uvx pyright@1.1.414 experiment_lab
+      - name: DuckDB reads attached SQLite tables correctly
+        run: uv run --script bin/sqlite_filter_bug.py
+      - name: Make a lab to check
+        run: |
+          uv run python bin/make_scratch.py "$RUNNER_TEMP/lab"
+          echo "EXPERIMENT_LAB_DATA=$RUNNER_TEMP/lab/lab-data" >> "$GITHUB_ENV"
+      - name: Views read the same with lab.db attached and copied
+        run: uv run --script bin/check_views.py
+      - name: Pages
+        run: |
+          PATH=$PWD/.venv/bin:$PATH bin/start.sh
+          uv run --script bin/check_pages.py --shots "$RUNNER_TEMP/shots"
+      - name: Keep the screenshots and the server's log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pages
+          path: |
+            ${{ runner.temp }}/shots
+            ${{ env.EXPERIMENT_LAB_DATA }}/server.log
+          if-no-files-found: ignore
