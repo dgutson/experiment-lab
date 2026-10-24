@@ -1,3 +1,0 @@
-#!/bin/sh
-# record.py; see record.py for usage.
-exec uv run --quiet --script "$(dirname "$(readlink -f "$0")")/record.py" "$@"

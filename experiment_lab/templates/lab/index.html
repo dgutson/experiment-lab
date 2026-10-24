@@ -1,0 +1,29 @@
+{% extends "lab/base.html" %}
+{% block title %}Records{% endblock %}
+{% block main %}
+<h1>Records</h1>
+<p class="meta">Decisions, findings, protocol rules and questions, by the experiment they are filed in. Click a column heading to sort.</p>
+<h2>Open</h2>
+{% if open %}
+<table class="sortable">
+<thead><tr><th>Title</th><th>Kind</th><th>Experiment</th><th>By</th><th>Time</th></tr></thead>
+<tbody>
+{% for r in open %}<tr><td><a href="/lab/record/{{ r.id }}">{{ r.title }}</a></td><td>{{ r.kind }}</td><td>{{ r.experiment }}</td><td>{{ r.author }}</td><td>{{ r.time }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% else %}<p>No open records.</p>{% endif %}
+{% for name, labels in groups %}
+<h2><a href="/lab/experiment/{{ name|urlencode }}">{{ name }}</a></h2>
+{% for label, rows in labels|dictsort %}
+{% if label != name %}<h3>{{ label }}</h3>{% endif %}
+<table class="sortable">
+<thead><tr><th>Kind</th><th>Status</th><th>Title</th><th>By</th><th>Time</th></tr></thead>
+<tbody>
+{% for r in rows %}<tr class="{{ r.status }}"><td>{{ r.kind }}</td><td>{{ r.status }}</td><td><a href="/lab/record/{{ r.id }}">{{ r.title }}</a></td><td>{{ r.author }}</td><td>{{ r.time }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% endfor %}
+{% endfor %}
+{% endblock %}

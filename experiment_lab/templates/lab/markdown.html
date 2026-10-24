@@ -1,6 +1,6 @@
 {% extends "lab/base.html" %}
 {% block title %}{{ shown }}{% endblock %}
 {% block main %}
-<p class="meta">{{ shown }} · <a href="{{ url_for('lab.file_page', path=shown, raw=1) }}">plain text</a></p>
+<p class="meta">{{ shown }} · <a href="/lab/file?path={{ shown|urlencode }}&amp;raw=1">plain text</a></p>
 {{ text }}
 {% endblock %}

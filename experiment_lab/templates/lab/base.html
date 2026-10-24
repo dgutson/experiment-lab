@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}Lab{% endblock %} · MLflow lab</title>
+<title>{% block title %}Lab{% endblock %} · Lab</title>
 <style>
 :root { --bg: #ffffff; --fg: #1f2328; --muted: #656d76; --line: #d0d7de; --head: #f6f8fa; --link: #0969da; --open: #9a6700; --bad: #cf222e; }
 @media (prefers-color-scheme: dark) {
@@ -34,15 +34,18 @@ tr.open td, span.open { color: var(--open); font-weight: 600; }
 tr.superseded td, span.superseded { color: var(--muted); text-decoration: line-through; }
 .error { color: var(--bad); white-space: pre-wrap; }
 textarea { box-sizing: border-box; width: 100%; font: 13px ui-monospace, monospace; background: var(--bg); color: var(--fg); border: 1px solid var(--line); padding: 6px; }
+nav form { margin-left: auto; }
+nav input { font: inherit; background: var(--bg); color: var(--fg); border: 1px solid var(--line); padding: 2px 8px; width: 16em; max-width: 60vw; }
 </style>
 </head>
 <body>
 <nav>
   <strong>Lab</strong>
-  <a href="{{ url_for('lab.index') }}">Records</a>
-  <a href="{{ url_for('lab.query_page') }}">Views and query</a>
-  <a href="{{ url_for('lab.file_page') }}">Files</a>
-  <a href="/">MLflow</a>
+  <a href="/lab/">Records</a>
+  <a href="/lab/experiments">Experiments</a>
+  <a href="/lab/query">Views and query</a>
+  <a href="/lab/file">Files</a>
+  <form action="/lab/search"><input name="find" value="{{ find|default("") }}" placeholder="Search texts" aria-label="Search texts"></form>
 </nav>
 <main>{% block main %}{% endblock %}</main>
 <script>
@@ -105,7 +108,7 @@ document.querySelectorAll("table.sortable").forEach(t => {
   };
   if (blocks.length) {
     const script = document.createElement("script");
-    script.src = "{{ url_for('lab.static', filename='mermaid-11.17.2.min.js') }}";
+    script.src = "/lab/static/mermaid-11.17.2.min.js";
     script.onload = () => { draw(); dark.addEventListener("change", draw); };
     script.onerror = () => blocks.forEach(b => showError(b, `mermaid.js did not load from ${script.src}`));
     document.body.append(script);

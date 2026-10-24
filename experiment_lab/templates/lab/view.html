@@ -1,0 +1,8 @@
+{% extends "lab/base.html" %}
+{% from "lab/macros.html" import data_table %}
+{% block title %}{{ name }}{% endblock %}
+{% block main %}
+<h1>{{ name }}</h1>
+<p class="meta"><a href="/lab/query?sql={{ ('SELECT * FROM "' ~ name ~ '"')|urlencode }}">query it</a></p>
+{{ data_table(t) }}
+{% endblock %}

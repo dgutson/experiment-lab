@@ -1,0 +1,33 @@
+{% extends "lab/base.html" %}
+{% from "lab/macros.html" import record_links %}
+{% block title %}{{ r.name }}{% endblock %}
+{% block main %}
+<h1>{{ r.name }}</h1>
+<p class="meta">{{ r.status }} · in <a href="/lab/experiment/{{ r.experiment|urlencode }}">{{ r.experiment }}</a> · {{ r.started }}{% if r.ended %} to {{ r.ended }}{% endif %} · id {{ r.run }}</p>
+{{ note }}
+{% for title, values in maps %}{% if values %}
+<h2>{{ title }}</h2>
+<table class="sortable">
+<thead><tr><th>Key</th><th>Value</th></tr></thead>
+<tbody>
+{% for k, v in values|dictsort %}<tr><td>{{ k }}</td><td{% if v is number %} class="n"{% endif %}>{{ v|cell }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% endif %}{% endfor %}
+{% if r.metrics %}<p class="note"><a href="/lab/query?sql={{ ("SELECT key, step, time, value FROM lab.metrics WHERE run = '" ~ r.run ~ "' ORDER BY key, step, time")|urlencode }}">Every value logged</a></p>{% endif %}
+{% if files %}
+<h2>Files</h2>
+<table class="sortable">
+<thead><tr><th>Name</th><th>Bytes</th></tr></thead>
+<tbody>
+{% for name, size in files %}<tr><td><a href="/lab/run/{{ r.run }}/file/{{ name|urlencode }}">{{ name }}</a></td><td class="n">{{ size }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% endif %}
+{% if cited_by %}
+<h2>Cited by</h2>
+{{ record_links(cited_by) }}
+{% endif %}
+{% endblock %}
