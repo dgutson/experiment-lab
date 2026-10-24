@@ -1,0 +1,13 @@
+{% extends "lab/base.html" %}
+{% block title %}{{ shown }}{% endblock %}
+{% block main %}
+<h1>{{ shown }}</h1>
+{% if parent %}<p><a href="/lab/file?path={{ parent|urlencode }}">↑ {{ parent }}</a></p>{% endif %}
+<table class="sortable">
+<thead><tr><th>Name</th><th>Bytes</th></tr></thead>
+<tbody>
+{% for i in items %}<tr><td><a href="/lab/file?path={{ i.path|urlencode }}">{{ i.name }}</a></td><td class="n">{{ i.size }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% endblock %}

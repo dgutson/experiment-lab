@@ -4,9 +4,9 @@
 # ///
 """Checks that DuckDB reads attached SQLite tables correctly: a filter on two
 maps built from two attached SQLite tables must count the 50 rows that match
-(DuckDB 1.5.5 counts 0). Before raising the DuckDB pin in q.py and in
-mlflow-lab, set the new version above and run this and check_views.py; both
-must pass.
+(DuckDB 1.5.5 counts 0). The view runs of lab.sql filters such maps. Before
+raising the DuckDB pin in pyproject.toml, set the new version above and run
+this and check_views.py; both must pass.
 
 usage: uv run --script sqlite_filter_bug.py
 """

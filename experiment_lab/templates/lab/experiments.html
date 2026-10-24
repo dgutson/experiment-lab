@@ -1,0 +1,12 @@
+{% extends "lab/base.html" %}
+{% block title %}Experiments{% endblock %}
+{% block main %}
+<h1>Experiments</h1>
+<table class="sortable">
+<thead><tr><th>Experiment</th><th>Runs</th><th>Records</th><th>Last run</th></tr></thead>
+<tbody>
+{% for name, runs, records, last_run in rows %}<tr><td><a href="/lab/experiment/{{ name|urlencode }}">{{ name }}</a></td><td class="n">{{ runs }}</td><td class="n">{{ records }}</td><td>{{ last_run or "" }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% endblock %}

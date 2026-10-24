@@ -1,0 +1,33 @@
+{% extends "lab/base.html" %}
+{% from "lab/macros.html" import data_table, record_links %}
+{% block title %}{{ r.title }}{% endblock %}
+{% block main %}
+<h1>{{ r.title }}</h1>
+<p class="meta">{{ r.kind }} · <span class="{{ r.status }}">{{ r.status }}</span> · by {{ r.author or "?" }} · {{ r.time }} · {{ r.experiment }} ·
+  in <a href="/lab/experiment/{{ r.filed_in|urlencode }}">{{ r.filed_in }}</a> · id {{ r.id }}</p>
+{% if answers %}<p>Answers <a href="/lab/record/{{ answers.id }}">{{ answers.title }}</a> ({{ answers.kind }}, {{ answers.status }}).</p>{% endif %}
+{% for x in answered_by %}<p>Answered by <a href="/lab/record/{{ x.id }}">{{ x.title }}</a> ({{ x.kind }}, {{ x.time }}).</p>{% endfor %}
+{{ text }}
+<h2>Evidence</h2>
+{% if not evidence %}<p>None listed.</p>{% endif %}
+{% for e in evidence %}
+{% if e.kind == "sql" %}
+<h3>Query</h3>
+<pre>{{ e.value }}</pre>
+{% if e.table.error %}<p class="error">{{ e.table.error }}</p>{% else %}{{ data_table(e.table) }}{% endif %}
+<p class="note"><a href="/lab/query?sql={{ e.value|urlencode }}">Open in the query box</a></p>
+{% elif e.kind == "run" %}
+<p>Run: {% if e.label %}<a href="/lab/run/{{ e.value }}">{{ e.label }}</a>{% else %}{{ e.value }} (no such run){% endif %}</p>
+{% elif e.kind == "file" %}
+<p>File: <a href="/lab/file?path={{ e.value|urlencode }}">{{ e.value }}</a></p>
+{% elif e.kind == "record" %}
+<p>Record: {% if e.label %}<a href="/lab/record/{{ e.value }}">{{ e.label }}</a>{% else %}{{ e.value }} (no such record){% endif %}</p>
+{% else %}
+<p>{{ e.kind }}:{{ e.value }}</p>
+{% endif %}
+{% endfor %}
+{% if cited_by %}
+<h2>Cited by</h2>
+{{ record_links(cited_by) }}
+{% endif %}
+{% endblock %}

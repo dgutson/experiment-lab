@@ -1,13 +1,20 @@
 [project]
-name = "mlflow-lab"
-version = "0.1.0"
-description = "Pages at /lab of the MLflow server: records, lab.sql's views, a read-only query box, experiment files."
+name = "experiment-lab"
+version = "0.2.0"
+description = "Decisions, findings, protocol rules and questions about experiments, next to the experiments' runs: q, rec and the /lab pages."
 requires-python = ">=3.12"
-dependencies = ["duckdb==1.5.6", "markdown==3.11"]
+dependencies = ["duckdb==1.5.6", "fastapi==0.143.0", "jinja2==3.1.6", "markdown==3.11", "uvicorn==0.54.0"]
 
-[project.entry-points."mlflow.app"]
-lab = "mlflow_lab:create_app"
+[project.scripts]
+q = "experiment_lab.q:main"
+rec = "experiment_lab.rec:main"
+lab-server = "experiment_lab.pages:main"
+lab-from-mlflow = "experiment_lab.from_mlflow:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"

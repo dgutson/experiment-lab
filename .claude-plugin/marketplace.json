@@ -1,15 +1,15 @@
 {
-  "name": "mlflow-lab-marketplace",
-  "description": "Marketplace hosting the mlflow-lab plugin.",
+  "name": "experiment-lab-marketplace",
+  "description": "Marketplace hosting the experiment-lab plugin.",
   "owner": {
     "name": "Daniel Gutson",
     "url": "https://github.com/dgutson"
   },
   "plugins": [
     {
-      "name": "mlflow-lab",
+      "name": "experiment-lab",
       "source": "./plugin",
-      "description": "The experiment-db skill: Claude answers questions about experiments with one DuckDB SQL query (q) over the local MLflow server's database, and records decisions, findings, protocol rules and open questions with rec."
+      "description": "The experiment-db skill: Claude answers questions about experiments with one DuckDB SQL query (q) over the lab's database, records decisions, findings, protocol rules and open questions with rec, and logs runs from Python."
     }
   ]
 }
