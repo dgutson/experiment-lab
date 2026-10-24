@@ -1,0 +1,28 @@
+schema_version: "1.1"
+name: dead-end
+description: Told that an idea failed, the agent marks its experiment as a dead end and files a finding saying why.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    The noise gate didn't work out: it cuts off the quiet ends of notes. Record that in the lab.
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  - name: marked-dead-end
+    type: tool_used
+    tool: Bash
+    input_match: 'noise gate.{0,80}--dead-end|--dead-end.{0,80}noise gate'
+  - name: finding-filed
+    type: llm
+    focus: trace
+    criteria: |
+      PASS if the agent filed a finding in the experiment "noise gate" (a `rec add finding ... --in "noise gate"`
+      command whose output shows the new record, not an error) and the finding's text says that the gate cuts off
+      the quiet ends of notes. FAIL if no such finding was filed, it was filed in another experiment, or rec
+      printed an error for it.

@@ -1,0 +1,26 @@
+schema_version: "1.1"
+name: find-past-work
+description: Asked whether something was tried, the agent searches the view texts; the subject is in no experiment's name.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    Did anyone already try adding dither? What came of it?
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  - name: searched-texts
+    type: tool_used
+    tool: Bash
+    input_match: texts
+  - name: names-experiment
+    type: regex
+    pattern: '16-bit output'
+  - name: gives-result
+    type: regex
+    pattern: '6 ?dB'

@@ -1,0 +1,23 @@
+schema_version: "1.1"
+name: other-project-views
+description: Asked about a view of another project, the agent uses q --project.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    Which photo does the vision project's blur_scores view say is the sharpest?
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  - name: project-option
+    type: tool_used
+    tool: Bash
+    input_match: '--project[ =]vision'
+  - name: names-photo
+    type: regex
+    pattern: 'market\.jpg'

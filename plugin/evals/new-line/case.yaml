@@ -1,0 +1,26 @@
+schema_version: "1.1"
+name: new-line
+description: An idea unrelated to the earlier experiments goes directly below the project.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    Set up an experiment in the lab that checks whether the encoded files play in VLC, mpv and
+    ffplay. Only set it up; don't run anything.
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  - name: experiment-made
+    type: tool_used
+    tool: Bash
+    input_match: rec experiment
+  - name: not-below-another
+    type: regex
+    target: trace
+    match: not_contains
+    pattern: 'experiment audio-codec › (sample rate sweep|16-bit output|noise shaping|noise gate) › '

@@ -1,0 +1,34 @@
+schema_version: "1.1"
+name: log-runs
+description: Asked to log a script's runs, the agent opens each run before its work, so that its duration is measured.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    Log bench.py's runs in the lab, in a new experiment: one run per frame size, with its time as a
+    metric.
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  - name: experiment-made
+    type: regex
+    target: trace
+    pattern: 'experiment audio-codec › \S|\.experiment\('
+  - name: runs-opened
+    type: regex
+    target: trace
+    pattern: 'with lab\.run\('
+  - name: work-inside-run
+    type: llm
+    focus: trace
+    criteria: |
+      bench.py times a function, encode(frame), at three frame sizes. PASS if the agent's code calls encode (or
+      runs bench.py's loop body) inside a `with lab.run(...)` block, one run per frame size, so that each run is
+      open while its work happens, and that code ran without an error. FAIL if the work runs first and the runs
+      are logged afterwards (for example by parsing bench.py's printed output into runs), if there is one run for
+      all frame sizes, or if the code failed.

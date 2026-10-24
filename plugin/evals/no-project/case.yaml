@@ -1,0 +1,31 @@
+schema_version: "1.1"
+name: no-project
+description: In a folder no project holds, the agent makes the project once, then the experiment.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    I'm starting work on a JSON parser in this folder. Set up a first experiment in the lab: how long
+    parsing takes on files of 1, 10 and 100 MB. Only set it up; don't run anything.
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  - name: project-made-once
+    type: tool_used
+    tool: Bash
+    input_match: rec project
+    min: 1
+    max: 1
+  - name: project-made
+    type: regex
+    target: trace
+    pattern: 'project \S+, folder '
+  - name: experiment-below-project
+    type: regex
+    target: trace
+    pattern: 'experiment \S+ › \S'

@@ -1,0 +1,21 @@
+schema_version: "1.1"
+name: pick-parent
+description: Asked for the step an experiment's finding suggests, the agent makes it below that experiment.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    Set up, in the lab, the experiment that the finding on sample rates says to try next. Only set it
+    up; don't run anything.
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  - name: below-sample-rate-sweep
+    type: regex
+    target: trace
+    pattern: 'experiment audio-codec › sample rate sweep › \S'

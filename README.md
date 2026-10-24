@@ -171,8 +171,14 @@ claude plugin install experiment-lab@experiment-lab-marketplace
 ```
 
 Its skill, `experiment-lab:experiment-db`, runs `q` and `rec` from the PATH, which find the project
-from the current folder, so it needs no editing. Eval cases for the plugin go in `plugin/evals/`;
-run them with `claude plugin eval ~/experiment-lab/plugin`.
+from the current folder, so it needs no editing.
+
+`plugin/evals/` holds eval cases for the skill. In each case, an agent given the plugin, and one
+without it, does a task in a small lab of its own (`plugin/evals/make_lab.py`), and graders check
+the commands it ran, what rec printed and what it answered. `bin/evals.sh` runs them with this
+clone's code through `claude plugin eval`, which takes the options given (for example
+`--case dead-end --runs 1 --model sonnet`). `plugin/evals/baseline.md` has the last full run's
+scores and costs.
 
 ## Logging runs from Python
 

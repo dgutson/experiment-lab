@@ -1,12 +1,21 @@
 ---
 name: experiment-db
-description: "Experiment data kept in the lab's database, lab.db: projects with their experiment trees, runs, parameters, metrics, decisions, findings, protocol rules and open questions. Use it to find past experiments by their text and answer any question about an experiment's state or numbers with one SQL call (q), to record a decision, finding, rule or question (rec), and to log runs from Python (experiment_lab.lab), before writing a script over result files."
+description: "Experiment data kept in the lab's database, lab.db: projects with their experiment trees, runs, parameters, metrics, decisions, findings, protocol rules and open questions. Use it to find past experiments by their text and answer any question about an experiment's state or numbers, or about a project's views, with one SQL call (q), to record a decision, finding, rule or question (rec), and to log runs from Python (experiment_lab.lab), before writing a script over result files."
 ---
 
 # Experiment database
 
 Answer from `q` before writing a new script. To find past experiments, runs or records about a
 subject, search the view `texts` first, then query the numbers of what it finds.
+
+An experiment, in order:
+
+1. `rec tree` prints the project's experiments, one per line, each indented below the one it came from.
+2. `rec experiment NAME --text DESCRIPTION`, with `--in PARENT` when it follows from the result of
+   PARENT, an experiment of `rec tree`; without it for an idea unrelated to the earlier ones.
+3. The work, inside `with lab.run(...)` (below), so that the lab measures how long each run took.
+4. `rec add finding "TITLE" --in NAME --text "what the runs showed" --evidence run:<run id>`.
+5. If the idea failed, `rec experiment NAME --dead-end`, and the finding says why.
 
 - `q`, `rec` and `lab-server` are commands of experiment-lab, installed with `uv tool install` from the
   clone at `~/experiment-lab`. If `q` is not on the PATH, ask the owner where experiment-lab is.
@@ -20,12 +29,10 @@ subject, search the view `texts` first, then query the numbers of what it finds.
   and their columns. The views of `lab.sql` hold every project's rows; filter on their column
   `project`. The tables are `lab.experiments`, `lab.runs`, `lab.params`, `lab.tags`, `lab.metrics`
   (every value logged, with `step` and `time`) and `lab.records`.
-- `rec experiment NAME --text DESCRIPTION` makes an experiment directly below the project (or sets
-  its description). A new experiment needs a description, in Markdown: what it measures and why, in
-  the words a later search would use. When it follows from an earlier experiment's result, add
-  `--in PARENT`, picked from `rec tree`, which prints the project's experiments one per line. When an
-  idea fails, `rec experiment NAME --dead-end` and a finding saying why.
-  `rec add KIND "TITLE" --in EXPERIMENT --text T [--experiment LABEL] --by WHO
+- `rec experiment NAME --text DESCRIPTION [--in PARENT] [--dead-end | --no-dead-end]` makes an
+  experiment, or changes it when it exists. A new experiment needs a description, in Markdown: what
+  it measures and why, in the words a later search would use.
+  `rec add KIND "TITLE" --in EXPERIMENT --text T [--experiment LABEL] [--by WHO]
   [--answers ID] [--evidence ITEM ...]` records a decision, finding, protocol rule or question in an
   existing experiment; its text may not be empty, and `--answers` closes that question. `rec set ID FIELD=VALUE` (`status=closed`,
   `title=...`, `evidence=a;b`); `rec open`. Evidence items: `run:<run id>`, `file:<~ or absolute
@@ -42,10 +49,11 @@ subject, search the view `texts` first, then query the numbers of what it finds.
       run.log_metrics({"accuracy": 0.91}, step=0)  # every value is kept
       run.set_tags({"outcome": "pass"})
       run.log_file("table.html")                 # copied to the data folder's files/<run id>/
+      print(run.id)                              # what evidence cites as run:<run id>
   ```
 
-  Open the run before the work starts, with the work inside the `with` block, so that the lab
-  measures how long it took; the owner's pages add up an experiment's run durations. A run ends FINISHED
+  Open the run before the work starts, with the work inside the `with` block; the owner's pages add
+  up an experiment's run durations. A run ends FINISHED
   when the `with` block ends and FAILED on an exception. To attach files or
   numbers to a record, log them as a run and cite it as `run:<run id>`.
 - The owner reads the same records, experiments, runs and views at http://127.0.0.1:5000/lab, and
