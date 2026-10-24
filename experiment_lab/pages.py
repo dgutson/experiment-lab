@@ -1,6 +1,7 @@
 """The /lab pages, each of one project, picked at the top of every page: the
 project's records with their evidence, its experiments as a tree with a search
-of their texts, the views as tables, a query box, and the project's files.
+of their texts, the views as tables, a query box, and the files under the
+projects' folders and files folders, which the other pages link to.
 lab-server serves them with uvicorn at http://127.0.0.1:$EXPERIMENT_LAB_PORT
 (default 5000).
 
@@ -15,11 +16,13 @@ it makes is kept.
 import contextlib
 import mimetypes
 import os
+import re
 import subprocess
 import sys
 import threading
 import urllib.parse
 from pathlib import Path
+from xml.etree import ElementTree
 
 import duckdb
 import markdown
@@ -28,6 +31,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from markdown.treeprocessors import Treeprocessor
 from markupsafe import Markup
 
 from experiment_lab import query, records
@@ -43,6 +47,9 @@ TEXT_TYPES = ("application/json", "application/javascript", "application/xml", "
 # statements that would act outside the transaction that is rolled back
 REFUSED = (duckdb.StatementType.TRANSACTION, duckdb.StatementType.ATTACH, duckdb.StatementType.DETACH)
 TIME = "strftime(to_timestamp({} / 1000), '%Y-%m-%d %H:%M')"
+# a ~/ or absolute path in a text, after the start, a space, a parenthesis or a quote; a . , ; : ! or ?
+# at its end is not part of it
+PATH = re.compile(r"""(?<![^\s("'])~?/[^\s()<>"'`\[\]]*[^\s()<>"'`\[\].,;:!?]""")
 
 templates = Jinja2Templates(directory=HERE / "templates")
 templates.env.filters["cell"] = query.cell
@@ -109,8 +116,74 @@ def run_sql(con, sql, limit=ROWS, cut: int | None = CUT):
         return {"error": str(e)}
 
 
-def md(text):
-    return Markup(markdown.markdown(text or "", extensions=["tables", "fenced_code", "sane_lists"]))
+def roots(con):
+    """The folders whose files /lab/file serves: each project's folder and files folder."""
+    return [Path(f).resolve() for row in con.execute("SELECT folder, files FROM lab.experiments"
+                                                     " WHERE parent IS NULL").fetchall() for f in row]
+
+
+def served(path, roots):
+    """The file or folder at path (~/ or absolute), resolved, if /lab/file serves it, else None."""
+    target = Path(os.path.expanduser(path))
+    if not target.is_absolute():
+        return None
+    target = target.resolve()
+    return target if any(target.is_relative_to(r) for r in roots) and target.exists() else None
+
+
+def media(path):
+    """"audio" or "image" for a file the pages play or show in place, else None."""
+    kind = mimetypes.guess_type(path.name)[0] or ""
+    return next((m for m in ("audio", "image") if kind.startswith(m + "/")), None)
+
+
+def link(path):
+    a = ElementTree.Element("a", href="/lab/file?path=" + urllib.parse.quote(path))
+    a.text = path
+    return a
+
+
+class PathLinks(Treeprocessor):
+    """Makes each path of the text (PATH) that /lab/file serves a link to it,
+    also when it is all of a code span, but not in code blocks and links."""
+
+    def __init__(self, md, roots):
+        super().__init__(md)
+        self.roots = roots
+
+    def pieces(self, text):
+        """text up to its first served path, and a link for each, with the
+        text after it up to the next as its tail."""
+        found = [m for m in PATH.finditer(text) if served(m[0], self.roots)]
+        links = [link(m[0]) for m in found]
+        for a, m, end in zip(links, found, [m.start() for m in found[1:]] + [len(text)]):
+            a.tail = text[m.end():end]
+        return text[:found[0].start()] if found else text, links
+
+    def run(self, root):
+        if root.tag in ("pre", "a"):
+            return
+        if root.tag == "code":
+            if root.text and PATH.fullmatch(root.text) and served(root.text, self.roots):
+                root.append(link(root.text))
+                root.text = None
+            return
+        for child in list(root):
+            self.run(child)
+            if child.tail:
+                child.tail, links = self.pieces(child.tail)
+                at = list(root).index(child) + 1
+                root[at:at] = links
+        if root.text:
+            root.text, links = self.pieces(root.text)
+            root[0:0] = links
+
+
+def md(text, roots):
+    """The Markdown text as HTML, with paths that /lab/file serves (roots) linked."""
+    m = markdown.Markdown(extensions=["tables", "fenced_code", "sane_lists"])
+    m.treeprocessors.register(PathLinks(m, roots), "paths", 5)
+    return Markup(m.convert(text or ""))
 
 
 def all_records(con, project=None):
@@ -296,8 +369,8 @@ def create_app(data):
         rs = [r for r in all_records(con) if r["filed_in"] == name]
         project = folder and {"folder": shown_path(Path(folder)), "files": shown_path(Path(files)),
                               "views": [shown_path(Path(v)) for v in views.split("; ") if v]}
-        return page(request, "experiment", name=name, description=md(description), dead_end=dead_end, above=above,
-                    branches=branches, project_settings=project, t=t, records=rs)
+        return page(request, "experiment", name=name, description=md(description, roots(con)), dead_end=dead_end,
+                    above=above, branches=branches, project_settings=project, t=t, records=rs)
 
     @app.get("/lab/run/{rid}")
     def run_page(request: Request, rid: str, con=Depends(cursor)):
@@ -308,9 +381,10 @@ def create_app(data):
             raise HTTPException(404, f"no run {rid}")
         r = dict(zip([d[0] for d in result.description], row))
         folder = data / "files" / rid
-        files = sorted((str(p.relative_to(folder)), p.stat().st_size) for p in folder.rglob("*") if p.is_file())
+        files = sorted((str(p.relative_to(folder)), p.stat().st_size, media(p))
+                       for p in folder.rglob("*") if p.is_file())
         cited_by = [x for x in all_records(con) if f"run:{rid}" in x["evidence"]]
-        return page(request, "run", r=r, note=md(r["note"]), files=files, cited_by=cited_by,
+        return page(request, "run", r=r, note=md(r["note"], roots(con)), files=files, cited_by=cited_by,
                     maps=[(title, r[key] or {}) for title, key in
                           (("Params", "params"), ("Latest metrics", "metrics"), ("Tags", "tags"))])
 
@@ -328,13 +402,20 @@ def create_app(data):
         if rid not in rs:
             raise HTTPException(404, f"no record {rid}")
         r = rs[rid]
+        tops = roots(con)
         evidence = []
         # sql: evidence reads the views of the record's project
         with contextlib.closing(request.app.state.views.cursor(r["project"])) as own:
             for item in r["evidence"]:
                 kind, _, value = item.partition(":")
+                if kind not in records.EVIDENCE:  # records.check refuses these; from_mlflow copies MLflow's as they are
+                    url = item.startswith(("http://", "https://"))
+                    kind, value = "file" if PATH.fullmatch(item) else "url" if url else "text", item
                 e = {"kind": kind, "value": value}
-                if kind == "sql":
+                if kind == "file":
+                    target = served(value, tops)
+                    e["served"], e["media"] = target is not None, target and media(target)
+                elif kind == "sql":
                     e["table"] = run_sql(own, value, EVIDENCE_ROWS)
                 elif kind == "run":
                     found = con.execute("SELECT name, experiment FROM lab.runs WHERE id = ?", [value]).fetchone()
@@ -344,7 +425,7 @@ def create_app(data):
                 evidence.append(e)
         answered_by = [x for x in rs.values() if x["answers"] == rid]
         cited_by = [x for x in rs.values() if f"record:{rid}" in x["evidence"]]
-        return page(request, "record", r=r, text=md(r["text"]), evidence=evidence, answers=rs.get(r["answers"]),
+        return page(request, "record", r=r, text=md(r["text"], tops), evidence=evidence, answers=rs.get(r["answers"]),
                     answered_by=answered_by, cited_by=cited_by)
 
     @app.get("/lab/view/{name}")
@@ -361,26 +442,26 @@ def create_app(data):
 
     @app.get("/lab/file")
     def file_page(request: Request, path: str = "", raw: str = "", con=Depends(cursor)):
-        """A file or folder under a project's files folder; without path, the picked project's."""
-        folders = dict(con.execute("SELECT name, files FROM lab.experiments WHERE parent IS NULL").fetchall())
-        if not folders:
+        """A file or folder under a project's folder or files folder; without
+        path, the picked project's files folder."""
+        files = dict(con.execute("SELECT name, files FROM lab.experiments WHERE parent IS NULL").fetchall())
+        if not files:
             raise HTTPException(404, "no project yet, so no files folder: rec project makes one")
-        target = Path(os.path.expanduser(path or folders[request.state.project])).resolve()
-        tops = [Path(f) for f in folders.values() if target.is_relative_to(f)]
-        if not tops:
-            raise HTTPException(403, "only files under the projects' files folders are shown")
-        top = min(tops, key=lambda f: len(f.parts))
-        if not target.exists():
-            raise HTTPException(404, f"no file {target}")
+        path, tops = path or files[request.state.project], roots(con)
+        target = served(path, tops)
+        if target is None:
+            raise HTTPException(404, f"no file {path} under a project's folder or files folder")
+        top = min((r for r in tops if target.is_relative_to(r)), key=lambda r: len(r.parts))
         shown = shown_path(target)
         if target.is_dir():
             entries = sorted(target.iterdir(), key=lambda p: (not p.is_dir(), p.name))
             items = [{"name": p.name + ("/" if p.is_dir() else ""), "path": f"{shown}/{p.name}",
-                      "size": p.stat().st_size if p.is_file() else ""} for p in entries]
+                      "size": p.stat().st_size if p.is_file() else "", "media": p.is_file() and media(p)}
+                     for p in entries]
             parent = shown_path(target.parent) if target != top else None
             return page(request, "folder", shown=shown, items=items, parent=parent)
         if target.suffix == ".md" and not raw:
-            return page(request, "markdown", shown=shown, text=md(target.read_text(errors="replace")))
+            return page(request, "markdown", shown=shown, text=md(target.read_text(errors="replace"), tops))
         return send(target)
 
     return app

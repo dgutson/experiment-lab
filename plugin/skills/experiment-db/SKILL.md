@@ -57,7 +57,9 @@ An experiment, in order:
   when the `with` block ends and FAILED on an exception. To attach files or
   numbers to a record, log them as a run and cite it as `run:<run id>`.
 - The owner reads the same records, experiments, runs and views at http://127.0.0.1:5000/lab, and
-  searches them on its Experiments page, which searches `texts` the same way.
+  searches them on its Experiments page, which searches `texts` the same way. The pages link a `file:`
+  item, and a `~/` or absolute path in any text, to the file when it is under a project's folder or
+  files folder, with a player for audio and the image for an image; a relative path is not linked.
   Record texts, notes, descriptions and `.md` files there are Markdown; a ```` ```mermaid ```` block
   is drawn as a diagram by mermaid 11.17.2, the version mmdc uses, so check a diagram with
   `mmdc -i x.mmd -o x.svg` before recording it.

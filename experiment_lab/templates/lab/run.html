@@ -1,5 +1,5 @@
 {% extends "lab/base.html" %}
-{% from "lab/macros.html" import record_links %}
+{% from "lab/macros.html" import record_links, in_place %}
 {% block title %}{{ r.name }}{% endblock %}
 {% block main %}
 <h1>{{ r.name }}</h1>
@@ -21,7 +21,7 @@
 <table class="sortable">
 <thead><tr><th>Name</th><th>Bytes</th></tr></thead>
 <tbody>
-{% for name, size in files %}<tr><td><a href="/lab/run/{{ r.run }}/file/{{ name|urlencode }}">{{ name }}</a></td><td class="n">{{ size }}</td></tr>
+{% for name, size, media in files %}{% set src = "/lab/run/" ~ r.run ~ "/file/" ~ name|urlencode %}<tr><td><a href="{{ src }}">{{ name }}</a>{{ in_place(media, src) }}</td><td class="n">{{ size }}</td></tr>
 {% endfor %}
 </tbody>
 </table>
