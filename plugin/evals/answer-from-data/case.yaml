@@ -1,0 +1,40 @@
+schema_version: "1.1"
+name: answer-from-data
+description: A question about past runs is answered with q over the views, with no script.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    In the sample rate sweep, which rate was the most accurate, and did any run fail?
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  - name: used-q
+    type: tool_used
+    tool: Bash
+    input_match: '\bq '
+  - name: no-script-written
+    type: tool_used
+    tool: Write
+    max: 0
+    min: 0
+  - name: no-python
+    type: tool_used
+    tool: Bash
+    input_match: python
+    min: 0
+    max: 0
+  - name: names-best-rate
+    type: regex
+    pattern: '48 ?kHz|48000|48,000|48\.0 ?kHz'
+  - name: gives-accuracy
+    type: regex
+    pattern: '0\.93|93 ?%'
+  - name: names-failed-run
+    type: regex
+    pattern: '96 ?kHz|96000|96,000'

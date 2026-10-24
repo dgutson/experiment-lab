@@ -17,6 +17,13 @@ There is no test suite or build step. The checks:
   `lab.db`; run them while nothing is logged to it.
 - `uv run --script bin/check_pages.py [URL]`: every page of a running server, and its diagrams in
   Chrome, light and dark.
+- `bin/evals.sh [--case NAME] [--model sonnet]`: the skill's eval cases, run by agents with and
+  without the plugin; on Linux it needs `bubblewrap` and `socat`. The whole suite costs about $5 on
+  Sonnet; `plugin/evals/baseline.md` has the last full run. `--keep-temp` keeps each run's folder,
+  with its `lab.db` and transcript. The runs' sandbox hides the repository that holds the plugin,
+  the real home folder and the network, which is why `bin/evals.sh` installs the clone into a venv
+  of its own and `plugin/evals/lab.sh` copies the package and DuckDB's SQLite extension into the
+  run's home folder.
 
 Try changes on a data folder and port of their own, with the commands of `.venv`:
 
@@ -71,6 +78,9 @@ Change these together:
   the views in `lab.sql`.
 - The evidence kinds: `EVIDENCE` in `records.py`, `record_page` in `pages.py` and
   `templates/lab/record.html`.
+- What rec prints after `rec project` (`project NAME, folder ...`) and `rec experiment`
+  (`experiment PROJECT › ... › NAME`): `rec.py` and the graders in `plugin/evals/*/case.yaml`,
+  which match it.
 - The order of experiments below the same parent (`created, name`): `rec.tree`, `pages.tree` and
   the Branches list of `pages.experiment`.
 - The DuckDB version: `pyproject.toml`, `bin/check_views.py`, `bin/sqlite_filter_bug.py`.
