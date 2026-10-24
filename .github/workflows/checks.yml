@@ -19,6 +19,8 @@ jobs:
           uvx pyright@1.1.414 experiment_lab
       - name: DuckDB reads attached SQLite tables correctly
         run: uv run --script bin/sqlite_filter_bug.py
+      - name: Commands print what bin/check_commands.txt holds
+        run: uv run python bin/check_commands.py
       - name: Make a lab to check
         run: |
           uv run python bin/make_scratch.py "$RUNNER_TEMP/lab"

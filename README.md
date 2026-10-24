@@ -19,6 +19,9 @@ experiments: the agent reads and writes with `q` and `rec`, the person reads the
 | `bin/start.sh` | starts the pages' server, `lab-server`, in the background |
 | `bin/check_pages.py` | opens every page of a running server and checks it |
 | `bin/check_views.py`, `bin/sqlite_filter_bug.py` | checks to run before changing the DuckDB version |
+| `bin/check_commands.py` | runs the commands on a new lab and compares what they print with `bin/check_commands.txt` |
+| `bin/make_scratch.py` | makes a lab with data in it, for the checks and for trying changes |
+| `evals/` | the skill's eval cases |
 | `plugin/` | a Claude Code plugin holding the skill `experiment-db`, which tells the agent how to use q, rec and `lab.py` |
 
 The commands, installed with the package: `q`, `rec`, `lab-server` and `lab-from-mlflow`.

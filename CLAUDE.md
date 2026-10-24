@@ -18,6 +18,11 @@ kind, a diagram, an audio file and an image. The checks:
 - `uv run --script bin/check_views.py` and `uv run --script bin/sqlite_filter_bug.py`: the views
   read the same with `lab.db` attached as with its tables copied. They read the data folder's
   `lab.db`; run them while nothing is logged to it.
+- `uv run python bin/check_commands.py`: runs a fixed list of rec, q, lab-server and
+  lab-from-mlflow commands, wrong input among them, in order on a new lab of `make_scratch.py`,
+  and compares what they print and their exit statuses with `bin/check_commands.txt`. When a change
+  to what they print is meant, `--update` rewrites the file, and its diff shows the change. The
+  output depends on the Python version, which `.python-version` pins.
 - `uv run --script bin/check_pages.py [URL]`: every page of a running server, and its diagrams,
   audio players and images in Chrome, light and dark.
 - `bin/evals.sh [--case NAME] [--model sonnet]`: the skill's eval cases, run by agents with and
