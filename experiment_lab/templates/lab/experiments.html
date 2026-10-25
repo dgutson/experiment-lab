@@ -12,9 +12,9 @@
 <button type="submit">Search</button>
 </div>
 <p class="note">The search finds the experiments, runs and records whose title or text holds every word searched for, in any letter case. The text is an experiment's description, a run's note, params and tags, or a record's text. In SQL, this is the view texts.</p>
-{% if hits is not none %}
+{% if found %}
 <h2>Found</h2>
-<p class="note">{% if more %}The first {{ hits|length }} found{% else %}{{ hits|length }} found{% endif %} {% if below %}in {{ node }} and below it{% else %}in {{ project }}{% endif %}.</p>
+<p class="note">{{ found }}</p>
 {% if hits %}
 <table class="sortable">
 <thead><tr><th>Kind</th><th>Title</th><th>Experiment</th><th>Text</th></tr></thead>
@@ -29,7 +29,7 @@
 <div class="scroll"><table>
 <thead><tr><th></th><th>Experiment</th><th>Records</th><th>Started</th><th>Processing duration</th><th>Clock duration</th></tr></thead>
 <tbody>
-{% for e in nodes %}<tr class="{{ 'root' if not e.above }}{{ ' dead-end' if e.dead_end }}"><td><input type="radio" name="node" value="{{ e.name }}" aria-label="Select {{ e.name }}"{% if e.name == node %} checked{% endif %}></td><td class="tree"><span class="branch">{{ e.branch }}</span><a href="{{ url('experiment', e.name) }}">{{ e.name }}</a>{{ dead_end_label(e.dead_end) }}</td><td class="n">{{ e.records or "" }}</td><td>{{ e.started }}</td>{% for d in (e.processing, e.clock) %}<td class="n">{% if e.running %}<span class="note">running</span>{% elif d %}{{ d }}{% else %}<span class="note">not timed</span>{% endif %}</td>{% endfor %}</tr>
+{% for e in nodes %}<tr class="{{ 'root' if not e.above }}{{ ' dead-end' if e.dead_end }}"><td><input type="radio" name="node" value="{{ e.name }}" aria-label="Select {{ e.name }}"{% if e.name == node %} checked{% endif %}></td><td class="tree"><span class="branch">{{ e.branch }}</span><a href="{{ url('experiment', e.name) }}">{{ e.name }}</a>{{ dead_end_label(e.dead_end) }}</td><td class="n">{{ e.records or "" }}</td><td>{{ e.started }}</td>{% for d in (e.processing, e.clock) %}<td class="n">{% if e.timed %}{{ d }}{% else %}<span class="note">{{ d }}</span>{% endif %}</td>{% endfor %}</tr>
 {% endfor %}
 </tbody>
 </table></div>
