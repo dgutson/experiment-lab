@@ -52,7 +52,7 @@ img.media { max-height: 320px; }
 <body>
 <nav>
   <strong>Lab</strong>
-  {% if projects %}<select aria-label="Project" onchange="document.cookie = 'project=' + encodeURIComponent(this.value) + '; path=/; max-age=31536000; samesite=lax'; location.reload()">
+  {% if picker and projects %}<select aria-label="Project" onchange="document.cookie = 'project=' + encodeURIComponent(this.value) + '; path=/; max-age=31536000; samesite=lax'; location.reload()">
     {% for p in projects %}<option{% if p == project %} selected{% endif %}>{{ p }}</option>{% endfor %}
   </select>{% endif %}
   <a href="/lab/">Records</a>
