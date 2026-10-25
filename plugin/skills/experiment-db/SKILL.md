@@ -28,9 +28,11 @@ An experiment, in order:
   view files; `--project P` for another project's) on `lab.db`, attached read-only as the catalog
   `lab`, and prints at most 40 rows (`--max N`, `--full` for long cells); a result of one cell
   prints it alone, whole, as stored (`q "SELECT text FROM records WHERE id = '...'"`). `q .views`
-  lists the views and their columns. The views of `lab.sql` hold every project's rows; filter on
-  their column `project`. The tables are `lab.experiments`, `lab.runs`, `lab.params`, `lab.tags`, `lab.metrics`
-  (every value logged, with `step` and `time`) and `lab.records`.
+  lists the views and their columns, and `q .keys` the keys of the project's runs' tags, params and
+  metrics, with how many runs have each; a key no run has gives NULL, with no error. The views of
+  `lab.sql` hold every project's rows; filter on their column `project`. The tables are
+  `lab.experiments`, `lab.runs`, `lab.params`, `lab.tags`, `lab.metrics` (every value logged, with
+  `step` and `time`) and `lab.records`.
 - `rec experiment NAME --text DESCRIPTION [--in PARENT] [--dead-end | --no-dead-end]` makes an
   experiment, or changes it when it exists. A new experiment needs a description, in Markdown: what
   it measures and why, in the words a later search would use.
@@ -73,7 +75,7 @@ An experiment, in order:
 | View | One row per | Columns |
 |---|---|---|
 | `experiments` | experiment | name, project, parent, depth (0 for a project), path (`a › b › c`, from the project down to the experiment itself), dead_end, description, created |
-| `runs` | run | run, experiment, project, name, status (RUNNING, FINISHED, FAILED or KILLED), start_time (ms), tags, params, metrics (maps: `metrics['accuracy']` is the latest value, `params['lr']`), end_time (ms), started, ended, minutes (NULL until the run ends), note |
+| `runs` | run | run, experiment, project, name, status (RUNNING, FINISHED, FAILED or KILLED), start_time (ms), tags, params, metrics (maps: `metrics['accuracy']` is the latest value, a double; `params['lr']` and tags are text, so `params['lr']::DOUBLE` for a number), end_time (ms), started, ended, minutes (NULL until the run ends), note |
 | `records` | record | id, time, project, experiment (the label it is shown under), kind, title, text, author, status, answers, evidence (items joined by `; `) |
 | `texts` | experiment, run and record | kind (`experiment`, `run` or `record`), id, project, experiment, title, text: an experiment's description; a run's note, then its params and tags as `key=value` lines; a record's text |
 

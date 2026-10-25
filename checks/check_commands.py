@@ -60,6 +60,9 @@ q "SET TimeZone = 'UTC'; SELECT name, started, ended, minutes FROM runs WHERE ex
 q .views
 q --project vision .views
 q --project vision "FROM blur_scores"
+q .keys
+q --project vision .keys
+cd ~ && q .keys
 q --max 2 "SELECT name FROM runs ORDER BY name"
 q "SELECT id, text FROM records WHERE id = '48-khz-is-the-most-accurate-rate'"
 q --full "SELECT text FROM records WHERE id = '48-khz-is-the-most-accurate-rate'"
