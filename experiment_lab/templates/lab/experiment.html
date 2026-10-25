@@ -17,6 +17,6 @@
 {{ record_links(records) }}
 {% endif %}
 <h2>Runs</h2>
-<p class="meta"><a href="/lab/query?sql={{ ("SELECT * FROM runs WHERE experiment = '" ~ name|replace("'", "''") ~ "'")|urlencode }}">query them</a></p>
-{{ data_table(t, link="/lab/run/") }}
+<p class="meta"><a href="/lab/query?sql={{ sql|urlencode }}">query them</a></p>
+{{ data_table(t, link="/lab/run/", ordered=true) }}
 {% endblock %}

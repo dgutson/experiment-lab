@@ -3,6 +3,6 @@
 {% block title %}{{ name }}{% endblock %}
 {% block main %}
 <h1>{{ name }}</h1>
-<p class="meta">{% if project %}A view of {{ project }} · {% endif %}<a href="/lab/query?sql={{ ('SELECT * FROM "' ~ name ~ '"')|urlencode }}">query it</a></p>
-{{ data_table(t) }}
+<p class="meta">{% if project %}A view of {{ project }} · {% endif %}<a href="/lab/query?sql={{ sql|urlencode }}">query it</a></p>
+{{ data_table(t, ordered=true) }}
 {% endblock %}

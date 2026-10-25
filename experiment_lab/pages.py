@@ -505,15 +505,16 @@ def create_app(data: Path) -> FastAPI:
             parent = (con.execute("SELECT parent FROM lab.experiments WHERE name = ?", [parent]).fetchone() or [None])[0]
         branches = con.execute("SELECT name, dead_end FROM lab.experiments WHERE parent = ? ORDER BY created, name",
                                [name]).fetchall()
+        runs = f"""FROM runs WHERE experiment = '{name.replace("'", "''")}' ORDER BY start_time DESC, name, run"""
         result = con.execute(f"""SELECT run, name, status, {TIME.format("start_time")} AS started,
-                round((end_time - start_time) / 1000, 1) AS seconds, params
-            FROM runs WHERE experiment = ? ORDER BY start_time DESC""", [name])
+                round((end_time - start_time) / 1000, 1) AS seconds, params {runs}""")
         t = query.table(result, ROWS, CUT)
         rs = [r for r in all_records(con) if r["filed_in"] == name]
         project = folder and {"folder": shown_path(Path(folder)), "files": shown_path(Path(files)),
                               "views": [shown_path(Path(v)) for v in views.split("; ") if v]}
         return page(request, "experiment", name=name, description=md(description, roots(con)), dead_end=dead_end,
-                    above=above, branches=branches, project_settings=project, t=t, records=rs)
+                    above=above, branches=branches, project_settings=project, t=t, sql="SELECT * " + runs,
+                    records=rs)
 
     @app.get("/lab/run/{rid}")
     def run_page(request: Request, rid: str, con: DuckDBPyConnection = Depends(cursor)) -> Response:
@@ -555,15 +556,17 @@ def create_app(data: Path) -> FastAPI:
 
     @app.get("/lab/view/{name}")
     def view_page(request: Request, name: str, project: str | None = None) -> Response:
-        """A view of the project's database; without project, of lab.sql's."""
+        """A view of the project's database, without project of lab.sql's, sorted
+        by every column so that each load shows the same rows."""
         views = request.app.state.views
         if project is not None and project not in views.projects():
             raise HTTPException(404, f"no project {project}")
         with contextlib.closing(views.cursor(project)) as con:
             if name not in [v for v, _ in query.view_columns(con)]:
                 raise HTTPException(404, f"no view {name}")
-            return page(request, "view", name=name, project=project,
-                        t=query.table(con.execute(f'FROM "{name}"'), ROWS, CUT))
+            sql = f'SELECT * FROM "{name}" ORDER BY ALL'
+            return page(request, "view", name=name, project=project, sql=sql,
+                        t=query.table(con.execute(sql), ROWS, CUT))
 
     @app.get("/lab/query")
     def query_page(request: Request, sql: str = "", con: DuckDBPyConnection = Depends(cursor)) -> Response:
