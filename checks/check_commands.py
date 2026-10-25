@@ -53,6 +53,7 @@ cd ~/speech && rec project speech --views views.sql missing.sql && q .views
 EXPERIMENT_LAB_DATA=~/missing/lab-data rec open
 EXPERIMENT_LAB_DATA=/proc/lab-data rec open
 q "SELECT name, status FROM runs WHERE experiment = 'sample rate sweep' ORDER BY name"
+q "SET TimeZone = 'UTC'; SELECT name, started, ended, minutes FROM runs WHERE experiment = 'sample rate sweep' ORDER BY name LIMIT 2"
 q .views
 q --project vision .views
 q --project vision "FROM blur_scores"

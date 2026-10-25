@@ -51,7 +51,6 @@ TEXT_TYPES = ("application/json", "application/javascript", "application/xml", "
               "application/x-sh", "application/toml")
 # statements that would act outside the transaction that is rolled back
 REFUSED = (duckdb.StatementType.TRANSACTION, duckdb.StatementType.ATTACH, duckdb.StatementType.DETACH)
-TIME = "strftime(to_timestamp({} / 1000), '%Y-%m-%d %H:%M')"
 # a ~/ or absolute path in a text, after the start, a space, a parenthesis or a quote; a . , ; : ! or ?
 # at its end is not part of it
 PATH = re.compile(r"""(?<![^\s("'])~?/[^\s()<>"'`\[\]]*[^\s()<>"'`\[\].,;:!?]""")
@@ -415,7 +414,7 @@ def tree(con: DuckDBPyConnection, project: str | None) -> Nodes:
     its parent) and branch (the lines that draw the tree before its name). The
     project's records, started, processing and clock are those of the whole
     project."""
-    rows = con.execute(f"""WITH r AS (SELECT experiment, min(start_time) AS t0,
+    rows = con.execute("""WITH r AS (SELECT experiment, min(start_time) AS t0,
                  bool_or(status = 'RUNNING') AS running FROM lab.runs GROUP BY ALL),
              c AS (SELECT experiment, count(*) AS n FROM lab.records GROUP BY ALL),
              own AS (SELECT e.name, e.parent, e.dead_end, e.created, coalesce(c.n, 0) AS records,
@@ -426,7 +425,7 @@ def tree(con: DuckDBPyConnection, project: str | None) -> Nodes:
                  if(parent IS NULL, sum(records) OVER (), records) AS records,
                  if(parent IS NULL, min(t0) OVER (), t0) AS t0,
                  if(parent IS NULL, bool_or(running) OVER (), running) AS running FROM own)
-        SELECT name, parent, dead_end, records, {TIME.format("t0")} AS started, running
+        SELECT name, parent, dead_end, records, local_time(t0) AS started, running
         FROM shown ORDER BY created, name""", [project]).fetchall()
     spans = ended_runs(con, project)
     children: dict[str | None, Nodes] = {}
@@ -624,8 +623,8 @@ def create_app(data: Path) -> FastAPI:
         branches = con.execute("SELECT name, dead_end FROM lab.experiments WHERE parent = ? ORDER BY created, name",
                                [name]).fetchall()
         runs = f"FROM runs WHERE experiment = {query.literal(name)} ORDER BY start_time DESC, name, run"
-        result = con.execute(f"""SELECT run, name, status, {TIME.format("start_time")} AS started,
-                round((end_time - start_time) / 1000, 1) AS seconds, params {runs}""")
+        result = con.execute(f"SELECT run, name, status, started, round((end_time - start_time) / 1000, 1) AS seconds,"
+                             f" params {runs}")
         t = shown(result, ROWS, CUT, ordered=True, link="run")
         rs = [r for r in all_records(con) if r["filed_in"] == name]
         project = folder and {"folder": shown_path(Path(folder)), "files": shown_path(Path(files)),
@@ -636,8 +635,7 @@ def create_app(data: Path) -> FastAPI:
 
     @app.get("/lab/run/{rid}")
     def run_page(request: Request, rid: str, con: DuckDBPyConnection = Depends(cursor)) -> Response:
-        result = con.execute(f"SELECT *, concat_ws(' to ', {TIME.format('start_time')}, {TIME.format('end_time')})"
-                             " AS span FROM runs WHERE run = ?", [rid])
+        result = con.execute("SELECT *, concat_ws(' to ', started, ended) AS span FROM runs WHERE run = ?", [rid])
         row = result.fetchone()
         if row is None:
             raise HTTPException(404, f"no run {rid}")
