@@ -10,11 +10,11 @@ needs beyond it.
 ## Commands
 
 There is no test suite or build step. `.github/workflows/checks.yml` runs the checks below, except
-the evals, on every push and pull request, on a lab that `uv run python bin/make_scratch.py FOLDER`
+the evals, on every push and pull request, on a lab that `uv run python checks/make_scratch.py FOLDER`
 makes: the evals' lab with a run with tags and files, a record of every kind, evidence of every
 kind, a diagram, an audio file and an image. The checks:
 
-- `uv run mypy` and `uv run pyright`: the types of `experiment_lab/` and `bin/`, mypy with
+- `uv run mypy` and `uv run pyright`: the types of `experiment_lab/` and `checks/`, mypy with
   `--strict`. `uv sync` installs mypy, the Markdown stubs, pyright, ruff, pylint,
   pylint-complex-struct and Playwright into `.venv` from the `dev` group of `pyproject.toml`, with
   the package editable. If the two disagree about correct code, mypy stays and pyright goes. mypy
@@ -22,33 +22,33 @@ kind, a diagram, an audio file and an image. The checks:
   fields become one through a function that names every key (`records.as_record`). mypy reports
   nothing for a file under the repository that its `files` setting leaves out: the editable
   install's `.pth` makes it look installed.
-- `uv run ruff check experiment_lab bin`: every function's parameters and return are annotated
+- `uv run ruff check experiment_lab checks`: every function's parameters and return are annotated
   (ruff's `ANN` rules only).
-- `uv run pylint experiment_lab bin`: pylint-complex-struct's messages only, and a failure if the
+- `uv run pylint experiment_lab checks`: pylint-complex-struct's messages only, and a failure if the
   plugin does not load. An annotation nests at most two levels, a name counting as one, so a deeper
   type becomes a type alias (`type Spans = list[Span]`), a `NamedTuple` or a `TypedDict`, and a
   function returns a `NamedTuple` rather than a tuple of different types.
-- `uv run --script bin/check_views.py` and `uv run --script bin/sqlite_filter_bug.py`: the views
+- `uv run --script checks/check_views.py` and `uv run --script checks/sqlite_filter_bug.py`: the views
   read the same with `lab.db` attached as with its tables copied. They read the data folder's
   `lab.db`; run them while nothing is logged to it.
-- `uv run python bin/check_commands.py`: runs a fixed list of rec, q, lab-server and
+- `uv run python checks/check_commands.py`: runs a fixed list of rec, q, lab-server and
   lab-from-mlflow commands, wrong input among them, in order on a new lab of `make_scratch.py`,
-  and compares what they print and their exit statuses with `bin/check_commands.txt`. When a change
+  and compares what they print and their exit statuses with `checks/check_commands.txt`. When a change
   to what they print is meant, `--update` rewrites the file, and its diff shows the change. The
   output depends on the Python version, which `.python-version` pins.
-- `uv run --script bin/check_pages.py [URL]`: every page of a running server, and its diagrams,
+- `uv run --script checks/check_pages.py [URL]`: every page of a running server, and its diagrams,
   audio players and images in Chrome, light and dark.
-- `bin/evals.sh [--case NAME] [--model sonnet]`: the skill's eval cases, run by agents with and
+- `evals/run.sh [--case NAME] [--model sonnet]`: the skill's eval cases, run by agents with and
   without the plugin; on Linux it needs `bubblewrap` and `socat`. The whole suite costs about $5 on
   Sonnet; `evals/baseline.md` has the last full run. `--keep-temp` keeps each run's folder,
   with its `lab.db` and transcript. The runs' sandbox hides the repository that holds the plugin,
-  the real home folder and the network, which is why `bin/evals.sh` installs the clone into a venv
+  the real home folder and the network, which is why `evals/run.sh` installs the clone into a venv
   of its own and `evals/lab.sh` copies the package and DuckDB's SQLite extension into the run's home
   folder. `claude plugin eval` takes the cases only from a folder inside the plugin's, with no links,
-  so `bin/evals.sh` runs a copy of `plugin/` with `evals/` copied into it.
+  so `evals/run.sh` runs a copy of `plugin/` with `evals/` copied into it.
 
-Every function in `experiment_lab/` and `bin/` has a cyclomatic complexity of B or less (at most
-10): `uvx radon cc experiment_lab bin -n C --show-closures` lists none.
+Every function in `experiment_lab/` and `checks/` has a cyclomatic complexity of B or less (at most
+10): `uvx radon cc experiment_lab checks -n C --show-closures` lists none.
 
 Try changes on a data folder and port of their own, with the commands of `.venv`:
 
@@ -61,7 +61,7 @@ rec add question "Which rate?" --in first --text "..."
 q "SELECT id, kind, status, title FROM records"    # pages at http://127.0.0.1:5001/lab
 ```
 
-For a lab with data already in it, make one with `bin/make_scratch.py` and set
+For a lab with data already in it, make one with `checks/make_scratch.py` and set
 `EXPERIMENT_LAB_DATA=FOLDER/lab-data` instead.
 
 lab-server reads Python and templates when it starts, so restart it after changing them; a change
@@ -92,7 +92,7 @@ changes, not for evals, checks or CI. After the change is on `main`:
   must stay importable without the package's dependencies too.
 - Readers: `query.py` attaches `lab.db` read-only to an in-memory DuckDB and runs `lab.sql`, then the
   view files of one project, so that each project's views are in a database of their own and may
-  reuse names. q, the pages, `from_mlflow.py`'s check and `bin/check_views.py` all read through it.
+  reuse names. q, the pages, `from_mlflow.py`'s check and `checks/check_views.py` all read through it.
 - No process may have `lab.db` open with Python's sqlite3 while DuckDB reads it, since the two copies
   of SQLite do not see each other's locks (`query.py`'s docstring). So lab-server makes a missing
   `lab.db` in a child process, and `from_mlflow.py` closes its sqlite3 connections before its check.
@@ -107,8 +107,8 @@ changes, not for evals, checks or CI. After the change is on `main`:
   SQL as the page shows it, and a name in SQL text through `query.literal` or `query.identifier`. A
   template's `if` only shows or hides markup or picks an attribute or a class.
 - `lab.sql` is the one set of views that q and the pages run. DuckDB 1.5.5 returned wrong rows for
-  a filter over attached SQLite tables (`bin/sqlite_filter_bug.py`), which is why
-  `bin/check_views.py` exists.
+  a filter over attached SQLite tables (`checks/sqlite_filter_bug.py`), which is why
+  `checks/check_views.py` exists.
 
 ## What is written in more than one place
 
@@ -125,8 +125,8 @@ Change these together:
   which match it.
 - The order of experiments below the same parent (`created, name`): `rec.tree`, `pages.tree` and
   the Branches list of `pages.experiment`.
-- The DuckDB version: `pyproject.toml`, `bin/check_views.py`, `bin/sqlite_filter_bug.py`.
-- The Playwright version: `bin/check_pages.py` and the `dev` group of `pyproject.toml`.
+- The DuckDB version: `pyproject.toml`, `checks/check_views.py`, `checks/sqlite_filter_bug.py`.
+- The Playwright version: `checks/check_pages.py` and the `dev` group of `pyproject.toml`.
 - The Markdown version: `markdown` in the dependencies of `pyproject.toml` and `types-Markdown`, its
   stubs, in the `dev` group.
 - The usage of q, rec and `lab.py`, the record fields and the views' columns: the module docstrings

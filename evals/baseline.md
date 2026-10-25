@@ -1,7 +1,7 @@
 # Eval baseline
 
 The last full run of the eval cases, for comparing a change to the skill, rec or q against:
-`bin/evals.sh --model sonnet` on 2026-10-24 with Claude Code 2.1.310, 3 runs per case and arm.
+`evals/run.sh --model sonnet` on 2026-10-24 with Claude Code 2.1.310, 3 runs per case and arm.
 The whole run cost $5.04, the judge's calls included.
 
 "With" is an agent given the plugin, "without" one given none. Both have rec and q on the PATH and

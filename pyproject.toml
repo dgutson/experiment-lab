@@ -18,21 +18,21 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 # The checks' tools, which uv sync installs into .venv; Playwright for the type checkers to read
-# bin/check_pages.py, and types-Markdown for mypy to read markdown
+# checks/check_pages.py, and types-Markdown for mypy to read markdown
 [dependency-groups]
 dev = ["mypy==2.4.0", "types-Markdown==3.10.2.20261007", "pyright==1.1.414", "ruff==0.17.2", "pylint==4.1.3",
        "pylint-complex-struct==0.2.2", "playwright==1.63.0"]
 
 [tool.mypy]
-files = ["experiment_lab", "bin"]
-mypy_path = "evals"  # make_lab, which bin/make_scratch.py imports
+files = ["experiment_lab", "checks"]
+mypy_path = "evals"  # make_lab, which checks/make_scratch.py imports
 strict = true
 
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
-include = ["experiment_lab", "bin"]
-extraPaths = ["evals"]  # make_lab, which bin/make_scratch.py imports
+include = ["experiment_lab", "checks"]
+extraPaths = ["evals"]  # make_lab, which checks/make_scratch.py imports
 
 # Only the annotation rules: every function's parameters and return are annotated
 [tool.ruff.lint]

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs the eval cases of evals/ with this clone's code. Options go to
-# claude plugin eval, e.g. bin/evals.sh --case dead-end --runs 1 --ablation none
+# claude plugin eval, e.g. evals/run.sh --case dead-end --runs 1 --ablation none
 set -euo pipefail
 clone=$(cd "$(dirname "$0")/.." && pwd)
 cache=${XDG_CACHE_HOME:-$HOME/.cache}
