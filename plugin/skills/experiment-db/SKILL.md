@@ -32,9 +32,9 @@ An experiment, in order:
   views and their columns, and `q .keys` the keys of the project's runs' tags, params and metrics,
   with how many runs have each; a key no run has gives NULL, with no error. The views of `lab.sql`
   hold every project's rows; filter on their column `project`. Query the views: the tables
-  `lab.experiments`, `lab.runs`, `lab.params`, `lab.tags`, `lab.metrics` and `lab.records` hold only
-  what is stored, for what the views leave out, such as every value logged of a metric, with its
-  `step` and `time` (`lab.metrics`).
+  `lab.experiments`, `lab.runs`, `lab.params`, `lab.tags`, `lab.metrics`, `lab.files` and
+  `lab.records` hold only what is stored, for what the views leave out, such as every value logged
+  of a metric, with its `step` and `time` (`lab.metrics`).
 - `rec experiment NAME --text DESCRIPTION [--in PARENT] [--dead-end | --no-dead-end]` makes an
   experiment, or changes it when it exists. A new experiment needs a description, in Markdown: what
   it measures and why, in the words a later search would use.
@@ -78,6 +78,7 @@ An experiment, in order:
 |---|---|---|
 | `experiments` | experiment | name, project, parent, depth (0 for a project), path (`a › b › c`, from the project down to the experiment itself), dead_end, description, created |
 | `runs` | run | run, experiment, project, name, status (RUNNING, FINISHED, FAILED or KILLED), start_time (ms), tags, params, metrics (maps: `metrics['accuracy']` is the latest value, a double; `params['lr']` and tags are text, so `params['lr']::DOUBLE` for a number), end_time (ms), started, ended, minutes (NULL until the run ends), note |
+| `files` | file logged for a run | run, experiment, project, name, bytes; the copy is `files/<run id>/<name>` in the data folder |
 | `records` | record | id, time, project, experiment (the label it is shown under), kind, title, text, author, status, answers, evidence (items joined by `; `) |
 | `texts` | experiment, run and record | kind (`experiment`, `run` or `record`), id, project, experiment, title, text: an experiment's description; a run's note, then its params and tags as `key=value` lines; a record's text |
 

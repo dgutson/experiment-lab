@@ -55,6 +55,15 @@ CREATE TABLE IF NOT EXISTS metrics (
 );
 CREATE INDEX IF NOT EXISTS metrics_by_run ON metrics (run, key);
 
+-- A file logged for a run, copied to files/<run>/<name> in the data folder;
+-- name may hold folders (plots/a.png), and bytes is the copy's size.
+CREATE TABLE IF NOT EXISTS files (
+    run TEXT NOT NULL REFERENCES runs (id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    bytes INTEGER NOT NULL,
+    PRIMARY KEY (run, name)
+);
+
 -- experiment is the experiment the record is filed in, label the name it is
 -- shown under; answers is a record id or ''; evidence is items joined by "; ".
 CREATE TABLE IF NOT EXISTS records (

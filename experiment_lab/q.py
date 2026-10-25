@@ -8,7 +8,7 @@ usage: q [--project P] [--max N] [--full] "SQL"   (SQL from stdin when omitted)
 The database is lab.db in the data folder ($EXPERIMENT_LAB_DATA, else
 ~/lab-data), attached read-only as the catalog lab with the tables
 lab.experiments, lab.runs, lab.params, lab.tags, lab.metrics (every value
-logged) and lab.records. The views are those of experiment_lab/lab.sql, then
+logged), lab.files (the files logged for runs) and lab.records. The views are those of experiment_lab/lab.sql, then
 those of the view files of the project of the current folder (the one whose
 folder holds it or its git repository's main worktree), or of --project; a
 statement of a view file that fails is printed on stderr and skipped. lab.sql's

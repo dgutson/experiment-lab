@@ -23,8 +23,8 @@ running; what it writes after the read starts is not copied. What is copied:
 - links to MLflow's pages in descriptions, notes and record texts
   (#/experiments/N and #/experiments/N/runs/ID) become links to the lab's pages;
 - a run's files under artifacts/ that have no other hard link, to
-  files/<run id>/; a file with another hard link is left out, since the run's
-  own folder holds it.
+  files/<run id>/, each with its row in the table files; a file with another
+  hard link is left out, since the run's own folder holds it.
 
 Deleted experiments and runs are left out. The check compares, per table, the
 rows the old database should give with the rows copied, and, through DuckDB,
@@ -113,7 +113,8 @@ class Metric(NamedTuple):
 
 class RunFile(NamedTuple):
     source: Path
-    path: Path  # under files/
+    run: str
+    name: str  # its path below files/<run>/
 
 
 def per_run(db: sqlite3.Connection, sql: str, live: Container[str]) -> collections.defaultdict[str, Rows]:
@@ -213,7 +214,7 @@ class Move:
                 path = Path(parent, name)
                 s = path.lstat()
                 if stat.S_ISREG(s.st_mode) and s.st_nlink == 1:
-                    found.append(RunFile(path, Path(rid) / path.relative_to(folder)))
+                    found.append(RunFile(path, rid, path.relative_to(folder).as_posix()))
                 else:
                     self.left_out.append(path)
         return found
@@ -229,12 +230,15 @@ class Move:
             db.executemany("INSERT INTO params (run, key, value) VALUES (?, ?, ?)", self.params)
             db.executemany("INSERT INTO tags (run, key, value) VALUES (?, ?, ?)", self.tags)
             db.executemany("INSERT INTO metrics (run, key, value, step, time) VALUES (?, ?, ?, ?, ?)", self.metrics)
+            db.executemany("INSERT INTO files (run, name, bytes) VALUES (?, ?, ?)",
+                           [(f.run, f.name, f.source.stat().st_size) for f in self.run_files])
             for r in self.records:
                 records.save(db, r)
         lab.close()
-        for source, path in self.run_files:
-            (data / "files" / path).parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, data / "files" / path)
+        for f in self.run_files:
+            target = data / "files" / f.run / f.name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(f.source, target)
 
 
 def evidence(text: str | None) -> list[str]:

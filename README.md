@@ -18,7 +18,7 @@ for a coding agent and a person working on the same experiments: the agent reads
 |---|---|
 | `experiment_lab/` | the package; its `__init__.py` lists what each module holds |
 | `experiment_lab/schema.sql` | the tables of `lab.db` |
-| `experiment_lab/lab.sql` | the views `experiments`, `runs`, `records` and `texts`, which q and the pages query |
+| `experiment_lab/lab.sql` | the views `experiments`, `runs`, `files`, `records` and `texts`, which q and the pages query |
 | `experiment_lab/lab.py` | logging projects, experiments and runs from Python, with the standard library only |
 | `bin/start.sh` | starts the pages' server, `lab-server`, in the background |
 | `checks/check_pages.py` | opens every page of a running server and checks it |
@@ -251,7 +251,7 @@ list of views.
 
 A view file holds DuckDB `CREATE VIEW` statements over the views of `lab.sql` and the tables of
 `lab.db` in the catalog `lab` (`lab.experiments`, `lab.runs`, `lab.params`, `lab.tags`,
-`lab.metrics`, `lab.records`). The views of `lab.sql` hold every project's rows; their column
+`lab.metrics`, `lab.files`, `lab.records`). The views of `lab.sql` hold every project's rows; their column
 `project` tells them apart. The tables keep times as milliseconds since 1970; the views' `created`,
 `time`, `started` and `ended` are local time, which `local_time(ms)` writes. For example:
 

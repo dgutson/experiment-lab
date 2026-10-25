@@ -104,13 +104,27 @@ def update(db: sqlite3.Connection, name: str, changes: Mapping[str, object]) -> 
 
 class Lab:
     def __init__(self, data: StrPath | None = None) -> None:
-        """Opens the data folder's lab.db, making the folder and the tables if missing."""
+        """Opens the data folder's lab.db, making the folder and the tables if
+        missing; with the table files, the rows of the files already logged."""
         self.data = Path(data) if data else data_folder()
         self.data.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(database(self.data), timeout=60, isolation_level=None)
         self.db.execute("PRAGMA journal_mode = WAL")
         self.db.execute("PRAGMA foreign_keys = ON")
+        had_files = self.db.execute("SELECT 1 FROM sqlite_master WHERE name = 'files'").fetchone() is not None
         self.db.executescript(SCHEMA.read_text())
+        if not had_files:
+            self.add_files()
+
+    def add_files(self) -> None:
+        """A row in the table files for each file in files/<run id>/ of a run
+        of lab.db, which a lab.db made without that table lacks."""
+        folder = self.data / "files"
+        with self.write() as db:
+            ids = {rid for (rid,) in db.execute("SELECT id FROM runs")}
+            db.executemany("INSERT OR IGNORE INTO files (run, name, bytes) VALUES (?, ?, ?)",
+                           [(d.name, p.relative_to(d).as_posix(), p.stat().st_size)
+                            for d in folder.glob("*") if d.name in ids for p in d.rglob("*") if p.is_file()])
 
     def close(self) -> None:
         self.db.close()
@@ -263,10 +277,17 @@ class Run:
 
     def log_file(self, path: StrPath, name: str | None = None) -> Path:
         """Copies the file to files/<run id>/<name> in the data folder (name:
-        the file's own) and returns the copy's path."""
-        target = self.lab.data / "files" / self.id / (name or Path(path).name)
+        the file's own; it may hold folders, as plots/a.png), adds it to the
+        table files and returns the copy's path. Logging a name again replaces
+        the file."""
+        folder = self.lab.data / "files" / self.id
+        target = folder / (name or Path(path).name)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(path, target)
+        with self.lab.write() as db:
+            db.execute("INSERT INTO files (run, name, bytes) VALUES (?, ?, ?)"
+                       " ON CONFLICT (run, name) DO UPDATE SET bytes = excluded.bytes",
+                       (self.id, target.relative_to(folder).as_posix(), target.stat().st_size))
         return target
 
     def end(self, status: str = "FINISHED") -> None:
@@ -274,7 +295,7 @@ class Run:
             db.execute("UPDATE runs SET status = ?, end_time = ? WHERE id = ?", (status, now(), self.id))
 
 
-if __name__ == "__main__":  # makes the data folder's lab.db, for lab-server
+if __name__ == "__main__":  # makes the data folder's lab.db, or the tables it lacks, for lab-server
     try:
         Lab().close()
     except (OSError, sqlite3.Error) as e:
