@@ -3,6 +3,7 @@ compact table.
 
 usage: q [--project P] [--max N] [--full] "SQL"   (SQL from stdin when omitted)
        q [--project P] .views                     (each view and its columns)
+       q [--project P] [--max N] .keys            (the keys of the project's runs)
 
 The database is lab.db in the data folder ($EXPERIMENT_LAB_DATA, else
 ~/lab-data), attached read-only as the catalog lab with the tables
@@ -15,7 +16,9 @@ views have every project's rows; their column project tells them apart.
 Several statements may be given; the last one's rows are printed, at most
 --max of them (40), with cells cut at 80 characters unless --full. A result of
 one row and one column prints that cell alone, whole and with its line breaks,
-as in q "SELECT text FROM records WHERE id = '...'".
+as in q "SELECT text FROM records WHERE id = '...'". .keys lists each key of the
+tags, params and metrics of the project's runs, with the number of runs that
+have it.
 """
 import argparse
 import sys
@@ -26,6 +29,12 @@ from duckdb import DuckDBPyConnection
 from experiment_lab import query
 from experiment_lab.lab import holding
 from experiment_lab.settings import data_folder
+
+KEYS = """WITH own AS (SELECT r.id FROM lab.runs r JOIN experiments x ON x.name = r.experiment WHERE x.project = $1)
+SELECT 'tags' AS "table", key, count(*) AS runs FROM lab.tags WHERE run IN (FROM own) GROUP BY key
+UNION ALL SELECT 'params', key, count(*) FROM lab.params WHERE run IN (FROM own) GROUP BY key
+UNION ALL SELECT 'metrics', key, count(DISTINCT run) FROM lab.metrics WHERE run IN (FROM own) GROUP BY key
+ORDER BY "table" DESC, key"""
 
 
 def show(t: query.Table, cut: int | None) -> None:
@@ -57,22 +66,31 @@ def arguments() -> argparse.Namespace:
     return a
 
 
-def make_views(con: DuckDBPyConnection, project: str | None) -> None:
+def make_views(con: DuckDBPyConnection, project: str | None) -> str | None:
     """Makes the views of lab.sql and of the view files of project, else of the
-    project of the current folder; prints the errors of the view files on stderr."""
+    project of the current folder, and returns that project (None if none);
+    prints the errors of the view files on stderr."""
     projects = query.projects(con)
     if project and project not in [p.name for p in projects]:
         raise ValueError(f"no project {project}")
-    for error in query.errors(query.make_views(con, project or holding(projects))):
+    project = project or holding(projects)
+    for error in query.errors(query.make_views(con, project)):
         print(error, file=sys.stderr)
+    return project
 
 
-def answer(con: DuckDBPyConnection, sql: str, limit: int, cut: int | None) -> None:
+def keys(con: DuckDBPyConnection, project: str | None) -> DuckDBPyConnection:
+    if project is None:
+        raise ValueError("no project holds this folder; --project P names one")
+    return con.execute(KEYS, [project])
+
+
+def answer(con: DuckDBPyConnection, sql: str, limit: int, cut: int | None, project: str | None) -> None:
     if sql.strip() == ".views":
         for name, columns in query.view_columns(con):
             print(f"{name}: {columns}")
         return
-    result = query.run(con, sql)
+    result = keys(con, project) if sql.strip() == ".keys" else query.run(con, sql)
     if result is None:
         print("ok")
         return
@@ -88,8 +106,7 @@ def main() -> None:
     sql = a.sql if a.sql is not None else sys.stdin.read()
     try:
         con = query.attach(data_folder())
-        make_views(con, a.project)
-        answer(con, sql, a.max, None if a.full else 80)
+        answer(con, sql, a.max, None if a.full else 80, make_views(con, a.project))
     except (duckdb.Error, FileNotFoundError, ValueError) as e:
         sys.exit(f"error: {e}")
 
