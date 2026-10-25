@@ -41,7 +41,7 @@ HERE = Path(__file__).parent
 ROWS = 1000  # rows shown per table
 EVIDENCE_ROWS = 200
 CUT = 300  # characters shown per cell, except in the query box
-KIND_ORDER = {"question": 0, "decision": 1, "protocol": 2, "finding": 3}
+LONGEST_FIND, LONGEST_SQL = 200, 5000  # characters of a search and of a query from the query box
 TEXT_TYPES = ("application/json", "application/javascript", "application/xml", "application/sql",
               "application/x-sh", "application/toml")
 # statements that would act outside the transaction that is rolled back
@@ -322,7 +322,7 @@ def create_app(data):
             by.setdefault(r["filed_in"], {}).setdefault(r["experiment"], []).append(r)
         for labels in by.values():
             for rows in labels.values():
-                rows.sort(key=lambda r: (KIND_ORDER.get(r["kind"], 9), r["time"]))
+                rows.sort(key=lambda r: (records.KINDS.index(r["kind"]), r["time"]))
         return page(request, "index", open=[r for r in rs if r["status"] == "open"],
                     groups=[(e, by[e["name"]]) for e in tree(con, project) if e["name"] in by],
                     errors=request.app.state.views.errors(project))
@@ -333,6 +333,8 @@ def create_app(data):
         runs and records whose title and text (the view texts) hold every word
         of find, ignoring case: below node when below is given, else in the
         whole project."""
+        if len(find) > LONGEST_FIND:
+            raise HTTPException(400, f"the search is longer than {LONGEST_FIND} characters")
         nodes = tree(con, request.state.project)
         node = node if node in [e["name"] for e in nodes] else request.state.project
         words = find.lower().split()
@@ -436,6 +438,8 @@ def create_app(data):
 
     @app.get("/lab/query")
     def query_page(request: Request, sql: str = "", con=Depends(cursor)):
+        if len(sql) > LONGEST_SQL:
+            raise HTTPException(400, f"the query is longer than {LONGEST_SQL} characters")
         result = run_sql(con, sql, cut=None) if sql.strip() else None
         return page(request, "query", sql=sql, result=result, views=query.view_columns(con),
                     errors=request.app.state.views.errors(request.state.project))
@@ -468,8 +472,11 @@ def create_app(data):
 
 
 def main():
+    port = os.environ.get("EXPERIMENT_LAB_PORT", "5000")
+    if not (port.isdigit() and 0 < int(port) < 65536):
+        sys.exit(f"error: EXPERIMENT_LAB_PORT is {port!r}, not a port number")
     data = data_folder()
-    if not database(data).exists():  # made in another process: this one reads lab.db with DuckDB only
-        subprocess.run([sys.executable, "-m", "experiment_lab.lab"], check=True)
-    uvicorn.run(create_app(data), host="127.0.0.1", port=int(os.environ.get("EXPERIMENT_LAB_PORT", "5000")),
-                log_level="warning")
+    # made in another process, which prints why it failed: this one reads lab.db with DuckDB only
+    if not database(data).exists() and subprocess.run([sys.executable, "-m", "experiment_lab.lab"]).returncode:
+        sys.exit(1)
+    uvicorn.run(create_app(data), host="127.0.0.1", port=int(port), log_level="warning")

@@ -72,7 +72,7 @@ open in audio-codec (2):
 exit 0
 
 $ rec add idea "An idea" --in bitrate --text "x"
-error: CHECK constraint failed: kind IN ('decision', 'finding', 'protocol', 'question')
+error: kind 'idea' is not one of question, decision, protocol, finding
 exit 1
 
 $ rec add finding "Lost" --in nowhere --text "x"
@@ -84,7 +84,7 @@ error: a record needs a text: Empty
 exit 1
 
 $ rec add finding "Unsure" --in bitrate --text "x" --status maybe
-error: CHECK constraint failed: status IN ('open', 'closed', 'superseded')
+error: status 'maybe' is not one of open, closed, superseded
 exit 1
 
 $ rec add finding "Odd evidence" --in bitrate --text "x" --evidence mlflow:123
@@ -116,7 +116,7 @@ error: cannot set color; fields: kind, title, text, by, status, experiment, answ
 exit 1
 
 $ rec set keep-48-khz status=maybe
-error: CHECK constraint failed: status IN ('open', 'closed', 'superseded')
+error: status 'maybe' is not one of open, closed, superseded
 exit 1
 
 $ rec experiment "blur detector" --text "x"
@@ -169,11 +169,7 @@ open (0):
 exit 0
 
 $ EXPERIMENT_LAB_DATA=/proc/lab-data rec open
-Traceback: FileNotFoundError: [Errno 2] No such file or directory: '/proc/lab-data'
-
-During handling of the above exception, another exception occurred:
-
-Traceback: FileNotFoundError: [Errno 2] No such file or directory: '/proc/lab-data'
+error: [Errno 2] No such file or directory: '/proc/lab-data'
 exit 1
 
 $ q "SELECT name, status FROM runs WHERE experiment = 'sample rate sweep' ORDER BY name"
@@ -266,23 +262,29 @@ LINE 1: SELECT nosuch FROM runs
 exit 1
 
 $ q --max 0 "SELECT 1 AS x"
-x
--
-(0 rows, more not shown (--max N shows more))
-exit 0
+usage: q [-h] [--project PROJECT] [--max MAX] [--full] [sql]
+q: error: --max must be 1 or more
+exit 2
 
 $ q --max -1 "SELECT 1 AS x"
-x
--
-(0 rows, more not shown (--max N shows more))
-exit 0
+usage: q [-h] [--project PROJECT] [--max MAX] [--full] [sql]
+q: error: --max must be 1 or more
+exit 2
 
 $ EXPERIMENT_LAB_DATA=~/absent/lab-data q "SELECT 1"
 error: no database FOLDER/home/absent/lab-data/lab.db; rec project or a logging script makes it
 exit 1
 
 $ EXPERIMENT_LAB_PORT=abc lab-server
-Traceback: ValueError: invalid literal for int() with base 10: 'abc'
+error: EXPERIMENT_LAB_PORT is 'abc', not a port number
+exit 1
+
+$ EXPERIMENT_LAB_PORT=70000 lab-server
+error: EXPERIMENT_LAB_PORT is '70000', not a port number
+exit 1
+
+$ EXPERIMENT_LAB_DATA=/proc/lab-data lab-server
+error: [Errno 2] No such file or directory: '/proc/lab-data'
 exit 1
 
 $ lab-from-mlflow ~/missing test --text "x"

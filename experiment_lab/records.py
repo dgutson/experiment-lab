@@ -9,6 +9,8 @@ import re
 
 from experiment_lab.lab import BELOW, now
 
+KINDS = ("question", "decision", "protocol", "finding")  # in the order the pages show them
+STATUSES = ("open", "closed", "superseded")
 EVIDENCE = ("run", "file", "sql", "record")
 
 
@@ -16,8 +18,12 @@ def split(evidence):
     return [item for item in (evidence or "").split("; ") if item]
 
 
-def check(r, fields=("text", "evidence")):
-    """Checks those of fields that are text (not empty) and evidence (items of EVIDENCE)."""
+def check(r, fields=("kind", "status", "text", "evidence")):
+    """Checks those of fields that are kind (one of KINDS), status (one of
+    STATUSES), text (not empty) and evidence (items of EVIDENCE)."""
+    for field, allowed in (("kind", KINDS), ("status", STATUSES)):
+        if field in fields and r[field] not in allowed:
+            raise ValueError(f"{field} {r[field]!r} is not one of {', '.join(allowed)}")
     if "text" in fields and not r["text"].strip():
         raise ValueError(f"a record needs a text: {r['title']}")
     for item in r["evidence"] if "evidence" in fields else []:

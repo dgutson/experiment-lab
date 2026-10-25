@@ -47,12 +47,14 @@ def main():
     p.add_argument("--full", action="store_true")
     p.add_argument("sql", nargs="?")
     a = p.parse_args()
+    if a.max < 1:
+        p.error("--max must be 1 or more")
     sql = a.sql if a.sql is not None else sys.stdin.read()
     try:
         con = query.attach(data_folder())
         projects = query.projects(con)
         if a.project and a.project not in [name for name, _ in projects]:
-            sys.exit(f"error: no project {a.project}")
+            raise ValueError(f"no project {a.project}")
         for error in query.errors(query.make_views(con, a.project or holding(projects))):
             print(error, file=sys.stderr)
         if sql.strip() == ".views":
