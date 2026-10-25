@@ -43,7 +43,8 @@ project's folder they refuse another project's experiments.
 project, or below an earlier experiment with `--in PARENT`; given again, `--in` moves it with the
 experiments below it. `--dead-end` marks an idea that failed, which keeps its runs and records so
 the reason can be found (a finding says why); `--no-dead-end` clears the mark. `rec tree` prints
-the project's experiments, one indented line each, with `[dead end]` after those marked so.
+the project's experiments, one indented line each, with `[dead end]` after those marked so;
+`rec tree EXPERIMENT`, only those below EXPERIMENT.
 Experiment names are unique across the lab.
 
 The Experiments page shows the tree with, for each experiment, its records, when its first run
@@ -59,9 +60,11 @@ A record is a row of the table `records`: an id, the experiment it is filed in, 
 shown under (the experiment's name unless given), a kind (decision, finding, protocol or question),
 a title, a text in Markdown, an author, a status (open, closed or superseded), the question it
 answers, and its evidence: items `run:<run id>`, `file:<path>`, `sql:<query over the views>` or
-`record:<id>`, joined by `; `. A new question is open and any other record closed unless a status is
-given, and a record that answers an open question closes it. The view `records` has one row per
-record, with its project, and the label as its column `experiment`.
+`record:<id>`, joined by `; `. rec warns about a `file:` item in a linked git worktree, where a
+later checkout can change the file; such a file is logged in a run and cited as `run:<run id>`. A
+new question is open and any other record closed unless a status is given, and a record that answers
+an open question closes it. The view `records` has one row per record, with its project, and the
+label as its column `experiment`.
 
 A record's page links each item of its evidence to its page or file, and shows the rows of a `sql:`
 item. lab-from-mlflow copies mlflow-lab's evidence, which may be any text, as it is; the page shows

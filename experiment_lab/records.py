@@ -7,7 +7,9 @@ over the views> or record:<id>. Only the standard library, as lab.py.
 """
 import re
 import sqlite3
+import subprocess
 from collections.abc import Collection, Iterable, Mapping
+from pathlib import Path
 from typing import Any, NamedTuple, TypedDict
 
 from experiment_lab.lab import BELOW, Lab, now
@@ -70,6 +72,26 @@ def check_evidence(items: Iterable[str]) -> None:
         kind, _, value = item.partition(":")
         if kind not in EVIDENCE or not value:
             raise ValueError(f"evidence {item!r} is not one of {', '.join(k + ':...' for k in EVIDENCE)}")
+
+
+def in_linked_worktree(items: Iterable[str]) -> list[str]:
+    """The file: items under a linked git worktree (one that git worktree add
+    made, not the repository's main one), where a later checkout can change the
+    file."""
+    return [item for item in items if item.startswith("file:") and linked(Path(item[5:]).expanduser())]
+
+
+def linked(path: Path) -> bool:
+    """Whether path, or the nearest folder above it that exists, is in a
+    linked git worktree: one whose git folder is not the repository's."""
+    folder = next(p for p in (path, *path.parents) if p.is_dir())
+    try:
+        git = subprocess.run(["git", "-C", str(folder), "rev-parse", "--path-format=absolute", "--git-dir",
+                              "--git-common-dir"], capture_output=True, text=True, check=True)
+    except (OSError, subprocess.CalledProcessError):
+        return False
+    own, common = git.stdout.splitlines()
+    return own != common
 
 
 def get(lab: Lab, rid: str) -> Record | None:
