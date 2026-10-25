@@ -256,6 +256,14 @@ metrics | sharpness |    3
 (2 rows)
 exit 0
 
+$ q --max 2 .keys
+table  | key     | runs
+-------+---------+-----
+tags   | outcome |    1
+params | dither  |    2
+(2 rows, more not shown (--max N shows more))
+exit 0
+
 $ cd ~ && q .keys
 error: no project holds this folder; --project P names one
 exit 1
@@ -292,6 +300,11 @@ exit 0
 
 $ echo "SELECT count(*) AS runs FROM runs" | q
 11
+exit 0
+
+$ q "SELECT 1 AS x; SET threads = 1; FROM runs LIMIT 1; SELECT 2 AS y"
+The rows of statements 1, 3 are not shown; only the last statement's are.
+2
 exit 0
 
 $ q "CREATE TABLE t AS SELECT 1 AS x; SELECT x FROM t"
