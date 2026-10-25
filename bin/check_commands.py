@@ -62,6 +62,7 @@ q --full "SELECT text FROM records WHERE id = '48-khz-is-the-most-accurate-rate'
 echo "SELECT count(*) AS runs FROM runs" | q
 q "CREATE TABLE t AS SELECT 1 AS x; SELECT x FROM t"
 q "CREATE TABLE t (x INT)"
+q "SET TimeZone = 'UTC'; SELECT TIMESTAMPTZ '2026-01-01 00:00:00+00' AS t"
 q --project nosuch .views
 q "SELECT nosuch FROM runs"
 q --max 0 "SELECT 1 AS x"

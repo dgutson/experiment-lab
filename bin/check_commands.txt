@@ -249,6 +249,13 @@ Count
 (0 rows)
 exit 0
 
+$ q "SET TimeZone = 'UTC'; SELECT TIMESTAMPTZ '2026-01-01 00:00:00+00' AS t"
+t
+-------------------------
+2026-01-01 00:00:00+00:00
+(1 rows)
+exit 0
+
 $ q --project nosuch .views
 error: no project nosuch
 exit 1
