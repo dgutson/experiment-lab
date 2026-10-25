@@ -505,7 +505,7 @@ def create_app(data: Path) -> FastAPI:
             parent = (con.execute("SELECT parent FROM lab.experiments WHERE name = ?", [parent]).fetchone() or [None])[0]
         branches = con.execute("SELECT name, dead_end FROM lab.experiments WHERE parent = ? ORDER BY created, name",
                                [name]).fetchall()
-        runs = f"""FROM runs WHERE experiment = '{name.replace("'", "''")}' ORDER BY start_time DESC, name, run"""
+        runs = f"FROM runs WHERE experiment = {query.literal(name)} ORDER BY start_time DESC, name, run"
         result = con.execute(f"""SELECT run, name, status, {TIME.format("start_time")} AS started,
                 round((end_time - start_time) / 1000, 1) AS seconds, params {runs}""")
         t = query.table(result, ROWS, CUT)
