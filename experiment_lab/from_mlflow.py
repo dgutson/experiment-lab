@@ -43,9 +43,12 @@ import stat
 import sys
 import tomllib
 import urllib.parse
+from collections.abc import Container, Iterable, Mapping
 from pathlib import Path
+from typing import Any, NamedTuple
 
 import duckdb
+from duckdb import DuckDBPyConnection
 
 from experiment_lab import query, records
 from experiment_lab.lab import Lab
@@ -73,15 +76,77 @@ CREATE VIEW records AS SELECT tags['record.id'] AS id, strftime(to_timestamp(sta
 """
 
 
+type Row = tuple[Any, ...]  # a row as sqlite3 or DuckDB returns it
+type Rows = list[Row]
+
+
+class Experiment(NamedTuple):
+    name: str
+    description: str
+    created: int
+
+
+class RunRow(NamedTuple):
+    id: str
+    experiment: str
+    name: str
+    status: str
+    start_time: int
+    end_time: int | None
+    note: str
+
+
+class Pair(NamedTuple):
+    """A row of params or tags."""
+    run: str
+    key: str
+    value: str
+
+
+class Metric(NamedTuple):
+    run: str
+    key: str
+    value: float | None
+    step: int
+    time: int
+
+
+class RunFile(NamedTuple):
+    source: Path
+    path: Path  # under files/
+
+
+def per_run(db: sqlite3.Connection, sql: str, live: Container[str]) -> collections.defaultdict[str, Rows]:
+    """The rows of sql, whose first column is a run id, per run of live, without that column."""
+    found = collections.defaultdict(list)
+    for run, *values in db.execute(sql):
+        if run in live:
+            found[run].append(tuple(values))
+    return found
+
+
+def run_tags(tags: Mapping[str, str]) -> dict[str, str]:
+    """The tags that stay a run's: not its note, its name or a record's fields."""
+    return {k: v for k, v in tags.items() if k not in (NOTE, NAME) and not k.startswith("record.")}
+
+
 class Move:
     """What the old data folder holds, in the new tables' form."""
 
-    def __init__(self, old):
+    def __init__(self, old: Path) -> None:
         self.old = old
         toml = old / "lab.toml"
         settings = tomllib.loads(toml.read_text()) if toml.exists() else {}
         self.files = settings.get("files") and str(old / Path(settings["files"]).expanduser())
         self.views = [old / Path(path).expanduser() for path in settings.get("views", [])]
+        self.runs: list[RunRow] = []
+        self.params: list[Pair] = []
+        self.tags: list[Pair] = []
+        self.metrics: list[Metric] = []
+        self.records: list[records.Record] = []
+        self.run_files: list[RunFile] = []
+        self.companions: set[str] = set()
+        self.left_out: list[Path] = []
         db = sqlite3.connect(f"file:{old / 'mlflow.db'}?mode=ro", uri=True, isolation_level=None)
         db.execute("BEGIN")  # one snapshot for every read
         rows = db.execute("""SELECT e.experiment_id, e.name, coalesce(t.value, ''), coalesce(e.creation_time, 0),
@@ -89,59 +154,56 @@ class Move:
             FROM experiments e LEFT JOIN experiment_tags t ON t.experiment_id = e.experiment_id AND t.key = ?
             WHERE e.lifecycle_stage = 'active'""", (NOTE,)).fetchall()
         self.names = {str(eid): name for eid, name, *_ in rows}
-        self.experiments = [(name, self.relink(text), created) for _, name, text, created, runs in rows
+        self.experiments = [Experiment(name, self.relink(text), created) for _, name, text, created, runs in rows
                             if runs or name != "Default"]
         live = {r[0]: r for r in db.execute("""SELECT r.run_uuid, e.name, r.name, r.status, r.start_time,
                 r.end_time, r.artifact_uri FROM runs r JOIN experiments e USING (experiment_id)
             WHERE r.lifecycle_stage = 'active' AND e.lifecycle_stage = 'active'""")}
-
-        def per_run(sql):
-            found = collections.defaultdict(list)
-            for run, *values in db.execute(sql):
-                if run in live:
-                    found[run].append(values)
-            return found
-
-        tags = per_run("SELECT run_uuid, key, value FROM tags")
-        params = per_run("SELECT run_uuid, key, value FROM params")
-        metrics = per_run("SELECT run_uuid, key, CASE WHEN is_nan THEN NULL ELSE value END, step, timestamp FROM metrics")
+        tags = per_run(db, "SELECT run_uuid, key, value FROM tags", live)
+        params = per_run(db, "SELECT run_uuid, key, value FROM params", live)
+        metrics = per_run(db, "SELECT run_uuid, key, CASE WHEN is_nan THEN NULL ELSE value END, step, timestamp"
+                              " FROM metrics", live)
         db.close()
-        self.runs, self.params, self.tags, self.metrics, self.records, self.run_files = [], [], [], [], [], []
-        self.companions, self.left_out = set(), []
         for rid, (_, experiment, name, status, start, end, uri) in live.items():
-            t = dict(tags[rid])
-            files = self.files_of(rid, uri)
-            other = {k: v for k, v in t.items() if k not in (NOTE, NAME) and not k.startswith("record.")}
-            if "record.id" in t:
-                self.records.append(self.record(experiment, name, start, t))
-                if not (params[rid] or metrics[rid] or other or files):
-                    continue
-                self.companions.add(rid)
-                self.records[-1]["evidence"].append(f"run:{rid}")
-            self.runs.append((rid, experiment, name, status, start, end,
-                              "" if rid in self.companions else self.relink(t.get(NOTE, ""))))
-            self.params += [(rid, k, v) for k, v in params[rid]]
-            self.tags += [(rid, k, v) for k, v in other.items()]
-            self.metrics += [(rid, *m) for m in metrics[rid]]
-            self.run_files += files
+            self.add_run(RunRow(rid, experiment, name, status, start, end, ""), uri, dict(tags[rid]), params[rid],
+                         metrics[rid])
 
-    def relink(self, text):
-        def lab_page(m):
+    def add_run(self, run: RunRow, uri: str | None, tags: Mapping[str, str], params: Rows, metrics: Rows) -> None:
+        """Adds the run, or the record it holds. A record's run that holds more
+        than the record (params, metrics, other tags, files) is also copied as a
+        run, with the same id, and the record's evidence gains run:<id>."""
+        files = self.files_of(run.id, uri)
+        other = run_tags(tags)
+        if "record.id" in tags:
+            self.records.append(self.record(run.experiment, run.name, run.start_time, tags))
+            if not any((params, metrics, other, files)):
+                return
+            self.companions.add(run.id)
+            self.records[-1]["evidence"].append(f"run:{run.id}")
+        self.runs.append(run._replace(note="" if run.id in self.companions else self.relink(tags.get(NOTE, ""))))
+        self.params += [Pair(run.id, k, v) for k, v in params]
+        self.tags += [Pair(run.id, k, v) for k, v in other.items()]
+        self.metrics += [Metric(run.id, *m) for m in metrics]
+        self.run_files += files
+
+    def relink(self, text: str) -> str:
+        def lab_page(m: re.Match[str]) -> str:
             if m[2]:
                 return f"/lab/run/{m[2]}"
             return f"/lab/experiment/{urllib.parse.quote(self.names[m[1]])}" if m[1] in self.names else m[0]
 
         return LINK.sub(lab_page, text)
 
-    def record(self, experiment, name, start, t):
-        return {"id": t["record.id"], "experiment": experiment, "label": t.get("record.experiment") or experiment,
-                "kind": t.get("record.kind"), "title": name.removeprefix(f"{t.get('record.kind')}: "),
-                "text": self.relink(t.get(NOTE, "")), "author": t.get("record.by") or "",
-                "status": t.get("record.status"), "answers": t.get("record.answers") or "", "evidence": evidence(t.get("record.evidence")),
-                "time": start}
+    def record(self, experiment: str, name: str, start: int, t: Mapping[str, str]) -> records.Record:
+        kind = t.get("record.kind", "")
+        return records.Record(id=t["record.id"], experiment=experiment, label=t.get("record.experiment") or experiment,
+                              kind=kind, title=name.removeprefix(f"{kind}: "), text=self.relink(t.get(NOTE, "")),
+                              author=t.get("record.by") or "", status=t.get("record.status", ""),
+                              answers=t.get("record.answers") or "", evidence=evidence(t.get("record.evidence")),
+                              time=start)
 
-    def files_of(self, rid, uri):
-        """The run's files to copy, as (source, path under files/<run id>/)."""
+    def files_of(self, rid: str, uri: str | None) -> list[RunFile]:
+        """The run's files to copy."""
         if not uri or not uri.startswith(ARTIFACTS):
             return []
         folder = self.old / "artifacts" / uri.removeprefix(ARTIFACTS)
@@ -151,12 +213,12 @@ class Move:
                 path = Path(parent, name)
                 s = path.lstat()
                 if stat.S_ISREG(s.st_mode) and s.st_nlink == 1:
-                    found.append((path, Path(rid) / path.relative_to(folder)))
+                    found.append(RunFile(path, Path(rid) / path.relative_to(folder)))
                 else:
                     self.left_out.append(path)
         return found
 
-    def write(self, data, project, description, folder):
+    def write(self, data: Path, project: str, description: str, folder: str | None) -> None:
         lab = Lab(data)
         lab.project(project, description, folder=folder, files=self.files, views=self.views)
         with lab.write() as db:
@@ -175,12 +237,12 @@ class Move:
             shutil.copy2(source, data / "files" / path)
 
 
-def evidence(text):
+def evidence(text: str | None) -> list[str]:
     """The items of an old record's evidence, mlflow:<run id> as run:<run id>."""
     return ["run:" + item.removeprefix("mlflow:") if item.startswith("mlflow:") else item for item in records.split(text)]
 
 
-def same(v):
+def same(v: object) -> object:
     """v in a form that compares by value: maps as sorted pairs, an empty map as none."""
     if isinstance(v, dict):
         return tuple(sorted((k, same(x)) for k, x in v.items())) or None
@@ -189,7 +251,7 @@ def same(v):
     return v
 
 
-def compare(name, old_rows, new_rows):
+def compare(name: str, old_rows: Iterable[Row], new_rows: Iterable[Row]) -> bool:
     old, new = collections.Counter(map(same, old_rows)), collections.Counter(map(same, new_rows))
     print(f"{name:20} {old.total():8} {new.total():8}  {'same' if old == new else 'DIFFERENT'}")
     for row in list((old - new).keys())[:3]:
@@ -199,21 +261,21 @@ def compare(name, old_rows, new_rows):
     return old == new
 
 
-def check(move, data, project):
+def old_database(move: Move) -> DuckDBPyConnection:
+    """mlflow.db attached to a new DuckDB database, with mlflow-lab's views
+    runs and records of it."""
     old = duckdb.connect()
     old.execute(f"ATTACH '{move.old / 'mlflow.db'}' AS ml (TYPE sqlite, READ_ONLY)")
     old.execute("CREATE SCHEMA mlflow")
     for table in ("experiments", "experiment_tags", "runs", "tags", "params", "metrics", "latest_metrics"):
         old.execute(f"CREATE VIEW mlflow.{table} AS FROM ml.{table}")
     old.execute(OLD_VIEWS)
-    failed = [f"old {path.name}: {e}" for path in move.views for e in query.run_file(old, path)]
-    new, sources = query.connect(data, project)
-    failed += [f"new {e}" for e in query.errors(sources)]
-    for error in failed:
-        print(error)
-    if failed:
-        return False
-    old.execute("CREATE SCHEMA moved")  # out of main, so out of the views compared below
+    return old
+
+
+def compare_counts(old: DuckDBPyConnection, new: DuckDBPyConnection, move: Move) -> bool:
+    """Compares, per table, the rows the old database should give with the rows copied."""
+    old.execute("CREATE SCHEMA moved")  # out of main, so out of the views compared later
     old.execute("CREATE TABLE moved.companions AS SELECT unnest(?::VARCHAR[]) AS run", [sorted(move.companions)])
     old.execute("""CREATE VIEW moved.copied AS SELECT run FROM main.runs WHERE tags['record.id'] IS NULL
                    UNION ALL FROM moved.companions""")
@@ -234,21 +296,36 @@ def check(move, data, project):
         copied = (new.execute(f"SELECT count(*) FROM lab.{table}{below}").fetchone() or (0,))[0]
         print(f"{table:20} {n:8} {copied:8}  {'same' if n == copied else 'DIFFERENT'}")
         ok &= n == copied
+    return ok
+
+
+RECORD_COLUMNS = "id, time, experiment, kind, title, text, author, status, answers, evidence"
+RUN_COLUMNS = "run, experiment, name, status, start_time"
+
+
+def old_records(old: DuckDBPyConnection, move: Move) -> Rows:
+    """The rows of the old view records as the new one should give them."""
+    return [(*r[:5], move.relink(r[5] or ""), r[6] or "", r[7], r[8] or "",
+             "; ".join([*evidence(r[9]), *([f"run:{r[10]}"] if r[10] in move.companions else [])]))
+            for r in old.execute(f"SELECT {RECORD_COLUMNS}, run FROM records").fetchall()]
+
+
+def old_runs(old: DuckDBPyConnection, move: Move) -> Rows:
+    """The rows of the old view runs, those that are not records, as the new one should give them."""
+    return [(*r[:5], {k: v for k, v in (r[5] or {}).items() if k not in (NOTE, NAME)}, r[6], r[7],
+             move.relink((r[5] or {}).get(NOTE, "")))
+            for r in old.execute(f"SELECT {RUN_COLUMNS}, tags, params, metrics FROM runs"
+                                 " WHERE tags['record.id'] IS NULL").fetchall()]
+
+
+def compare_views(old: DuckDBPyConnection, new: DuckDBPyConnection, move: Move) -> bool:
+    """Compares the rows of the old views with the new ones: runs, records,
+    experiments, and every view of the view files."""
     print(f"\n{'view':20} {'old rows':>8} {'new rows':>8}")
-    columns = "id, time, experiment, kind, title, text, author, status, answers, evidence"
-    ok &= compare("records", [
-        (*r[:5], move.relink(r[5] or ""), r[6] or "", r[7], r[8] or "",
-         "; ".join([*evidence(r[9]), *([f"run:{r[10]}"] if r[10] in move.companions else [])]))
-        for r in old.execute(f"SELECT {columns}, run FROM records").fetchall()],
-        new.execute(f"SELECT {columns} FROM records").fetchall())
-    run_columns = "run, experiment, name, status, start_time"
-    ok &= compare("runs", [
-        (*r[:5], {k: v for k, v in (r[5] or {}).items() if k not in (NOTE, NAME)}, r[6], r[7],
-         move.relink((r[5] or {}).get(NOTE, "")))
-        for r in old.execute(f"SELECT {run_columns}, tags, params, metrics FROM runs"
-                             " WHERE tags['record.id'] IS NULL").fetchall()],
-        new.execute(f"SELECT {run_columns}, tags, params, metrics, note FROM runs"
-                    " WHERE run NOT IN (SELECT unnest(?::VARCHAR[]))", [sorted(move.companions)]).fetchall())
+    ok = compare("records", old_records(old, move), new.execute(f"SELECT {RECORD_COLUMNS} FROM records").fetchall())
+    ok &= compare("runs", old_runs(old, move),
+                  new.execute(f"SELECT {RUN_COLUMNS}, tags, params, metrics, note FROM runs"
+                              " WHERE run NOT IN (SELECT unnest(?::VARCHAR[]))", [sorted(move.companions)]).fetchall())
     ok &= compare("experiments", [(n, move.relink(d or "")) for n, d in old.execute(
         """SELECT e.name, t.value FROM mlflow.experiments e LEFT JOIN mlflow.experiment_tags t
            ON t.experiment_id = e.experiment_id AND t.key = 'mlflow.note.content' WHERE e.lifecycle_stage = 'active'
@@ -260,7 +337,21 @@ def check(move, data, project):
     return ok
 
 
-def main():
+def check(move: Move, data: Path, project: str) -> bool:
+    """Compares the copy with the old database (see the module's docstring)."""
+    old = old_database(move)
+    failed = [f"old {path.name}: {e}" for path in move.views for e in query.run_file(old, path)]
+    new, sources = query.connect(data, project)
+    failed += [f"new {e}" for e in query.errors(sources)]
+    for error in failed:
+        print(error)
+    if failed:
+        return False
+    counted = compare_counts(old, new, move)
+    return compare_views(old, new, move) and counted
+
+
+def main() -> None:
     p = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     p.add_argument("old", type=Path, metavar="OLD_DATA_FOLDER")
     p.add_argument("project")

@@ -37,8 +37,8 @@ with tempfile.TemporaryDirectory() as folder:
     db.close()
     con = duckdb.connect()
     con.execute(f"ATTACH '{path}' AS ml (TYPE sqlite, READ_ONLY)")
-    attached = con.execute(QUERY.format(s="ml.")).fetchone()[0]
+    ((attached,),) = con.execute(QUERY.format(s="ml.")).fetchall()
     con.execute("CREATE TABLE runs AS FROM ml.runs; CREATE TABLE tags AS FROM ml.tags; CREATE TABLE params AS FROM ml.params")
-    copied = con.execute(QUERY.format(s="")).fetchone()[0]
+    ((copied,),) = con.execute(QUERY.format(s="")).fetchall()
 print(f"duckdb {duckdb.__version__}: attached SQLite {attached}, copies {copied}, expected 50:",
       "fixed" if attached == 50 else "bug present")

@@ -6,50 +6,98 @@ question closes it. Evidence items are run:<run id>, file:<path>, sql:<query
 over the views> or record:<id>. Only the standard library, as lab.py.
 """
 import re
+import sqlite3
+from collections.abc import Collection, Iterable, Mapping
+from typing import Any, NamedTuple, TypedDict
 
-from experiment_lab.lab import BELOW, now
+from experiment_lab.lab import BELOW, Lab, now
 
 KINDS = ("question", "decision", "protocol", "finding")  # in the order the pages show them
 STATUSES = ("open", "closed", "superseded")
 EVIDENCE = ("run", "file", "sql", "record")
 
+type Evidence = list[str]
 
-def split(evidence):
+
+class Record(TypedDict):
+    """A row of records, its evidence a list."""
+    id: str
+    experiment: str
+    label: str
+    kind: str
+    title: str
+    text: str
+    author: str
+    status: str
+    answers: str
+    evidence: Evidence
+    time: int
+
+
+class OpenRecord(NamedTuple):
+    id: str
+    label: str
+    kind: str
+    title: str
+
+
+def split(evidence: str | None) -> Evidence:
     return [item for item in (evidence or "").split("; ") if item]
 
 
-def check(r, fields=("kind", "status", "text", "evidence")):
+def as_record(r: Mapping[str, Any]) -> Record:
+    """A row of records, its evidence a list, or a record with fields changed,
+    as a Record; a KeyError if a key is missing."""
+    return Record(id=r["id"], experiment=r["experiment"], label=r["label"], kind=r["kind"], title=r["title"],
+                  text=r["text"], author=r["author"], status=r["status"], answers=r["answers"],
+                  evidence=r["evidence"], time=r["time"])
+
+
+def check(r: Record, fields: Collection[str] = ("kind", "status", "text", "evidence")) -> None:
     """Checks those of fields that are kind (one of KINDS), status (one of
     STATUSES), text (not empty) and evidence (items of EVIDENCE)."""
-    for field, allowed in (("kind", KINDS), ("status", STATUSES)):
-        if field in fields and r[field] not in allowed:
-            raise ValueError(f"{field} {r[field]!r} is not one of {', '.join(allowed)}")
+    for field, value, allowed in (("kind", r["kind"], KINDS), ("status", r["status"], STATUSES)):
+        if field in fields and value not in allowed:
+            raise ValueError(f"{field} {value!r} is not one of {', '.join(allowed)}")
     if "text" in fields and not r["text"].strip():
         raise ValueError(f"a record needs a text: {r['title']}")
-    for item in r["evidence"] if "evidence" in fields else []:
+    if "evidence" in fields:
+        check_evidence(r["evidence"])
+
+
+def check_evidence(items: Iterable[str]) -> None:
+    for item in items:
         kind, _, value = item.partition(":")
         if kind not in EVIDENCE or not value:
             raise ValueError(f"evidence {item!r} is not one of {', '.join(k + ':...' for k in EVIDENCE)}")
 
 
-def get(lab, rid):
-    """The record as a dict, its evidence a list; None if there is none."""
+def get(lab: Lab, rid: str) -> Record | None:
+    """The record; None if there is none."""
     cursor = lab.db.execute("SELECT * FROM records WHERE id = ?", (rid,))
     row = cursor.fetchone()
     if row is None:
         return None
     r = dict(zip([d[0] for d in cursor.description], row))
-    r["evidence"] = split(r["evidence"])
-    return r
+    return as_record({**r, "evidence": split(r["evidence"])})
 
 
-def open_records(lab, project=None):
+def open_records(lab: Lab, project: str | None = None) -> list[OpenRecord]:
     """The open records, only those of the project when one is given."""
-    return lab.db.execute(f"{BELOW} SELECT id, label, kind, title FROM records WHERE status = 'open'"
-                          " AND (? IS NULL OR experiment IN below) ORDER BY time", (project, project)).fetchall()
+    return [OpenRecord(*row) for row in lab.db.execute(
+        f"{BELOW} SELECT id, label, kind, title FROM records WHERE status = 'open'"
+        " AND (? IS NULL OR experiment IN below) ORDER BY time", (project, project))]
 
 
-def new_id(lab, title):
+def free_id(lab: Lab, rid: str | None, title: str) -> str:
+    """rid, which must be lower-case letters, digits and dashes and not taken;
+    without it, an id made from the title that is not taken."""
+    if rid:
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", rid):
+            raise ValueError(f"an id is lower-case letters, digits and dashes: {rid}")
+        if get(lab, rid):
+            raise ValueError(f"{rid} exists; change it instead")
+        return rid
     base = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:40].rstrip("-")
     rid, n = base, 2
     while get(lab, rid):
@@ -57,28 +105,31 @@ def new_id(lab, title):
     return rid
 
 
-def save(db, r):
+def answered(lab: Lab, answers: str) -> Record | None:
+    """The question that answers names, which must exist; None if it names none."""
+    question = get(lab, answers) if answers else None
+    if answers and not question:
+        raise ValueError(f"no record {answers}")
+    return question
+
+
+def save(db: sqlite3.Connection, r: Record) -> None:
     db.execute("INSERT OR REPLACE INTO records (id, experiment, label, kind, title, text, author, status, answers,"
                " evidence, time) VALUES (:id, :experiment, :label, :kind, :title, :text, :author, :status, :answers,"
                " :evidence, :time)", {**r, "evidence": "; ".join(r["evidence"])})
 
 
-def add(lab, experiment, kind, title, *, text, label=None, author="agent", status=None, answers="",
-        evidence=(), rid=None, time=None):
+def add(lab: Lab, experiment: str, kind: str, title: str, *, text: str, label: str | None = None,
+        author: str = "agent", status: str | None = None, answers: str = "", evidence: Iterable[str] = (),
+        rid: str | None = None, time: int | None = None) -> list[Record]:
     """Adds a record to an existing experiment; returns it, and the question
     it closed if any. text (Markdown) may not be empty."""
-    if rid and not re.fullmatch(r"[a-z0-9][a-z0-9-]*", rid):
-        raise ValueError(f"an id is lower-case letters, digits and dashes: {rid}")
-    if rid and get(lab, rid):
-        raise ValueError(f"{rid} exists; change it instead")
-    question = get(lab, answers) if answers else None
-    if answers and not question:
-        raise ValueError(f"no record {answers}")
+    rid = free_id(lab, rid, title)
+    question = answered(lab, answers)
     lab.check_experiment(experiment)
-    r = {"id": rid or new_id(lab, title), "experiment": experiment, "label": label or experiment, "kind": kind,
-         "title": title, "text": text, "author": author,
-         "status": status or ("open" if kind == "question" else "closed"), "answers": answers,
-         "evidence": list(evidence), "time": time or now()}
+    r = Record(id=rid, experiment=experiment, label=label or experiment, kind=kind, title=title, text=text,
+               author=author, status=status or ("open" if kind == "question" else "closed"), answers=answers,
+               evidence=list(evidence), time=time or now())
     check(r)
     changed = [r]
     with lab.write() as db:
@@ -90,13 +141,13 @@ def add(lab, experiment, kind, title, *, text, label=None, author="agent", statu
     return changed
 
 
-def change(lab, rid, **fields):
+def change(lab: Lab, rid: str, **fields: str | Evidence) -> Record:
     """Sets fields of the record (columns of records; evidence a list) and
     checks them, not the fields it keeps; returns it."""
     r = get(lab, rid)
     if r is None:
         raise ValueError(f"no record {rid}")
-    r.update(fields)
+    r = as_record({**r, **fields})
     check(r, fields)
     with lab.write() as db:
         save(db, r)
