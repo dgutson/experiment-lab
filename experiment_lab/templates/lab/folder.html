@@ -3,11 +3,11 @@
 {% block title %}{{ shown }}{% endblock %}
 {% block main %}
 <h1>{{ shown }}</h1>
-{% if parent %}<p><a href="/lab/file?path={{ parent|urlencode }}">↑ {{ parent }}</a></p>{% endif %}
+{% if parent %}<p><a href="{{ file_url(parent) }}">↑ {{ parent }}</a></p>{% endif %}
 <table class="sortable">
 <thead><tr><th>Name</th><th>Bytes</th></tr></thead>
 <tbody>
-{% for i in items %}{% set src = "/lab/file?path=" ~ i.path|urlencode %}<tr><td><a href="{{ src }}">{{ i.name }}</a>{{ in_place(i.media, src) }}</td><td class="n">{{ i.size }}</td></tr>
+{% for i in items %}<tr><td><a href="{{ i.src }}">{{ i.name }}</a>{{ in_place(i.media, i.src) }}</td><td class="n">{{ i.size }}</td></tr>
 {% endfor %}
 </tbody>
 </table>

@@ -24,7 +24,7 @@ import threading
 import urllib.parse
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
-from typing import NamedTuple, Required, TypedDict
+from typing import Any, NamedTuple, Required, TypedDict
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element
 
@@ -57,7 +57,6 @@ TIME = "strftime(to_timestamp({} / 1000), '%Y-%m-%d %H:%M')"
 PATH = re.compile(r"""(?<![^\s("'])~?/[^\s()<>"'`\[\]]*[^\s()<>"'`\[\].,;:!?]""")
 
 templates = Jinja2Templates(directory=HERE / "templates")
-templates.env.filters["cell"] = query.cell
 
 type Span = tuple[int, int]  # a run's start and end, in milliseconds
 type Spans = list[Span]
@@ -67,8 +66,22 @@ class Failure(TypedDict):
     error: str
 
 
-class Shown(query.Table):
-    """A table as a page shows it, with the sentence under it."""
+class Cell(NamedTuple):
+    """A cell of a table as a page shows it, and the page it links to."""
+    text: str
+    numeric: bool
+    href: str | None = None
+
+
+type Cells = list[Cell]
+type RunValues = dict[str, Cell]  # a run's params, latest metrics or tags, by key
+
+
+class Shown(TypedDict):
+    """A table as a page shows it: its column names, its rows and the
+    sentence under it."""
+    columns: list[str]
+    rows: list[Cells]
     note: str
 
 
@@ -98,9 +111,9 @@ class Node(TypedDict):
     name: str
     parent: str | None
     dead_end: bool
-    records: int
+    records: str
     started: str
-    running: bool
+    timed: bool
     processing: str
     clock: str
     above: list[str]
@@ -108,18 +121,31 @@ class Node(TypedDict):
 
 
 type Nodes = list[Node]
+type LabelRecords = tuple[str | None, Listing]  # a label and the records under it; None: the experiment's name
+
+
+class ExperimentRecords(TypedDict):
+    """An experiment's records as the records page shows them: indent is how
+    far its box is from the left (px), path the experiments above it below
+    the project, labels its records by label."""
+    name: str
+    dead_end: bool
+    indent: int
+    path: str
+    labels: list[LabelRecords]
 
 
 class Item(TypedDict, total=False):
     """An evidence item as the record page shows it: its kind and value; for
-    a file, whether /lab/file serves it and its media; for sql, its table; for
-    run and record, a label (None if missing)."""
+    sql, its table; else the words that show it (prefix, then label), the
+    page it links to (None if there is none) and, for a file, its media."""
     kind: Required[str]
     value: Required[str]
-    served: bool
-    media: str | None
     table: Shown | Failure
-    label: str | None
+    prefix: str
+    label: str
+    href: str | None
+    media: str | None
 
 
 class Hit(TypedDict):
@@ -186,20 +212,50 @@ def page(request: Request, template: str, status_code: int = 200, **context: obj
     return templates.TemplateResponse(request, f"lab/{template}.html", context, status_code=status_code)
 
 
+def url(kind: str, name: str) -> str:
+    """The page of an experiment, a run or a record."""
+    return f"/lab/{kind}/{urllib.parse.quote(name)}"
+
+
+def file_url(path: str, raw: bool = False) -> str:
+    """The page of a file or folder that /lab/file serves; raw: of its plain text."""
+    return "/lab/file?path=" + urllib.parse.quote(path) + ("&raw=1" if raw else "")
+
+
+def view_url(name: str, project: str | None) -> str:
+    """The page of a view of the project's database."""
+    return "/lab/view/" + urllib.parse.quote(name) + (f"?project={urllib.parse.quote(project)}" if project else "")
+
+
 def query_url(sql: str) -> str:
     """The query page that runs sql."""
     return "/lab/query?sql=" + urllib.parse.quote(sql)
 
 
-def shown(result: DuckDBPyConnection, limit: int, cut: int | None, ordered: bool = False) -> Shown:
-    """query.table's result and the sentence under it, which says how many
-    rows it has, which ones when some are left out (ordered: the query's ORDER
-    BY gives every row its place) and whether cells are cut."""
+templates.env.globals.update(url=url, file_url=file_url, view_url=view_url, query_url=query_url)
+
+
+def shown(result: DuckDBPyConnection, limit: int, cut: int | None, ordered: bool = False,
+          link: str | None = None) -> Shown:
+    """query.table's result as a page shows it, and the sentence under it,
+    which says how many rows it has, which ones when some are left out
+    (ordered: the query's ORDER BY gives every row its place) and whether cells
+    are cut. With link, a kind of page that url() takes, the first column (an
+    id) is not shown and the second links to the page of that id."""
     t = query.table(result, limit, cut)
     rows = (f"{len(t['rows'])} rows." if not t["more"] else f"The first {limit} rows." if ordered else
             f"The first {limit} rows the query returned; without ORDER BY, other rows may come first on another load.")
     cells = f" Cells longer than {t['cut']} characters are cut; the query box's result shows them whole." if t["cut"] else ""
-    return Shown(**t, note=rows + cells)
+    return Shown(columns=t["columns"][1:] if link else t["columns"],
+                 rows=[row_cells(r, t["numeric"], link) for r in t["rows"]], note=rows + cells)
+
+
+def row_cells(row: query.Row, numeric: Sequence[bool], link: str | None) -> Cells:
+    """A row of query.table as a page shows it; with link, the second value,
+    or the first when it is empty, links to the page of the first."""
+    if link is None:
+        return [Cell(v, n) for v, n in zip(row, numeric)]
+    return [Cell(row[1] or row[0], numeric[1], url(link, row[0])), *map(Cell, row[2:], numeric[2:])]
 
 
 def run_sql(con: DuckDBPyConnection, sql: str, limit: int = ROWS, cut: int | None = CUT) -> Shown | Failure:
@@ -239,7 +295,7 @@ def media(path: Path) -> str | None:
 
 
 def link(path: str) -> Element:
-    a = ElementTree.Element("a", href="/lab/file?path=" + urllib.parse.quote(path))
+    a = ElementTree.Element("a", href=file_url(path))
     a.text = path
     return a
 
@@ -306,6 +362,12 @@ def duration(ms: float) -> str:
     return "< 1 min" if m < 1 else f"{m} min" if m < 60 else f"{m // 60} h {m % 60} min"
 
 
+def spent(ms: float, running: bool) -> str:
+    """An experiment's time as the experiments page shows it: running while
+    one of its runs has not ended, else its duration, not timed if 0."""
+    return "running" if running else duration(ms) if ms else "not timed"
+
+
 def covered(spans: Iterable[Span]) -> int:
     """The time during which at least one of the (start, end) spans runs."""
     total = end = 0
@@ -346,13 +408,13 @@ def drawn(children: Mapping[str | None, Nodes]) -> Nodes:
 def tree(con: DuckDBPyConnection, project: str | None) -> Nodes:
     """The project's experiments, each followed by those below it, siblings in
     the order they were made. Each is a dict: name, parent, dead_end, records
-    (how many), started (when its first run started, or with no runs when it
-    was made), running (whether a run has not ended), processing (the sum of
-    its ended runs' durations) and clock (the time during which at least one of
-    them ran) as text, empty if 0, above (the names from the project down to
+    (how many, empty if none), started (when its first run started, or with no runs when it
+    was made), processing (the sum of its ended runs' durations) and clock (the
+    time during which at least one of them ran) as spent() shows them, timed
+    (whether both are durations), above (the names from the project down to
     its parent) and branch (the lines that draw the tree before its name). The
-    project's records, started, running, processing and clock are those of the
-    whole project."""
+    project's records, started, processing and clock are those of the whole
+    project."""
     rows = con.execute(f"""WITH r AS (SELECT experiment, min(start_time) AS t0,
                  bool_or(status = 'RUNNING') AS running FROM lab.runs GROUP BY ALL),
              c AS (SELECT experiment, count(*) AS n FROM lab.records GROUP BY ALL),
@@ -372,10 +434,20 @@ def tree(con: DuckDBPyConnection, project: str | None) -> Nodes:
         own = spans.get(name, []) if parent else [s for ss in spans.values() for s in ss]
         processing, clock = sum(end - start for start, end in own), covered(own)
         children.setdefault(parent, []).append(Node(
-            name=name, parent=parent, dead_end=dead_end, records=count, started=started, running=running,
-            processing=duration(processing) if processing else "", clock=duration(clock) if clock else "",
+            name=name, parent=parent, dead_end=dead_end, records=str(count) if count else "", started=started,
+            timed=not running and processing > 0, processing=spent(processing, running), clock=spent(clock, running),
             above=[], branch=""))
     return drawn(children)
+
+
+def experiment_records(e: Node, labels: Labeled) -> ExperimentRecords:
+    """The experiment's records, by label in the order of their names
+    ignoring case, as the records page shows them."""
+    above = e["above"][1:]
+    return ExperimentRecords(name=e["name"], dead_end=e["dead_end"], indent=16 * len(above),
+                 path=" › ".join(above) + " ›" if above else "",
+                 labels=[(None if label == e["name"] else label, rows)
+                         for label, rows in sorted(labels.items(), key=lambda lr: lr[0].lower())])
 
 
 def under(nodes: Iterable[Node], node: str | None, below: bool) -> list[str]:
@@ -409,18 +481,27 @@ def evidence_item(item: str, con: DuckDBPyConnection, own: DuckDBPyConnection, t
     """The evidence item as the record page shows it; sql: reads own, the
     views of the record's project, and rs are the records by id."""
     kind, value = kind_of(item)
-    e = Item(kind=kind, value=value)
+    if kind == "sql":
+        return Item(kind=kind, value=value, table=run_sql(own, value, EVIDENCE_ROWS))
     if kind == "file":
         target = served(value, tops)
-        e["served"], e["media"] = target is not None, media(target) if target else None
-    elif kind == "sql":
-        e["table"] = run_sql(own, value, EVIDENCE_ROWS)
-    elif kind == "run":
+        return cited_item(kind, value, value if target else None, file_url(value),
+                       "file under a project's folder or files folder", media(target) if target else None)
+    if kind == "run":
         found = con.execute("SELECT name, experiment FROM lab.runs WHERE id = ?", [value]).fetchone()
-        e["label"] = f"{found[0]} ({found[1]})" if found else None
-    elif kind == "record":
-        e["label"] = rs[value]["title"] if value in rs else None
-    return e
+        return cited_item(kind, value, f"{found[0]} ({found[1]})" if found else None, url("run", value), "run")
+    if kind == "record":
+        return cited_item(kind, value, rs[value]["title"] if value in rs else None, url("record", value), "record")
+    return Item(kind=kind, value=value, prefix="", label=value, href=value if kind == "url" else None)
+
+
+def cited_item(kind: str, value: str, label: str | None, href: str, missing: str, media_kind: str | None = None) -> Item:
+    """An evidence item that cites a run, a file or a record: its label, page
+    and media_kind (pages.media); with label None, that there is no such missing."""
+    if label is None:
+        return Item(kind=kind, value=value, prefix=f"{kind.capitalize()}: ", label=f"{value} (no such {missing})",
+                    href=None)
+    return Item(kind=kind, value=value, prefix=f"{kind.capitalize()}: ", label=label, href=href, media=media_kind)
 
 
 def folder(request: Request, target: Path, tops: Iterable[Path], picker: bool) -> Response:
@@ -430,11 +511,26 @@ def folder(request: Request, target: Path, tops: Iterable[Path], picker: bool) -
     top = min((r for r in tops if target.is_relative_to(r)), key=lambda r: len(r.parts))
     shown = shown_path(target)
     entries = sorted(target.iterdir(), key=lambda p: (not p.is_dir(), p.name))
-    items = [{"name": p.name + ("/" if p.is_dir() else ""), "path": f"{shown}/{p.name}",
+    items = [{"name": p.name + ("/" if p.is_dir() else ""), "src": file_url(f"{shown}/{p.name}"),
               "size": p.stat().st_size if p.is_file() else "", "media": p.is_file() and media(p)}
              for p in entries]
     return page(request, "folder", shown=shown, items=items,
                 parent=shown_path(target.parent) if target != top else None, picker=picker)
+
+
+def run_values(r: Mapping[str, Any]) -> dict[str, RunValues]:
+    """The run's params, latest metrics and tags, those it has, by the
+    heading its page shows them under: keys in order ignoring case, values as
+    query.cell writes them."""
+    return {title: {k: Cell(query.cell(v), isinstance(v, (int, float)))
+                    for k, v in sorted(values.items(), key=lambda kv: kv[0].lower())}
+            for title, values in (("Params", r["params"]), ("Latest metrics", r["metrics"]), ("Tags", r["tags"]))
+            if values}
+
+
+def found(hits: Sequence[Hit], where: str) -> str:
+    """The sentence above a search's results, of which the page shows ROWS."""
+    return f"{'The first ' if len(hits) > ROWS else ''}{min(len(hits), ROWS)} found in {where}."
 
 
 def snippet(text: str, words: Sequence[str], width: int = 240) -> str:
@@ -494,7 +590,7 @@ def create_app(data: Path) -> FastAPI:
             for rows in labels.values():
                 rows.sort(key=lambda r: (records.KINDS.index(r["kind"]), r["time"]))
         return page(request, "index", open=[r for r in rs if r["status"] == "open"],
-                    groups=[(e, by[e["name"]]) for e in tree(con, project) if e["name"] in by],
+                    experiments=[experiment_records(e, by[e["name"]]) for e in tree(con, project) if e["name"] in by],
                     errors=request.app.state.views.errors(project), picker=True)
 
     @app.get("/lab/experiments")
@@ -510,8 +606,9 @@ def create_app(data: Path) -> FastAPI:
         node = node if node in [e["name"] for e in nodes] else request.state.project
         words = find.lower().split()
         hits = search(con, words, under(nodes, node, bool(below))) if words else None
+        where = f"{node} and below it" if below else request.state.project
         return page(request, "experiments", nodes=nodes, node=node, find=find, below=bool(below) or not words,
-                    hits=hits and hits[:ROWS], more=hits is not None and len(hits) > ROWS, picker=True)
+                    hits=hits and hits[:ROWS], found=None if hits is None else found(hits, where), picker=True)
 
     @app.get("/lab/experiment/{name:path}")
     def experiment(request: Request, name: str, con: DuckDBPyConnection = Depends(cursor)) -> Response:
@@ -529,29 +626,31 @@ def create_app(data: Path) -> FastAPI:
         runs = f"FROM runs WHERE experiment = {query.literal(name)} ORDER BY start_time DESC, name, run"
         result = con.execute(f"""SELECT run, name, status, {TIME.format("start_time")} AS started,
                 round((end_time - start_time) / 1000, 1) AS seconds, params {runs}""")
-        t = shown(result, ROWS, CUT, ordered=True)
+        t = shown(result, ROWS, CUT, ordered=True, link="run")
         rs = [r for r in all_records(con) if r["filed_in"] == name]
         project = folder and {"folder": shown_path(Path(folder)), "files": shown_path(Path(files)),
-                              "views": [shown_path(Path(v)) for v in views.split("; ") if v]}
+                              "views": ", ".join(shown_path(Path(v)) for v in views.split("; ") if v) or "none"}
         return page(request, "experiment", name=name, description=md(description, roots(con)), dead_end=dead_end,
                     above=above, branches=branches, project_settings=project, t=t,
                     query=query_url("SELECT * " + runs), records=rs)
 
     @app.get("/lab/run/{rid}")
     def run_page(request: Request, rid: str, con: DuckDBPyConnection = Depends(cursor)) -> Response:
-        result = con.execute(f"SELECT *, {TIME.format('start_time')} AS started, {TIME.format('end_time')} AS ended"
-                             " FROM runs WHERE run = ?", [rid])
+        result = con.execute(f"SELECT *, concat_ws(' to ', {TIME.format('start_time')}, {TIME.format('end_time')})"
+                             " AS span FROM runs WHERE run = ?", [rid])
         row = result.fetchone()
         if row is None:
             raise HTTPException(404, f"no run {rid}")
         r = dict(zip([d[0] for d in result.description], row))
         folder = data / "files" / rid
-        files = sorted((str(p.relative_to(folder)), p.stat().st_size, media(p))
-                       for p in folder.rglob("*") if p.is_file())
+        names = sorted(str(p.relative_to(folder)) for p in folder.rglob("*") if p.is_file())
+        files = [(n, (folder / n).stat().st_size, media(folder / n), f"{url('run', rid)}/file/{urllib.parse.quote(n)}")
+                 for n in names]
         cited_by = [x for x in all_records(con) if f"run:{rid}" in x["evidence"]]
-        return page(request, "run", r=r, note=md(r["note"], roots(con)), files=files, cited_by=cited_by,
-                    maps=[(title, r[key] or {}) for title, key in
-                          (("Params", "params"), ("Latest metrics", "metrics"), ("Tags", "tags"))])
+        logged = query_url("SELECT key, step, time, value FROM lab.metrics"
+                           f" WHERE run = {query.literal(rid)} ORDER BY key, step, time")
+        return page(request, "run", r=r, note=md(r["note"], roots(con)), files=files, cited_by=cited_by, logged=logged,
+                    run_values=run_values(r))
 
     @app.get("/lab/run/{rid}/file/{path:path}")
     def run_file(rid: str, path: str) -> FileResponse:
@@ -573,7 +672,7 @@ def create_app(data: Path) -> FastAPI:
         answered_by = [x for x in rs.values() if x["answers"] == rid]
         cited_by = [x for x in rs.values() if f"record:{rid}" in x["evidence"]]
         return page(request, "record", r=r, text=md(r["text"], tops), evidence=evidence, answers=rs.get(r["answers"]),
-                    answered_by=answered_by, cited_by=cited_by)
+                    answered_by=answered_by, cited_by=cited_by, by=r["author"] or "?")
 
     @app.get("/lab/view/{name}")
     def view_page(request: Request, name: str, project: str | None = None) -> Response:
@@ -594,8 +693,10 @@ def create_app(data: Path) -> FastAPI:
         if len(sql) > LONGEST_SQL:
             raise HTTPException(400, f"the query is longer than {LONGEST_SQL} characters")
         result = run_sql(con, sql, cut=None) if sql.strip() else None
-        return page(request, "query", sql=sql, result=result, views=query.view_columns(con),
-                    errors=request.app.state.views.errors(request.state.project), picker=True)
+        project = request.state.project
+        listed = "lab.sql's views" + (f" and those of {project}'s view files" if project else "") + "."
+        return page(request, "query", sql=sql, result=result, views=query.view_columns(con), listed=listed,
+                    errors=request.app.state.views.errors(project), picker=True)
 
     @app.get("/lab/file")
     def file_page(request: Request, path: str = "", raw: str = "",

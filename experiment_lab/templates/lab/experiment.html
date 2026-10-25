@@ -2,15 +2,15 @@
 {% from "lab/macros.html" import data_table, record_links, dead_end_label %}
 {% block title %}{{ name }}{% endblock %}
 {% block main %}
-{% if above %}<p class="path">{% for a in above %}<a href="/lab/experiment/{{ a|urlencode }}">{{ a }}</a> › {% endfor %}</p>{% endif %}
+{% if above %}<p class="path">{% for a in above %}<a href="{{ url('experiment', a) }}">{{ a }}</a> › {% endfor %}</p>{% endif %}
 <h1>{{ name }}{{ dead_end_label(dead_end) }}</h1>
 {% if project_settings %}<p class="meta">project</p>{% endif %}
-{% if project_settings %}<p class="meta">Folder {{ project_settings.folder }} · files folder <a href="/lab/file?path={{ project_settings.files|urlencode }}">{{ project_settings.files }}</a> ·
-  view files {{ project_settings.views|join(", ") or "none" }}</p>{% endif %}
+{% if project_settings %}<p class="meta">Folder {{ project_settings.folder }} · files folder <a href="{{ file_url(project_settings.files) }}">{{ project_settings.files }}</a> ·
+  view files {{ project_settings.views }}</p>{% endif %}
 {{ description }}
 {% if branches %}
 <h2>Branches</h2>
-<ul>{% for b, dead_end in branches %}<li><a href="/lab/experiment/{{ b|urlencode }}">{{ b }}</a>{{ dead_end_label(dead_end) }}</li>{% endfor %}</ul>
+<ul>{% for b, dead_end in branches %}<li><a href="{{ url('experiment', b) }}">{{ b }}</a>{{ dead_end_label(dead_end) }}</li>{% endfor %}</ul>
 {% endif %}
 {% if records %}
 <h2>Records</h2>
@@ -18,5 +18,5 @@
 {% endif %}
 <h2>Runs</h2>
 <p class="meta"><a href="{{ query }}">query them</a></p>
-{{ data_table(t, link="/lab/run/") }}
+{{ data_table(t) }}
 {% endblock %}
