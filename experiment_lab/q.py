@@ -13,7 +13,9 @@ folder holds it or its git repository's main worktree), or of --project; a
 statement of a view file that fails is printed on stderr and skipped. lab.sql's
 views have every project's rows; their column project tells them apart.
 Several statements may be given; the last one's rows are printed, at most
---max of them (40), with cells cut at 80 characters unless --full.
+--max of them (40), with cells cut at 80 characters unless --full. A result of
+one row and one column prints that cell alone, whole and with its line breaks,
+as in q "SELECT text FROM records WHERE id = '...'".
 """
 import argparse
 import sys
@@ -26,8 +28,9 @@ from experiment_lab.lab import holding
 from experiment_lab.settings import data_folder
 
 
-def show(t: query.Table) -> None:
-    rows = [[v.replace("\n", " ") for v in r] for r in t["rows"]]
+def show(t: query.Table, cut: int | None) -> None:
+    """The table with its cells cut at cut characters (None: whole), each on one line."""
+    rows = [[v.replace("\n", " ") for v in query.shorten(r, cut)] for r in t["rows"]]
     widths = [max([len(n)] + [len(r[i]) for r in rows]) for i, n in enumerate(t["columns"])]
 
     def fmt(values: list[str]) -> str:
@@ -73,7 +76,11 @@ def answer(con: DuckDBPyConnection, sql: str, limit: int, cut: int | None) -> No
     if result is None:
         print("ok")
         return
-    show(query.table(result, limit, cut))
+    t = query.table(result, limit)
+    if len(t["columns"]) == 1 and len(t["rows"]) == 1 and not t["more"]:
+        print(t["rows"][0][0], end="" if t["rows"][0][0].endswith("\n") else "\n")
+    else:
+        show(t, cut)
 
 
 def main() -> None:

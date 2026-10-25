@@ -63,6 +63,7 @@ q --project vision "FROM blur_scores"
 q --max 2 "SELECT name FROM runs ORDER BY name"
 q "SELECT id, text FROM records WHERE id = '48-khz-is-the-most-accurate-rate'"
 q --full "SELECT text FROM records WHERE id = '48-khz-is-the-most-accurate-rate'"
+q "SELECT text FROM records WHERE id = 'keep-48-khz'"
 echo "SELECT count(*) AS runs FROM runs" | q
 q "CREATE TABLE t AS SELECT 1 AS x; SELECT x FROM t"
 q "CREATE TABLE t (x INT)"
