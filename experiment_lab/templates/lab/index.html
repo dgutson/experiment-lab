@@ -16,12 +16,12 @@
 </tbody>
 </table>
 {% else %}<p>No open records.</p>{% endif %}
-{% for g in groups %}
-<div class="group" style="margin-left: {{ g.indent }}px">
-{% if g.path %}<p class="path">{{ g.path }}</p>{% endif %}
-<h2><a href="{{ url('experiment', g.name) }}">{{ g.name }}</a>{{ dead_end_label(g.dead_end) }}</h2>
-{% for heading, rows in g.labels %}
-{% if heading is not none %}<h3>{{ heading }}</h3>{% endif %}
+{% for e in experiments %}
+<div class="group" style="margin-left: {{ e.indent }}px">
+{% if e.path %}<p class="path">{{ e.path }}</p>{% endif %}
+<h2><a href="{{ url('experiment', e.name) }}">{{ e.name }}</a>{{ dead_end_label(e.dead_end) }}</h2>
+{% for label, rows in e.labels %}
+{% if label is not none %}<h3>{{ label }}</h3>{% endif %}
 <table class="sortable">
 <thead><tr><th>Kind</th><th>Status</th><th>Title</th><th>By</th><th>Time</th></tr></thead>
 <tbody>

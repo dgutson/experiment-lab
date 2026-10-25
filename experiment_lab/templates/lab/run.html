@@ -5,12 +5,12 @@
 <h1>{{ r.name }}</h1>
 <p class="meta">{{ r.status }} · in <a href="{{ url('experiment', r.experiment) }}">{{ r.experiment }}</a> · {{ r.span }} · id {{ r.run }}</p>
 {{ note }}
-{% for title, pairs in maps %}
-<h2>{{ title }}</h2>
+{% for heading, values in run_values.items() %}
+<h2>{{ heading }}</h2>
 <table class="sortable">
 <thead><tr><th>Key</th><th>Value</th></tr></thead>
 <tbody>
-{% for k, v, number in pairs %}<tr><td>{{ k }}</td><td{% if number %} class="n"{% endif %}>{{ v }}</td></tr>
+{% for key, value in values.items() %}<tr><td>{{ key }}</td><td{% if value.numeric %} class="n"{% endif %}>{{ value.text }}</td></tr>
 {% endfor %}
 </tbody>
 </table>

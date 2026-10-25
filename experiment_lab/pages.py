@@ -69,11 +69,12 @@ class Failure(TypedDict):
 class Cell(NamedTuple):
     """A cell of a table as a page shows it, and the page it links to."""
     text: str
-    number: bool
+    numeric: bool
     href: str | None = None
 
 
 type Cells = list[Cell]
+type RunValues = dict[str, Cell]  # a run's params, latest metrics or tags, by key
 
 
 class Shown(TypedDict):
@@ -120,10 +121,10 @@ class Node(TypedDict):
 
 
 type Nodes = list[Node]
-type Heading = tuple[str | None, Listing]  # records under a label; None: under the experiment's name
+type LabelRecords = tuple[str | None, Listing]  # a label and the records under it; None: the experiment's name
 
 
-class Group(TypedDict):
+class ExperimentRecords(TypedDict):
     """An experiment's records as the records page shows them: indent is how
     far its box is from the left (px), path the experiments above it below
     the project, labels its records by label."""
@@ -131,17 +132,17 @@ class Group(TypedDict):
     dead_end: bool
     indent: int
     path: str
-    labels: list[Heading]
+    labels: list[LabelRecords]
 
 
 class Item(TypedDict, total=False):
     """An evidence item as the record page shows it: its kind and value; for
-    sql, its table; else the words that show it (heading, then label), the
+    sql, its table; else the words that show it (prefix, then label), the
     page it links to (None if there is none) and, for a file, its media."""
     kind: Required[str]
     value: Required[str]
     table: Shown | Failure
-    heading: str
+    prefix: str
     label: str
     href: str | None
     media: str | None
@@ -154,18 +155,6 @@ class Hit(TypedDict):
     experiment: str
     title: str
     snippet: str
-
-
-class Pair(NamedTuple):
-    key: str
-    value: str
-    number: bool
-
-
-class Map(NamedTuple):
-    """A map of a run, as its page shows it."""
-    title: str
-    pairs: list[Pair]
 
 
 class Pieces(NamedTuple):
@@ -451,11 +440,11 @@ def tree(con: DuckDBPyConnection, project: str | None) -> Nodes:
     return drawn(children)
 
 
-def group(e: Node, labels: Labeled) -> Group:
+def experiment_records(e: Node, labels: Labeled) -> ExperimentRecords:
     """The experiment's records, by label in the order of their names
     ignoring case, as the records page shows them."""
     above = e["above"][1:]
-    return Group(name=e["name"], dead_end=e["dead_end"], indent=16 * len(above),
+    return ExperimentRecords(name=e["name"], dead_end=e["dead_end"], indent=16 * len(above),
                  path=" › ".join(above) + " ›" if above else "",
                  labels=[(None if label == e["name"] else label, rows)
                          for label, rows in sorted(labels.items(), key=lambda lr: lr[0].lower())])
@@ -496,23 +485,23 @@ def evidence_item(item: str, con: DuckDBPyConnection, own: DuckDBPyConnection, t
         return Item(kind=kind, value=value, table=run_sql(own, value, EVIDENCE_ROWS))
     if kind == "file":
         target = served(value, tops)
-        return pointer(kind, value, value if target else None, file_url(value),
+        return cited_item(kind, value, value if target else None, file_url(value),
                        "file under a project's folder or files folder", media(target) if target else None)
     if kind == "run":
         found = con.execute("SELECT name, experiment FROM lab.runs WHERE id = ?", [value]).fetchone()
-        return pointer(kind, value, f"{found[0]} ({found[1]})" if found else None, url("run", value), "run")
+        return cited_item(kind, value, f"{found[0]} ({found[1]})" if found else None, url("run", value), "run")
     if kind == "record":
-        return pointer(kind, value, rs[value]["title"] if value in rs else None, url("record", value), "record")
-    return Item(kind=kind, value=value, heading="", label=value, href=value if kind == "url" else None)
+        return cited_item(kind, value, rs[value]["title"] if value in rs else None, url("record", value), "record")
+    return Item(kind=kind, value=value, prefix="", label=value, href=value if kind == "url" else None)
 
 
-def pointer(kind: str, value: str, label: str | None, href: str, missing: str, shows: str | None = None) -> Item:
-    """An evidence item of a run, a file or a record: its label and page, its
-    media shows; with label None, that there is no such missing."""
+def cited_item(kind: str, value: str, label: str | None, href: str, missing: str, media_kind: str | None = None) -> Item:
+    """An evidence item that cites a run, a file or a record: its label, page
+    and media_kind (pages.media); with label None, that there is no such missing."""
     if label is None:
-        return Item(kind=kind, value=value, heading=f"{kind.capitalize()}: ", label=f"{value} (no such {missing})",
+        return Item(kind=kind, value=value, prefix=f"{kind.capitalize()}: ", label=f"{value} (no such {missing})",
                     href=None)
-    return Item(kind=kind, value=value, heading=f"{kind.capitalize()}: ", label=label, href=href, media=shows)
+    return Item(kind=kind, value=value, prefix=f"{kind.capitalize()}: ", label=label, href=href, media=media_kind)
 
 
 def folder(request: Request, target: Path, tops: Iterable[Path], picker: bool) -> Response:
@@ -529,13 +518,14 @@ def folder(request: Request, target: Path, tops: Iterable[Path], picker: bool) -
                 parent=shown_path(target.parent) if target != top else None, picker=picker)
 
 
-def run_maps(r: Mapping[str, Any]) -> list[Map]:
-    """The run's params, latest metrics and tags, those it has, as its page
-    shows them: keys in order ignoring case, values as query.cell writes them."""
-    return [Map(title, [Pair(k, query.cell(v), isinstance(v, (int, float)))
-                        for k, v in sorted(values.items(), key=lambda kv: kv[0].lower())])
+def run_values(r: Mapping[str, Any]) -> dict[str, RunValues]:
+    """The run's params, latest metrics and tags, those it has, by the
+    heading its page shows them under: keys in order ignoring case, values as
+    query.cell writes them."""
+    return {title: {k: Cell(query.cell(v), isinstance(v, (int, float)))
+                    for k, v in sorted(values.items(), key=lambda kv: kv[0].lower())}
             for title, values in (("Params", r["params"]), ("Latest metrics", r["metrics"]), ("Tags", r["tags"]))
-            if values]
+            if values}
 
 
 def found(hits: Sequence[Hit], where: str) -> str:
@@ -600,7 +590,7 @@ def create_app(data: Path) -> FastAPI:
             for rows in labels.values():
                 rows.sort(key=lambda r: (records.KINDS.index(r["kind"]), r["time"]))
         return page(request, "index", open=[r for r in rs if r["status"] == "open"],
-                    groups=[group(e, by[e["name"]]) for e in tree(con, project) if e["name"] in by],
+                    experiments=[experiment_records(e, by[e["name"]]) for e in tree(con, project) if e["name"] in by],
                     errors=request.app.state.views.errors(project), picker=True)
 
     @app.get("/lab/experiments")
@@ -660,7 +650,7 @@ def create_app(data: Path) -> FastAPI:
         logged = query_url("SELECT key, step, time, value FROM lab.metrics"
                            f" WHERE run = {query.literal(rid)} ORDER BY key, step, time")
         return page(request, "run", r=r, note=md(r["note"], roots(con)), files=files, cited_by=cited_by, logged=logged,
-                    maps=run_maps(r))
+                    run_values=run_values(r))
 
     @app.get("/lab/run/{rid}/file/{path:path}")
     def run_file(rid: str, path: str) -> FileResponse:
