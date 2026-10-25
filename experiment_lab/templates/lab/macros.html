@@ -1,12 +1,9 @@
-{# A table of pages.shown's result. With link, a kind of page that url()
-   takes, the first column (an id) is not shown and the second links to the
-   page of that id. #}
-{% macro data_table(t, link=none) %}
-{% set skip = 1 if link else 0 %}
+{# A table of pages.shown's result. #}
+{% macro data_table(t) %}
 <div class="scroll"><table class="sortable">
-<thead><tr>{% for c in t.columns[skip:] %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+<thead><tr>{% for c in t.columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
 <tbody>
-{% for row in t.rows %}<tr>{% for v in row[skip:] %}<td{% if t.numeric[loop.index0 + skip] %} class="n"{% endif %}>{% if link and loop.first %}<a href="{{ url(link, row[0]) }}">{{ v or row[0] }}</a>{% else %}{{ v }}{% endif %}</td>{% endfor %}</tr>
+{% for row in t.rows %}<tr>{% for c in row %}<td{% if c.number %} class="n"{% endif %}>{% if c.href %}<a href="{{ c.href }}">{{ c.text }}</a>{% else %}{{ c.text }}{% endif %}</td>{% endfor %}</tr>
 {% endfor %}
 </tbody>
 </table></div>

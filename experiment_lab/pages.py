@@ -24,7 +24,7 @@ import threading
 import urllib.parse
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
-from typing import NamedTuple, Required, TypedDict
+from typing import Any, NamedTuple, Required, TypedDict
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element
 
@@ -57,7 +57,6 @@ TIME = "strftime(to_timestamp({} / 1000), '%Y-%m-%d %H:%M')"
 PATH = re.compile(r"""(?<![^\s("'])~?/[^\s()<>"'`\[\]]*[^\s()<>"'`\[\].,;:!?]""")
 
 templates = Jinja2Templates(directory=HERE / "templates")
-templates.env.filters["cell"] = query.cell
 
 type Span = tuple[int, int]  # a run's start and end, in milliseconds
 type Spans = list[Span]
@@ -67,8 +66,21 @@ class Failure(TypedDict):
     error: str
 
 
-class Shown(query.Table):
-    """A table as a page shows it, with the sentence under it."""
+class Cell(NamedTuple):
+    """A cell of a table as a page shows it, and the page it links to."""
+    text: str
+    number: bool
+    href: str | None = None
+
+
+type Cells = list[Cell]
+
+
+class Shown(TypedDict):
+    """A table as a page shows it: its column names, its rows and the
+    sentence under it."""
+    columns: list[str]
+    rows: list[Cells]
     note: str
 
 
@@ -98,7 +110,7 @@ class Node(TypedDict):
     name: str
     parent: str | None
     dead_end: bool
-    records: int
+    records: str
     started: str
     timed: bool
     processing: str
@@ -108,6 +120,18 @@ class Node(TypedDict):
 
 
 type Nodes = list[Node]
+type Heading = tuple[str | None, Listing]  # records under a label; None: under the experiment's name
+
+
+class Group(TypedDict):
+    """An experiment's records as the records page shows them: indent is how
+    far its box is from the left (px), path the experiments above it below
+    the project, labels its records by label."""
+    name: str
+    dead_end: bool
+    indent: int
+    path: str
+    labels: list[Heading]
 
 
 class Item(TypedDict, total=False):
@@ -130,6 +154,18 @@ class Hit(TypedDict):
     experiment: str
     title: str
     snippet: str
+
+
+class Pair(NamedTuple):
+    key: str
+    value: str
+    number: bool
+
+
+class Map(NamedTuple):
+    """A map of a run, as its page shows it."""
+    title: str
+    pairs: list[Pair]
 
 
 class Pieces(NamedTuple):
@@ -210,15 +246,27 @@ def query_url(sql: str) -> str:
 templates.env.globals.update(url=url, file_url=file_url, view_url=view_url, query_url=query_url)
 
 
-def shown(result: DuckDBPyConnection, limit: int, cut: int | None, ordered: bool = False) -> Shown:
-    """query.table's result and the sentence under it, which says how many
-    rows it has, which ones when some are left out (ordered: the query's ORDER
-    BY gives every row its place) and whether cells are cut."""
+def shown(result: DuckDBPyConnection, limit: int, cut: int | None, ordered: bool = False,
+          link: str | None = None) -> Shown:
+    """query.table's result as a page shows it, and the sentence under it,
+    which says how many rows it has, which ones when some are left out
+    (ordered: the query's ORDER BY gives every row its place) and whether cells
+    are cut. With link, a kind of page that url() takes, the first column (an
+    id) is not shown and the second links to the page of that id."""
     t = query.table(result, limit, cut)
     rows = (f"{len(t['rows'])} rows." if not t["more"] else f"The first {limit} rows." if ordered else
             f"The first {limit} rows the query returned; without ORDER BY, other rows may come first on another load.")
     cells = f" Cells longer than {t['cut']} characters are cut; the query box's result shows them whole." if t["cut"] else ""
-    return Shown(**t, note=rows + cells)
+    return Shown(columns=t["columns"][1:] if link else t["columns"],
+                 rows=[row_cells(r, t["numeric"], link) for r in t["rows"]], note=rows + cells)
+
+
+def row_cells(row: query.Row, numeric: Sequence[bool], link: str | None) -> Cells:
+    """A row of query.table as a page shows it; with link, the second value,
+    or the first when it is empty, links to the page of the first."""
+    if link is None:
+        return [Cell(v, n) for v, n in zip(row, numeric)]
+    return [Cell(row[1] or row[0], numeric[1], url(link, row[0])), *map(Cell, row[2:], numeric[2:])]
 
 
 def run_sql(con: DuckDBPyConnection, sql: str, limit: int = ROWS, cut: int | None = CUT) -> Shown | Failure:
@@ -371,7 +419,7 @@ def drawn(children: Mapping[str | None, Nodes]) -> Nodes:
 def tree(con: DuckDBPyConnection, project: str | None) -> Nodes:
     """The project's experiments, each followed by those below it, siblings in
     the order they were made. Each is a dict: name, parent, dead_end, records
-    (how many), started (when its first run started, or with no runs when it
+    (how many, empty if none), started (when its first run started, or with no runs when it
     was made), processing (the sum of its ended runs' durations) and clock (the
     time during which at least one of them ran) as spent() shows them, timed
     (whether both are durations), above (the names from the project down to
@@ -397,10 +445,20 @@ def tree(con: DuckDBPyConnection, project: str | None) -> Nodes:
         own = spans.get(name, []) if parent else [s for ss in spans.values() for s in ss]
         processing, clock = sum(end - start for start, end in own), covered(own)
         children.setdefault(parent, []).append(Node(
-            name=name, parent=parent, dead_end=dead_end, records=count, started=started,
+            name=name, parent=parent, dead_end=dead_end, records=str(count) if count else "", started=started,
             timed=not running and processing > 0, processing=spent(processing, running), clock=spent(clock, running),
             above=[], branch=""))
     return drawn(children)
+
+
+def group(e: Node, labels: Labeled) -> Group:
+    """The experiment's records, by label in the order of their names
+    ignoring case, as the records page shows them."""
+    above = e["above"][1:]
+    return Group(name=e["name"], dead_end=e["dead_end"], indent=16 * len(above),
+                 path=" › ".join(above) + " ›" if above else "",
+                 labels=[(None if label == e["name"] else label, rows)
+                         for label, rows in sorted(labels.items(), key=lambda lr: lr[0].lower())])
 
 
 def under(nodes: Iterable[Node], node: str | None, below: bool) -> list[str]:
@@ -471,6 +529,15 @@ def folder(request: Request, target: Path, tops: Iterable[Path], picker: bool) -
                 parent=shown_path(target.parent) if target != top else None, picker=picker)
 
 
+def run_maps(r: Mapping[str, Any]) -> list[Map]:
+    """The run's params, latest metrics and tags, those it has, as its page
+    shows them: keys in order ignoring case, values as query.cell writes them."""
+    return [Map(title, [Pair(k, query.cell(v), isinstance(v, (int, float)))
+                        for k, v in sorted(values.items(), key=lambda kv: kv[0].lower())])
+            for title, values in (("Params", r["params"]), ("Latest metrics", r["metrics"]), ("Tags", r["tags"]))
+            if values]
+
+
 def found(hits: Sequence[Hit], where: str) -> str:
     """The sentence above a search's results, of which the page shows ROWS."""
     return f"{'The first ' if len(hits) > ROWS else ''}{min(len(hits), ROWS)} found in {where}."
@@ -533,7 +600,7 @@ def create_app(data: Path) -> FastAPI:
             for rows in labels.values():
                 rows.sort(key=lambda r: (records.KINDS.index(r["kind"]), r["time"]))
         return page(request, "index", open=[r for r in rs if r["status"] == "open"],
-                    groups=[(e, by[e["name"]]) for e in tree(con, project) if e["name"] in by],
+                    groups=[group(e, by[e["name"]]) for e in tree(con, project) if e["name"] in by],
                     errors=request.app.state.views.errors(project), picker=True)
 
     @app.get("/lab/experiments")
@@ -569,7 +636,7 @@ def create_app(data: Path) -> FastAPI:
         runs = f"FROM runs WHERE experiment = {query.literal(name)} ORDER BY start_time DESC, name, run"
         result = con.execute(f"""SELECT run, name, status, {TIME.format("start_time")} AS started,
                 round((end_time - start_time) / 1000, 1) AS seconds, params {runs}""")
-        t = shown(result, ROWS, CUT, ordered=True)
+        t = shown(result, ROWS, CUT, ordered=True, link="run")
         rs = [r for r in all_records(con) if r["filed_in"] == name]
         project = folder and {"folder": shown_path(Path(folder)), "files": shown_path(Path(files)),
                               "views": [shown_path(Path(v)) for v in views.split("; ") if v]}
@@ -593,8 +660,7 @@ def create_app(data: Path) -> FastAPI:
         logged = query_url("SELECT key, step, time, value FROM lab.metrics"
                            f" WHERE run = {query.literal(rid)} ORDER BY key, step, time")
         return page(request, "run", r=r, note=md(r["note"], roots(con)), files=files, cited_by=cited_by, logged=logged,
-                    maps=[(title, r[key] or {}) for title, key in
-                          (("Params", "params"), ("Latest metrics", "metrics"), ("Tags", "tags"))])
+                    maps=run_maps(r))
 
     @app.get("/lab/run/{rid}/file/{path:path}")
     def run_file(rid: str, path: str) -> FileResponse:
@@ -616,7 +682,7 @@ def create_app(data: Path) -> FastAPI:
         answered_by = [x for x in rs.values() if x["answers"] == rid]
         cited_by = [x for x in rs.values() if f"record:{rid}" in x["evidence"]]
         return page(request, "record", r=r, text=md(r["text"], tops), evidence=evidence, answers=rs.get(r["answers"]),
-                    answered_by=answered_by, cited_by=cited_by)
+                    answered_by=answered_by, cited_by=cited_by, by=r["author"] or "?")
 
     @app.get("/lab/view/{name}")
     def view_page(request: Request, name: str, project: str | None = None) -> Response:

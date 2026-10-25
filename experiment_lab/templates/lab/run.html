@@ -5,16 +5,16 @@
 <h1>{{ r.name }}</h1>
 <p class="meta">{{ r.status }} · in <a href="{{ url('experiment', r.experiment) }}">{{ r.experiment }}</a> · {{ r.span }} · id {{ r.run }}</p>
 {{ note }}
-{% for title, values in maps %}{% if values %}
+{% for title, pairs in maps %}
 <h2>{{ title }}</h2>
 <table class="sortable">
 <thead><tr><th>Key</th><th>Value</th></tr></thead>
 <tbody>
-{% for k, v in values|dictsort %}<tr><td>{{ k }}</td><td{% if v is number %} class="n"{% endif %}>{{ v|cell }}</td></tr>
+{% for k, v, number in pairs %}<tr><td>{{ k }}</td><td{% if number %} class="n"{% endif %}>{{ v }}</td></tr>
 {% endfor %}
 </tbody>
 </table>
-{% endif %}{% endfor %}
+{% endfor %}
 {% if r.metrics %}<p class="note"><a href="{{ logged }}">Every value logged</a></p>{% endif %}
 {% if files %}
 <h2>Files</h2>

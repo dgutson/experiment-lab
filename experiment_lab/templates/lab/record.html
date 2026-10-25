@@ -3,7 +3,7 @@
 {% block title %}{{ r.title }}{% endblock %}
 {% block main %}
 <h1>{{ r.title }}</h1>
-<p class="meta">{{ r.kind }} · <span class="{{ r.status }}">{{ r.status }}</span> · by {{ r.author or "?" }} · {{ r.time }} · {{ r.experiment }} ·
+<p class="meta">{{ r.kind }} · <span class="{{ r.status }}">{{ r.status }}</span> · by {{ by }} · {{ r.time }} · {{ r.experiment }} ·
   in <a href="{{ url('experiment', r.filed_in) }}">{{ r.filed_in }}</a> · id {{ r.id }}</p>
 {% if answers %}<p>Answers <a href="{{ url('record', answers.id) }}">{{ answers.title }}</a> ({{ answers.kind }}, {{ answers.status }}).</p>{% endif %}
 {% for x in answered_by %}<p>Answered by <a href="{{ url('record', x.id) }}">{{ x.title }}</a> ({{ x.kind }}, {{ x.time }}).</p>{% endfor %}
