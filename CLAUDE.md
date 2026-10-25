@@ -102,6 +102,10 @@ changes, not for evals, checks or CI. After the change is on `main`:
   about 140 ms, since each new DuckDB database loads the SQLite extension again. File access
   is off and the configuration locked. SQL from the query box and from `sql:` evidence runs in a
   transaction that is rolled back; `REFUSED` lists the statement types that would act outside it.
+- The templates only lay out what `pages.py` gives them. `pages.py` writes every sentence, number,
+  link (`url`, `file_url`, `view_url` and `query_url`, which the templates may call) and piece of
+  SQL as the page shows it, and a name in SQL text through `query.literal` or `query.identifier`. A
+  template's `if` only shows or hides markup or picks an attribute or a class.
 - `lab.sql` is the one set of views that q and the pages run. DuckDB 1.5.5 returned wrong rows for
   a filter over attached SQLite tables (`bin/sqlite_filter_bug.py`), which is why
   `bin/check_views.py` exists.
