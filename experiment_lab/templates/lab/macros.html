@@ -1,11 +1,12 @@
-{# A table of query.table's result. With link, the first column (an id) is
-   not shown and the second links to link followed by that id. #}
+{# A table of pages.shown's result. With link, a kind of page that url()
+   takes, the first column (an id) is not shown and the second links to the
+   page of that id. #}
 {% macro data_table(t, link=none) %}
 {% set skip = 1 if link else 0 %}
 <div class="scroll"><table class="sortable">
 <thead><tr>{% for c in t.columns[skip:] %}<th>{{ c }}</th>{% endfor %}</tr></thead>
 <tbody>
-{% for row in t.rows %}<tr>{% for v in row[skip:] %}<td{% if t.numeric[loop.index0 + skip] %} class="n"{% endif %}>{% if link and loop.first %}<a href="{{ link }}{{ row[0] }}">{{ v or row[0] }}</a>{% else %}{{ v }}{% endif %}</td>{% endfor %}</tr>
+{% for row in t.rows %}<tr>{% for v in row[skip:] %}<td{% if t.numeric[loop.index0 + skip] %} class="n"{% endif %}>{% if link and loop.first %}<a href="{{ url(link, row[0]) }}">{{ v or row[0] }}</a>{% else %}{{ v }}{% endif %}</td>{% endfor %}</tr>
 {% endfor %}
 </tbody>
 </table></div>
@@ -13,7 +14,7 @@
 {% endmacro %}
 
 {% macro record_links(rs) %}
-<ul>{% for x in rs %}<li><a href="/lab/record/{{ x.id }}">{{ x.title }}</a> ({{ x.kind }}, <span class="{{ x.status }}">{{ x.status }}</span>)</li>{% endfor %}</ul>
+<ul>{% for x in rs %}<li><a href="{{ url('record', x.id) }}">{{ x.title }}</a> ({{ x.kind }}, <span class="{{ x.status }}">{{ x.status }}</span>)</li>{% endfor %}</ul>
 {% endmacro %}
 
 {# An audio player or the image at src, for a file whose media (pages.media) is "audio" or "image". #}

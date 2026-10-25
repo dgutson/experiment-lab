@@ -186,9 +186,27 @@ def page(request: Request, template: str, status_code: int = 200, **context: obj
     return templates.TemplateResponse(request, f"lab/{template}.html", context, status_code=status_code)
 
 
+def url(kind: str, name: str) -> str:
+    """The page of an experiment, a run or a record."""
+    return f"/lab/{kind}/{urllib.parse.quote(name)}"
+
+
+def file_url(path: str, raw: bool = False) -> str:
+    """The page of a file or folder that /lab/file serves; raw: of its plain text."""
+    return "/lab/file?path=" + urllib.parse.quote(path) + ("&raw=1" if raw else "")
+
+
+def view_url(name: str, project: str | None) -> str:
+    """The page of a view of the project's database."""
+    return "/lab/view/" + urllib.parse.quote(name) + (f"?project={urllib.parse.quote(project)}" if project else "")
+
+
 def query_url(sql: str) -> str:
     """The query page that runs sql."""
     return "/lab/query?sql=" + urllib.parse.quote(sql)
+
+
+templates.env.globals.update(url=url, file_url=file_url, view_url=view_url, query_url=query_url)
 
 
 def shown(result: DuckDBPyConnection, limit: int, cut: int | None, ordered: bool = False) -> Shown:
@@ -239,7 +257,7 @@ def media(path: Path) -> str | None:
 
 
 def link(path: str) -> Element:
-    a = ElementTree.Element("a", href="/lab/file?path=" + urllib.parse.quote(path))
+    a = ElementTree.Element("a", href=file_url(path))
     a.text = path
     return a
 
@@ -430,7 +448,7 @@ def folder(request: Request, target: Path, tops: Iterable[Path], picker: bool) -
     top = min((r for r in tops if target.is_relative_to(r)), key=lambda r: len(r.parts))
     shown = shown_path(target)
     entries = sorted(target.iterdir(), key=lambda p: (not p.is_dir(), p.name))
-    items = [{"name": p.name + ("/" if p.is_dir() else ""), "path": f"{shown}/{p.name}",
+    items = [{"name": p.name + ("/" if p.is_dir() else ""), "src": file_url(f"{shown}/{p.name}"),
               "size": p.stat().st_size if p.is_file() else "", "media": p.is_file() and media(p)}
              for p in entries]
     return page(request, "folder", shown=shown, items=items,
@@ -546,10 +564,13 @@ def create_app(data: Path) -> FastAPI:
             raise HTTPException(404, f"no run {rid}")
         r = dict(zip([d[0] for d in result.description], row))
         folder = data / "files" / rid
-        files = sorted((str(p.relative_to(folder)), p.stat().st_size, media(p))
-                       for p in folder.rglob("*") if p.is_file())
+        names = sorted(str(p.relative_to(folder)) for p in folder.rglob("*") if p.is_file())
+        files = [(n, (folder / n).stat().st_size, media(folder / n), f"{url('run', rid)}/file/{urllib.parse.quote(n)}")
+                 for n in names]
         cited_by = [x for x in all_records(con) if f"run:{rid}" in x["evidence"]]
-        return page(request, "run", r=r, note=md(r["note"], roots(con)), files=files, cited_by=cited_by,
+        logged = query_url("SELECT key, step, time, value FROM lab.metrics"
+                           f" WHERE run = {query.literal(rid)} ORDER BY key, step, time")
+        return page(request, "run", r=r, note=md(r["note"], roots(con)), files=files, cited_by=cited_by, logged=logged,
                     maps=[(title, r[key] or {}) for title, key in
                           (("Params", "params"), ("Latest metrics", "metrics"), ("Tags", "tags"))])
 

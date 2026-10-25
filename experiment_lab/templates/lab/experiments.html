@@ -19,7 +19,7 @@
 <table class="sortable">
 <thead><tr><th>Kind</th><th>Title</th><th>Experiment</th><th>Text</th></tr></thead>
 <tbody>
-{% for h in hits %}<tr><td>{{ h.kind }}</td><td><a href="/lab/{{ h.kind }}/{{ h.id|urlencode }}">{{ h.title }}</a></td><td>{{ h.experiment }}</td><td>{{ h.snippet }}</td></tr>
+{% for h in hits %}<tr><td>{{ h.kind }}</td><td><a href="{{ url(h.kind, h.id) }}">{{ h.title }}</a></td><td>{{ h.experiment }}</td><td>{{ h.snippet }}</td></tr>
 {% endfor %}
 </tbody>
 </table>
@@ -29,7 +29,7 @@
 <div class="scroll"><table>
 <thead><tr><th></th><th>Experiment</th><th>Records</th><th>Started</th><th>Processing duration</th><th>Clock duration</th></tr></thead>
 <tbody>
-{% for e in nodes %}<tr class="{{ 'root' if not e.above }}{{ ' dead-end' if e.dead_end }}"><td><input type="radio" name="node" value="{{ e.name }}" aria-label="Select {{ e.name }}"{% if e.name == node %} checked{% endif %}></td><td class="tree"><span class="branch">{{ e.branch }}</span><a href="/lab/experiment/{{ e.name|urlencode }}">{{ e.name }}</a>{{ dead_end_label(e.dead_end) }}</td><td class="n">{{ e.records or "" }}</td><td>{{ e.started }}</td>{% for d in (e.processing, e.clock) %}<td class="n">{% if e.running %}<span class="note">running</span>{% elif d %}{{ d }}{% else %}<span class="note">not timed</span>{% endif %}</td>{% endfor %}</tr>
+{% for e in nodes %}<tr class="{{ 'root' if not e.above }}{{ ' dead-end' if e.dead_end }}"><td><input type="radio" name="node" value="{{ e.name }}" aria-label="Select {{ e.name }}"{% if e.name == node %} checked{% endif %}></td><td class="tree"><span class="branch">{{ e.branch }}</span><a href="{{ url('experiment', e.name) }}">{{ e.name }}</a>{{ dead_end_label(e.dead_end) }}</td><td class="n">{{ e.records or "" }}</td><td>{{ e.started }}</td>{% for d in (e.processing, e.clock) %}<td class="n">{% if e.running %}<span class="note">running</span>{% elif d %}{{ d }}{% else %}<span class="note">not timed</span>{% endif %}</td>{% endfor %}</tr>
 {% endfor %}
 </tbody>
 </table></div>

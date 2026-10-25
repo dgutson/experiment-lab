@@ -11,7 +11,7 @@
 <table class="sortable">
 <thead><tr><th>Title</th><th>Kind</th><th>Experiment</th><th>By</th><th>Time</th></tr></thead>
 <tbody>
-{% for r in open %}<tr><td><a href="/lab/record/{{ r.id }}">{{ r.title }}</a></td><td>{{ r.kind }}</td><td>{{ r.experiment }}</td><td>{{ r.author }}</td><td>{{ r.time }}</td></tr>
+{% for r in open %}<tr><td><a href="{{ url('record', r.id) }}">{{ r.title }}</a></td><td>{{ r.kind }}</td><td>{{ r.experiment }}</td><td>{{ r.author }}</td><td>{{ r.time }}</td></tr>
 {% endfor %}
 </tbody>
 </table>
@@ -19,13 +19,13 @@
 {% for e, labels in groups %}
 <div class="group" style="margin-left: {{ [e.above|length - 1, 0]|max * 16 }}px">
 {% if e.above|length > 1 %}<p class="path">{{ e.above[1:]|join(" › ") }} ›</p>{% endif %}
-<h2><a href="/lab/experiment/{{ e.name|urlencode }}">{{ e.name }}</a>{{ dead_end_label(e.dead_end) }}</h2>
+<h2><a href="{{ url('experiment', e.name) }}">{{ e.name }}</a>{{ dead_end_label(e.dead_end) }}</h2>
 {% for label, rows in labels|dictsort %}
 {% if label != e.name %}<h3>{{ label }}</h3>{% endif %}
 <table class="sortable">
 <thead><tr><th>Kind</th><th>Status</th><th>Title</th><th>By</th><th>Time</th></tr></thead>
 <tbody>
-{% for r in rows %}<tr class="{{ r.status }}"><td>{{ r.kind }}</td><td>{{ r.status }}</td><td><a href="/lab/record/{{ r.id }}">{{ r.title }}</a></td><td>{{ r.author }}</td><td>{{ r.time }}</td></tr>
+{% for r in rows %}<tr class="{{ r.status }}"><td>{{ r.kind }}</td><td>{{ r.status }}</td><td><a href="{{ url('record', r.id) }}">{{ r.title }}</a></td><td>{{ r.author }}</td><td>{{ r.time }}</td></tr>
 {% endfor %}
 </tbody>
 </table>

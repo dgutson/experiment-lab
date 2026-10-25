@@ -3,7 +3,7 @@
 {% block title %}{{ r.name }}{% endblock %}
 {% block main %}
 <h1>{{ r.name }}</h1>
-<p class="meta">{{ r.status }} · in <a href="/lab/experiment/{{ r.experiment|urlencode }}">{{ r.experiment }}</a> · {{ r.started }}{% if r.ended %} to {{ r.ended }}{% endif %} · id {{ r.run }}</p>
+<p class="meta">{{ r.status }} · in <a href="{{ url('experiment', r.experiment) }}">{{ r.experiment }}</a> · {{ r.started }}{% if r.ended %} to {{ r.ended }}{% endif %} · id {{ r.run }}</p>
 {{ note }}
 {% for title, values in maps %}{% if values %}
 <h2>{{ title }}</h2>
@@ -15,13 +15,13 @@
 </tbody>
 </table>
 {% endif %}{% endfor %}
-{% if r.metrics %}<p class="note"><a href="/lab/query?sql={{ ("SELECT key, step, time, value FROM lab.metrics WHERE run = '" ~ r.run ~ "' ORDER BY key, step, time")|urlencode }}">Every value logged</a></p>{% endif %}
+{% if r.metrics %}<p class="note"><a href="{{ logged }}">Every value logged</a></p>{% endif %}
 {% if files %}
 <h2>Files</h2>
 <table class="sortable">
 <thead><tr><th>Name</th><th>Bytes</th></tr></thead>
 <tbody>
-{% for name, size, media in files %}{% set src = "/lab/run/" ~ r.run ~ "/file/" ~ name|urlencode %}<tr><td><a href="{{ src }}">{{ name }}</a>{{ in_place(media, src) }}</td><td class="n">{{ size }}</td></tr>
+{% for name, size, media, src in files %}<tr><td><a href="{{ src }}">{{ name }}</a>{{ in_place(media, src) }}</td><td class="n">{{ size }}</td></tr>
 {% endfor %}
 </tbody>
 </table>
