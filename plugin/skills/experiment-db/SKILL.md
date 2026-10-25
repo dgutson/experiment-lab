@@ -26,11 +26,12 @@ An experiment, in order:
   holds the folder, make it once there: `rec project NAME --text "what the project is, in one line"`.
 - `q "SQL"` runs DuckDB SQL over the views (those of `experiment_lab/lab.sql`, then the project's
   view files; `--project P` for another project's) on `lab.db`, attached read-only as the catalog
-  `lab`, and prints at most 40 rows (`--max N`, `--full` for long cells); a result of one cell
-  prints it alone, whole, as stored (`q "SELECT text FROM records WHERE id = '...'"`). `q .views`
-  lists the views and their columns, and `q .keys` the keys of the project's runs' tags, params and
-  metrics, with how many runs have each; a key no run has gives NULL, with no error. The views of
-  `lab.sql` hold every project's rows; filter on their column `project`. Query the views: the tables
+  `lab`, and prints at most 40 rows (`--max N`, `--full` for long cells) of the last statement,
+  naming on stderr the earlier SELECTs, whose rows it leaves out; a result of one cell prints it
+  alone, whole, as stored (`q "SELECT text FROM records WHERE id = '...'"`). `q .views` lists the
+  views and their columns, and `q .keys` the keys of the project's runs' tags, params and metrics,
+  with how many runs have each; a key no run has gives NULL, with no error. The views of `lab.sql`
+  hold every project's rows; filter on their column `project`. Query the views: the tables
   `lab.experiments`, `lab.runs`, `lab.params`, `lab.tags`, `lab.metrics` and `lab.records` hold only
   what is stored, for what the views leave out, such as every value logged of a metric, with its
   `step` and `time` (`lab.metrics`).

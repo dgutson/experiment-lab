@@ -43,6 +43,14 @@ class Database(NamedTuple):
     sources: list[Source]
 
 
+class LastResult(NamedTuple):
+    """The last statement's result, None if it returns no rows, and the
+    sentence naming the earlier SELECT statements, whose rows it leaves out
+    ('' if none)."""
+    result: DuckDBPyConnection | None
+    hidden_note: str
+
+
 class View(NamedTuple):
     name: str
     columns: str  # joined by ', '
@@ -125,15 +133,19 @@ def errors(sources: Iterable[Source]) -> list[str]:
     return [f"{s['path'].name}: {e}" for s in sources for e in s["errors"]]
 
 
-def run(con: DuckDBPyConnection, sql: str) -> DuckDBPyConnection | None:
-    """Runs the statements of sql; the last one's result, None if it returns no rows."""
+def run(con: DuckDBPyConnection, sql: str) -> LastResult:
+    """Runs the statements of sql. A SET returns rows too, so only an earlier
+    statement of type SELECT counts as one whose rows are left out."""
     statements = con.extract_statements(sql)
     if not statements:
         raise ValueError("no statement")
     for statement in statements[:-1]:
         con.execute(statement)
     result = con.execute(statements[-1])
-    return result if result.description else None
+    hidden = [str(i) for i, s in enumerate(statements[:-1], 1) if s.type == duckdb.StatementType.SELECT]
+    note = (f"The rows of statement{'s' if len(hidden) > 1 else ''} {', '.join(hidden)} are not shown;"
+            " only the last statement's are.") if hidden else ""
+    return LastResult(result if result.description else None, note)
 
 
 def view_columns(con: DuckDBPyConnection) -> list[View]:

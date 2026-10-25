@@ -77,11 +77,12 @@ type RunValues = dict[str, Cell]  # a run's params, latest metrics or tags, by k
 
 
 class Shown(TypedDict):
-    """A table as a page shows it: its column names, its rows and the
-    sentence under it."""
+    """A table as a page shows it: its column names, its rows, the sentence
+    under it and query.LastResult's hidden_note above it."""
     columns: list[str]
     rows: list[Cells]
     note: str
+    hidden_note: str
 
 
 class Listed(TypedDict):
@@ -235,7 +236,7 @@ templates.env.globals.update(url=url, file_url=file_url, view_url=view_url, quer
 
 
 def shown(result: DuckDBPyConnection, limit: int, cut: int | None, ordered: bool = False,
-          link: str | None = None) -> Shown:
+          link: str | None = None, hidden_note: str = "") -> Shown:
     """query.table's result as a page shows it, and the sentence under it,
     which says how many rows it has, which ones when some are left out
     (ordered: the query's ORDER BY gives every row its place) and whether cells
@@ -246,7 +247,8 @@ def shown(result: DuckDBPyConnection, limit: int, cut: int | None, ordered: bool
             f"The first {limit} rows the query returned; without ORDER BY, other rows may come first on another load.")
     cells = f" Cells longer than {t['cut']} characters are cut; the query box's result shows them whole." if t["cut"] else ""
     return Shown(columns=t["columns"][1:] if link else t["columns"],
-                 rows=[row_cells(r, t["numeric"], link) for r in t["rows"]], note=rows + cells)
+                 rows=[row_cells(r, t["numeric"], link) for r in t["rows"]], note=rows + cells,
+                 hidden_note=hidden_note)
 
 
 def row_cells(row: query.Row, numeric: Sequence[bool], link: str | None) -> Cells:
@@ -264,8 +266,10 @@ def run_sql(con: DuckDBPyConnection, sql: str, limit: int = ROWS, cut: int | Non
             return Failure(error="BEGIN, COMMIT, ROLLBACK, ATTACH and DETACH are not run here")
         con.begin()
         try:
-            result = query.run(con, sql)
-            return Failure(error="the statement returns no rows") if result is None else shown(result, limit, cut)
+            last = query.run(con, sql)
+            if last.result is None:
+                return Failure(error="the statement returns no rows")
+            return shown(last.result, limit, cut, hidden_note=last.hidden_note)
         finally:
             con.rollback()
     except (duckdb.Error, ValueError) as e:

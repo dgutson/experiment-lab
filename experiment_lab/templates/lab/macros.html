@@ -1,6 +1,7 @@
 {# A table of pages.shown's result. #}
 {% macro data_table(t) %}
-<div class="scroll"><table class="sortable">
+{% if t.hidden_note %}<p class="note">{{ t.hidden_note }}</p>
+{% endif %}<div class="scroll"><table class="sortable">
 <thead><tr>{% for c in t.columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
 <tbody>
 {% for row in t.rows %}<tr>{% for c in row %}<td{% if c.numeric %} class="n"{% endif %}>{% if c.href %}<a href="{{ c.href }}">{{ c.text }}</a>{% else %}{{ c.text }}{% endif %}</td>{% endfor %}</tr>

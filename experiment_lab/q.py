@@ -17,7 +17,8 @@ Several statements may be given; the last one's rows are printed, at most
 --max of them (40), with cells cut at 80 characters unless --full. A result of
 one row and one column prints that cell alone, whole and with its line breaks,
 as in q "SELECT text FROM records WHERE id = '...'". An error about a column
-that is not found names the views that have it. .keys lists each key of the
+that is not found names the views that have it, and earlier statements of
+type SELECT, whose rows are not printed, are named on stderr. .keys lists each key of the
 tags, params and metrics of the project's runs, with the number of runs that
 have it.
 """
@@ -39,8 +40,9 @@ UNION ALL SELECT 'metrics', key, count(DISTINCT run) FROM lab.metrics WHERE run 
 ORDER BY "table" DESC, key"""
 
 
-def show(t: query.Table, cut: int | None) -> None:
-    """The table with its cells cut at cut characters (None: whole), each on one line."""
+def show(t: query.Table, cut: int | None, ordered: bool) -> None:
+    """The table with its cells cut at cut characters (None: whole), each on one
+    line; ordered: the query's ORDER BY gives every row its place."""
     rows = [[v.replace("\n", " ") for v in query.shorten(r, cut)] for r in t["rows"]]
     widths = [max([len(n)] + [len(r[i]) for r in rows]) for i, n in enumerate(t["columns"])]
 
@@ -52,8 +54,8 @@ def show(t: query.Table, cut: int | None) -> None:
     print("-+-".join("-" * w for w in widths))
     for r in rows:
         print(fmt(r))
-    print(f"({len(rows)} rows{', more not shown (--max N shows more; without ORDER BY, other rows may come first)'
-                              if t['more'] else ''})")
+    unordered = "" if ordered else "; without ORDER BY, other rows may come first"
+    print(f"({len(rows)} rows{f', more not shown (--max N shows more{unordered})' if t['more'] else ''})")
 
 
 def arguments() -> argparse.Namespace:
@@ -99,15 +101,25 @@ def views_with(con: DuckDBPyConnection, error: duckdb.BinderException) -> str:
     return f"\ncolumn {found[1]} is in the view{'s' if len(names) > 1 else ''} {', '.join(names)}"
 
 
+def sql_result(con: DuckDBPyConnection, sql: str) -> DuckDBPyConnection | None:
+    """The result of sql's last statement, None if it returns no rows; prints
+    on stderr which earlier statements' rows are left out."""
+    try:
+        last = query.run(con, sql)
+    except duckdb.BinderException as e:
+        raise ValueError(f"{e}{views_with(con, e)}") from e
+    if last.hidden_note:
+        print(last.hidden_note, file=sys.stderr)
+    return last.result
+
+
 def answer(con: DuckDBPyConnection, sql: str, limit: int, cut: int | None, project: str | None) -> None:
     if sql.strip() == ".views":
         for name, columns in query.view_columns(con):
             print(f"{name}: {columns}")
         return
-    try:
-        result = keys(con, project) if sql.strip() == ".keys" else query.run(con, sql)
-    except duckdb.BinderException as e:
-        raise ValueError(f"{e}{views_with(con, e)}") from e
+    asks_keys = sql.strip() == ".keys"
+    result = keys(con, project) if asks_keys else sql_result(con, sql)
     if result is None:
         print("ok")
         return
@@ -115,7 +127,7 @@ def answer(con: DuckDBPyConnection, sql: str, limit: int, cut: int | None, proje
     if len(t["columns"]) == 1 and len(t["rows"]) == 1 and not t["more"]:
         print(t["rows"][0][0], end="" if t["rows"][0][0].endswith("\n") else "\n")
     else:
-        show(t, cut)
+        show(t, cut, ordered=asks_keys)
 
 
 def main() -> None:
