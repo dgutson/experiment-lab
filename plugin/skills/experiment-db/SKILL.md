@@ -10,7 +10,8 @@ subject, search the view `texts` first, then query the numbers of what it finds.
 
 An experiment, in order:
 
-1. `rec tree` prints the project's experiments, one per line, each indented below the one it came from.
+1. `rec tree` prints the project's experiments, one per line, each indented below the one it came from;
+   `rec tree EXPERIMENT`, only those below EXPERIMENT.
 2. `rec experiment NAME --text DESCRIPTION`, with `--in PARENT` when it follows from the result of
    PARENT, an experiment of `rec tree`; without it for an idea unrelated to the earlier ones.
 3. The work, inside `with lab.run(...)` (below), so that the lab measures how long each run took.
@@ -38,6 +39,10 @@ An experiment, in order:
   `title=...`, `evidence=a;b`); `rec open`. Evidence items: `run:<run id>`, `file:<~ or absolute
   path>`, `sql:<query over the views>`, `record:<id>`. rec writes `lab.db` itself; no server is
   needed, and a text has no length limit.
+- Evidence must show later what it showed when the record was written. Log a file that a later run
+  or checkout can overwrite, and numbers, in a run (`run.log_file`, below) and cite `run:<run id>`;
+  `file:` is for a file that stays as it is, such as one committed to git. rec warns about a
+  `file:` item in a linked git worktree.
 - To log runs, use the module `experiment_lab.lab` (standard library only):
   `PYTHONPATH=~/experiment-lab python3 script.py`, with
 
@@ -54,8 +59,7 @@ An experiment, in order:
 
   Open the run before the work starts, with the work inside the `with` block; the owner's pages add
   up an experiment's run durations. A run ends FINISHED
-  when the `with` block ends and FAILED on an exception. To attach files or
-  numbers to a record, log them as a run and cite it as `run:<run id>`.
+  when the `with` block ends and FAILED on an exception.
 - The owner reads the same records, experiments, runs and views at http://127.0.0.1:5000/lab, and
   searches them on its Experiments page, which searches `texts` the same way. The pages link a `file:`
   item, and a `~/` or absolute path in any text, to the file when it is under a project's folder or
@@ -67,9 +71,9 @@ An experiment, in order:
 
 | View | One row per | Columns |
 |---|---|---|
-| `experiments` | experiment | name, project, parent, depth (0 for a project), path (`a › b › c`), dead_end, description, created |
-| `runs` | run | run, experiment, project, name, status, start_time (ms), tags, params, metrics (maps: `metrics['accuracy']` is the latest value, `params['lr']`), end_time (ms), started, ended, minutes (NULL until the run ends), note |
-| `records` | record | id, time, project, experiment (the label it is shown under), kind, title, text, author, status, answers, evidence |
+| `experiments` | experiment | name, project, parent, depth (0 for a project), path (`a › b › c`, from the project down to the experiment itself), dead_end, description, created |
+| `runs` | run | run, experiment, project, name, status (RUNNING, FINISHED, FAILED or KILLED), start_time (ms), tags, params, metrics (maps: `metrics['accuracy']` is the latest value, `params['lr']`), end_time (ms), started, ended, minutes (NULL until the run ends), note |
+| `records` | record | id, time, project, experiment (the label it is shown under), kind, title, text, author, status, answers, evidence (items joined by `; `) |
 | `texts` | experiment, run and record | kind (`experiment`, `run` or `record`), id, project, experiment, title, text: an experiment's description; a run's note, then its params and tags as `key=value` lines; a record's text |
 
 `created`, `time`, `started` and `ended` are local time, to the minute (`2026-08-31T21:03`).

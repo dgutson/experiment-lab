@@ -119,6 +119,25 @@ $ rec set keep-48-khz status=maybe
 error: status 'maybe' is not one of open, closed, superseded
 exit 1
 
+$ git -c init.defaultBranch=main init -q ~/results && git -C ~/results -c user.name=x -c user.email=x commit -q --allow-empty -m x && git -C ~/results worktree add -q ~/results-b && touch ~/results-b/out.json
+exit 0
+
+$ rec add finding "From a worktree" --in bitrate --text "x" --evidence file:~/results-b/out.json file:~/results/out.json run:x
+from-a-worktree: finding, closed: From a worktree
+warning: file:~/results-b/out.json is in a linked git worktree, where a later checkout can change it; log the file with run.log_file and cite run:<run id>
+open in audio-codec (2):
+  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+  where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
+exit 0
+
+$ rec set from-a-worktree "evidence=file:~/results-b/new/out.json; file:~/audio-codec/tone.wav"
+from-a-worktree: finding, closed: From a worktree
+warning: file:~/results-b/new/out.json is in a linked git worktree, where a later checkout can change it; log the file with run.log_file and cite run:<run id>
+open in audio-codec (2):
+  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+  where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
+exit 0
+
 $ rec experiment "blur detector" --text "x"
 error: 'blur detector' is in the project vision, not in audio-codec, whose folder this is
 exit 1

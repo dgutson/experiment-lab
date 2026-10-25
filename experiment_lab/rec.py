@@ -31,7 +31,8 @@ named by --in, which must exist; --experiment gives the label it is shown under
 question. A new question is open and any other record closed, unless --status
 says otherwise (open, closed or superseded); a record added with --answers
 closes that question. Evidence items are run:<run id>, file:<path>, sql:<query
-over the views> or record:<id>. set changes kind, title, text, by, status,
+over the views> or record:<id>; add and set warn about a file: item in a linked
+git worktree, where a later checkout can change the file. set changes kind, title, text, by, status,
 experiment, answers or evidence (items separated by ";"). add, set and open
 then print the project's open records. The database is lab.db in
 $EXPERIMENT_LAB_DATA, else ~/lab-data.
@@ -40,6 +41,7 @@ import argparse
 import datetime
 import sqlite3
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 
 from experiment_lab import records
@@ -92,11 +94,18 @@ def run_tree(lab: Lab, a: argparse.Namespace) -> None:
     walk(top, 1)
 
 
+def warn_overwritable(evidence: Iterable[str]) -> None:
+    for item in records.in_linked_worktree(evidence):
+        print(f"warning: {item} is in a linked git worktree, where a later checkout can change it;"
+              " log the file with run.log_file and cite run:<run id>", file=sys.stderr)
+
+
 def run_add(lab: Lab, a: argparse.Namespace) -> None:
     for r in records.add(lab, a.container, a.kind, a.title, label=a.experiment, text=a.text, author=a.by,
                          status=a.status, answers=a.answers, evidence=a.evidence, rid=a.id,
                          time=a.time and int(a.time.timestamp() * 1000)):
         show(r)
+    warn_overwritable(a.evidence)
     show_open(lab)
 
 
@@ -109,6 +118,7 @@ def run_set(lab: Lab, a: argparse.Namespace) -> None:
         fields[COLUMNS.get(field, field)] = ([v.strip() for v in value.split(";") if v.strip()]
                                              if field == "evidence" else value)
     show(records.change(lab, a.id, **fields))
+    warn_overwritable(fields.get("evidence", []))
     show_open(lab)
 
 
