@@ -3,10 +3,14 @@
 -- lab.params, lab.tags, lab.metrics, lab.records. Each project's view files
 -- (lab.experiments.views) run after this one and may use its views.
 
+-- A time of lab.db (milliseconds since 1970) as the views write it: local
+-- time, to the minute.
+CREATE MACRO local_time(ms) AS strftime(to_timestamp(ms / 1000), '%Y-%m-%dT%H:%M');
+
 -- One row per experiment: its project (the root of its tree; a project is its
 -- own), parent, depth (0 for a project), path (the names from the project down,
 -- joined by ' › '), whether it is a dead end (an idea that failed), description,
--- and when it was made.
+-- and when it was made (local time).
 CREATE VIEW experiments AS
 WITH RECURSIVE tree AS (
     SELECT name, name AS project, 0 AS depth, name AS path FROM lab.experiments WHERE parent IS NULL
@@ -14,12 +18,14 @@ WITH RECURSIVE tree AS (
     SELECT e.name, t.project, t.depth + 1, t.path || ' › ' || e.name
     FROM lab.experiments e JOIN tree t ON e.parent = t.name)
 SELECT e.name, t.project, e.parent, t.depth, t.path, e.dead_end <> 0 AS dead_end, e.description,
-    strftime(to_timestamp(e.created / 1000), '%Y-%m-%dT%H:%M') AS created
+    local_time(e.created) AS created
 FROM lab.experiments e JOIN tree t USING (name);
 
 -- One row per run: tags, params and the latest value of each metric as maps
 -- (metrics['machine/cpu_busy_mean_pct']), in key order. A metric's latest
--- value is the one of the highest step, then of the latest time.
+-- value is the one of the highest step, then of the latest time. start_time and
+-- end_time are lab.db's milliseconds; started and ended the same in local time,
+-- and minutes the time from start to end, NULL until the run ends.
 CREATE VIEW runs AS
 WITH t AS (SELECT run, map_from_entries(list(struct_pack(k := key, v := value) ORDER BY key)) AS tags
            FROM lab.tags GROUP BY run),
@@ -29,14 +35,15 @@ WITH t AS (SELECT run, map_from_entries(list(struct_pack(k := key, v := value) O
      m AS (SELECT run, map_from_entries(list(struct_pack(k := key, v := value) ORDER BY key)) AS metrics
            FROM latest GROUP BY run)
 SELECT r.id AS run, r.experiment, x.project, r.name, r.status, r.start_time, t.tags, p.params, m.metrics, r.end_time,
+    local_time(r.start_time) AS started, local_time(r.end_time) AS ended, (r.end_time - r.start_time) / 60000.0 AS minutes,
     r.note
 FROM lab.runs r LEFT JOIN experiments x ON x.name = r.experiment
 LEFT JOIN t ON t.run = r.id LEFT JOIN p ON p.run = r.id LEFT JOIN m ON m.run = r.id;
 
 -- Decisions, findings, protocol rules and questions. experiment is the label a
 -- record is shown under; lab.records.experiment is the experiment it is filed
--- in, and project that experiment's project.
-CREATE VIEW records AS SELECT r.id, strftime(to_timestamp(r.time / 1000), '%Y-%m-%dT%H:%M') AS time, x.project,
+-- in, and project that experiment's project. time is local time.
+CREATE VIEW records AS SELECT r.id, local_time(r.time) AS time, x.project,
     r.label AS experiment, r.kind, r.title, r.text, r.author, r.status, r.answers, r.evidence
     FROM lab.records r LEFT JOIN experiments x ON x.name = r.experiment;
 

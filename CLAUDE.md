@@ -106,7 +106,7 @@ changes, not for evals, checks or CI. After the change is on `main`:
   link (`url`, `file_url`, `view_url` and `query_url`, which the templates may call) and piece of
   SQL as the page shows it, and a name in SQL text through `query.literal` or `query.identifier`. A
   template's `if` only shows or hides markup or picks an attribute or a class.
-- `lab.sql` is the one set of views that q and the pages run. DuckDB 1.5.5 returned wrong rows for
+- `lab.sql` is the one set of views, with the macro `local_time`, that q and the pages run. DuckDB 1.5.5 returned wrong rows for
   a filter over attached SQLite tables (`checks/sqlite_filter_bug.py`), which is why
   `checks/check_views.py` exists.
 
@@ -116,6 +116,8 @@ Change these together:
 
 - The tables: `schema.sql`; the inserts in `lab.py`, `records.save` and `from_mlflow.Move.write`;
   the views in `lab.sql`.
+- The views' time format: `local_time` in `lab.sql` and the view `records` of
+  `from_mlflow.OLD_VIEWS`, whose `time` the copy's check compares.
 - The record kinds and statuses: the CHECKs in `schema.sql`, and `KINDS` (in the order the pages
   show them) and `STATUSES` in `records.py`.
 - The evidence kinds: `EVIDENCE` in `records.py`, `record_page` in `pages.py` and

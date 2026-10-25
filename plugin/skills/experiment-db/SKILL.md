@@ -68,9 +68,12 @@ An experiment, in order:
 | View | One row per | Columns |
 |---|---|---|
 | `experiments` | experiment | name, project, parent, depth (0 for a project), path (`a › b › c`), dead_end, description, created |
-| `runs` | run | run, experiment, project, name, status, start_time (ms), tags, params, metrics (maps: `metrics['accuracy']` is the latest value, `params['lr']`), end_time, note |
+| `runs` | run | run, experiment, project, name, status, start_time (ms), tags, params, metrics (maps: `metrics['accuracy']` is the latest value, `params['lr']`), end_time (ms), started, ended, minutes (NULL until the run ends), note |
 | `records` | record | id, time, project, experiment (the label it is shown under), kind, title, text, author, status, answers, evidence |
 | `texts` | experiment, run and record | kind (`experiment`, `run` or `record`), id, project, experiment, title, text: an experiment's description; a run's note, then its params and tags as `key=value` lines; a record's text |
+
+`created`, `time`, `started` and `ended` are local time, to the minute (`2026-08-31T21:03`).
+`local_time(ms)` writes any time of the tables (milliseconds, as `lab.metrics.time`) the same way.
 
 The project's own view files are listed in its row of `lab.experiments`, column `views`; read
 those files for what each view holds.
