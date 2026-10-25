@@ -28,7 +28,7 @@ for a coding agent and a person working on the same experiments: the agent reads
 | `evals/` | the skill's eval cases, and `run.sh`, which runs them |
 | `plugin/` | a Claude Code plugin holding the skill `experiment-db`, which tells the agent how to use q, rec and `lab.py` |
 
-The commands, installed with the package: `q`, `rec`, `lab-server` and `lab-from-mlflow`.
+The commands, installed with the package: `q`, `rec` and `lab-server`.
 
 ## Projects and the experiment tree
 
@@ -67,9 +67,8 @@ an open question closes it. The view `records` has one row per record, with its 
 label as its column `experiment`.
 
 A record's page links each item of its evidence to its page or file, and shows the rows of a `sql:`
-item. lab-from-mlflow copies mlflow-lab's evidence, which may be any text, as it is; the page shows
-such an item that is a `~/` or absolute path as a `file:` item, an `http(s)` URL as a link, and
-anything else as text.
+item. An item of no kind, which rec refuses but `lab.db` may hold, is shown as a `file:` item when it
+is a `~/` or absolute path, as a link when it is an `http(s)` URL, and as text otherwise.
 
 ## Searching
 
@@ -141,7 +140,7 @@ it.
 
 | Database | Engine | Where | Written by | Read by | Lasts |
 |---|---|---|---|---|---|
-| `lab.db` | SQLite, WAL mode | data folder | `experiment_lab.lab` and `experiment_lab.records`, with Python's sqlite3: rec, the logging scripts, lab-from-mlflow | q and the pages, through DuckDB | always |
+| `lab.db` | SQLite, WAL mode | data folder | `experiment_lab.lab` and `experiment_lab.records`, with Python's sqlite3: rec and the logging scripts | q and the pages, through DuckDB | always |
 | the pages' databases, one per project | DuckDB, in memory | the lab-server process | the pages: `lab.db` attached read-only as the catalog `lab`, then the views of `lab.sql` and of the project's view files | the pages, a cursor per request, with file access off | until `lab.sql`, one of the project's view files or its list of them changes |
 | q's database | DuckDB, in memory | q's process | q: `lab.db` attached read-only as the catalog `lab`, then the views of `lab.sql` and of the project's view files | the SQL given to q | one q call |
 
@@ -214,16 +213,7 @@ with lab.run("rate test", "run 1", params={"rate": 48000}, note="Markdown") as r
 ```
 
 A run ends FINISHED when its `with` block ends, FAILED on an exception and KILLED on Ctrl-C; without
-a `with` block, call `run.end()`. A script that logged with MLflow changes these calls:
-
-| MLflow | experiment-lab |
-|---|---|
-| `mlflow.set_experiment(name)` | `lab.experiment(name, description)` |
-| `mlflow.start_run(run_name=n)` | `lab.run(experiment, n)` |
-| `mlflow.log_param(s)` | `run.log_params({...})` |
-| `mlflow.log_metric(s)(..., step=s)` | `run.log_metrics({...}, step=s)` |
-| `mlflow.set_tag(s)` | `run.set_tags({...})` |
-| `mlflow.log_artifact(path)` | `run.log_file(path)` |
+a `with` block, call `run.end()`.
 
 To record a decision or finding from a script, `experiment_lab.records.add` does what `rec add`
 does.
@@ -260,20 +250,6 @@ A view file holds DuckDB `CREATE VIEW` statements over the views of `lab.sql` an
 CREATE VIEW accuracy AS SELECT name, metrics['accuracy'] AS accuracy
     FROM runs WHERE experiment = 'rate test' AND status = 'FINISHED';
 ```
-
-## Moving from mlflow-lab
-
-`lab-from-mlflow OLD_DATA_FOLDER PROJECT --text DESCRIPTION [--folder FOLDER]` copies a data folder
-of mlflow-lab, where an MLflow server kept the runs and records in `mlflow.db`, into a new `lab.db`
-in `$EXPERIMENT_LAB_DATA` (default `~/lab-data`), which must have none yet. The experiments go
-directly below a new project, PROJECT, whose files folder and view files are those of the old
-folder's `lab.toml`. It only reads the old folder, so the MLflow server may keep running. Its
-docstring lists what is copied and what is left out. It then compares the copy with the old database, table by table and view by
-view, and ends with "the copy agrees" or "the copy differs".
-
-The comparison runs the view files on both databases, so they must read only the views `runs` and
-`records`, which both define; rewrite a view that reads MLflow's tables (the schema `mlflow`) over
-the tables in `lab` first.
 
 ## Diagrams
 

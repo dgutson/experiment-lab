@@ -87,8 +87,8 @@ $ rec add finding "Unsure" --in bitrate --text "x" --status maybe
 error: status 'maybe' is not one of open, closed, superseded
 exit 1
 
-$ rec add finding "Odd evidence" --in bitrate --text "x" --evidence mlflow:123
-error: evidence 'mlflow:123' is not one of run:..., file:..., sql:..., record:...
+$ rec add finding "Odd evidence" --in bitrate --text "x" --evidence ticket:123
+error: evidence 'ticket:123' is not one of run:..., file:..., sql:..., record:...
 exit 1
 
 $ rec add finding "Bad time" --in bitrate --text "x" --time yesterday
@@ -387,12 +387,4 @@ exit 1
 
 $ EXPERIMENT_LAB_DATA=/proc/lab-data lab-server
 error: [Errno 2] No such file or directory: '/proc/lab-data'
-exit 1
-
-$ lab-from-mlflow ~/missing test --text "x"
-error: no FOLDER/home/missing/mlflow.db
-exit 1
-
-$ mkdir ~/old && touch ~/old/mlflow.db && lab-from-mlflow ~/old test --text "x"
-error: FOLDER/lab-data/lab.db exists; move it away first
 exit 1

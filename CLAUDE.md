@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `README.md` is the user documentation: projects and the experiment tree, the record format, the
 architecture diagram, the table of databases, setup, logging from Python, a project's settings,
-moving from mlflow-lab, and the steps for changing the Mermaid or DuckDB version. Read it before changing behavior. This file holds what a developer
-needs beyond it.
+and the steps for changing the Mermaid or DuckDB version. Read it before changing behavior. This
+file holds what a developer needs beyond it.
 
 ## Commands
 
@@ -31,8 +31,8 @@ kind, a diagram, an audio file and an image. The checks:
 - `uv run --script checks/check_views.py` and `uv run --script checks/sqlite_filter_bug.py`: the views
   read the same with `lab.db` attached as with its tables copied. They read the data folder's
   `lab.db`; run them while nothing is logged to it.
-- `uv run python checks/check_commands.py`: runs a fixed list of rec, q, lab-server and
-  lab-from-mlflow commands, wrong input among them, in order on a new lab of `make_scratch.py`,
+- `uv run python checks/check_commands.py`: runs a fixed list of rec, q and lab-server
+  commands, wrong input among them, in order on a new lab of `make_scratch.py`,
   and compares what they print and their exit statuses with `checks/check_commands.txt`. When a change
   to what they print is meant, `--update` rewrites the file, and its diff shows the change. The
   output depends on the Python version, which `.python-version` pins.
@@ -92,10 +92,10 @@ changes, not for evals, checks or CI. After the change is on `main`:
   must stay importable without the package's dependencies too.
 - Readers: `query.py` attaches `lab.db` read-only to an in-memory DuckDB and runs `lab.sql`, then the
   view files of one project, so that each project's views are in a database of their own and may
-  reuse names. q, the pages, `from_mlflow.py`'s check and `checks/check_views.py` all read through it.
+  reuse names. q, the pages and `checks/check_views.py` all read through it.
 - No process may have `lab.db` open with Python's sqlite3 while DuckDB reads it, since the two copies
   of SQLite do not see each other's locks (`query.py`'s docstring). So lab-server makes `lab.db`, or
-  the tables it lacks, in a child process, and `from_mlflow.py` closes its sqlite3 connections before its check.
+  the tables it lacks, in a child process.
 - The pages (`pages.py`) keep one DuckDB database per project (`Views`), made again when
   `query.version` changes (the modification time of `lab.sql` or a view file, or the list of view
   files), and give each request a cursor of the project in the cookie `project`. Attaching costs
@@ -114,10 +114,7 @@ changes, not for evals, checks or CI. After the change is on `main`:
 
 Change these together:
 
-- The tables: `schema.sql`; the inserts in `lab.py`, `records.save` and `from_mlflow.Move.write`;
-  the views in `lab.sql`.
-- The views' time format: `local_time` in `lab.sql` and the view `records` of
-  `from_mlflow.OLD_VIEWS`, whose `time` the copy's check compares.
+- The tables: `schema.sql`; the inserts in `lab.py` and `records.save`; the views in `lab.sql`.
 - The record kinds and statuses: the CHECKs in `schema.sql`, and `KINDS` (in the order the pages
   show them) and `STATUSES` in `records.py`.
 - The evidence kinds: `EVIDENCE` in `records.py`, `record_page` in `pages.py` and

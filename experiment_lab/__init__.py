@@ -9,7 +9,6 @@ records.py    adding and changing records (standard library only)
 query.py      DuckDB SQL over lab.db and the views of lab.sql and a project's view files
 q.py, rec.py  the commands q and rec
 pages.py      the /lab pages and the command lab-server
-from_mlflow.py  the command lab-from-mlflow, which moves an mlflow-lab data folder
 
 This file imports nothing, so that lab.py and records.py stay importable
 without the package's dependencies.
