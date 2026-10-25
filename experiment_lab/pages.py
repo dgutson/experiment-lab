@@ -15,6 +15,7 @@ and from sql: evidence runs in a transaction that is rolled back, so nothing
 it makes is kept.
 """
 import contextlib
+import importlib.metadata
 import mimetypes
 import os
 import re
@@ -531,6 +532,19 @@ def run_values(r: Mapping[str, Any]) -> dict[str, RunValues]:
             if values}
 
 
+def about() -> dict[str, Cell]:
+    """The version, repository and author of the installed experiment-lab, as
+    its pyproject.toml gives them; only the version, unknown, if it is not
+    installed."""
+    try:
+        meta = importlib.metadata.metadata("experiment-lab")
+    except importlib.metadata.PackageNotFoundError:
+        return {"Version": Cell("unknown", False)}
+    urls = dict(u.split(", ", 1) for u in meta.get_all("Project-URL") or [])
+    return {"Version": Cell(meta["Version"], False), "Repository": Cell(urls["Repository"], False, urls["Repository"]),
+            "Author": Cell(meta["Author"], False, urls["Author"])}
+
+
 def found(hits: Sequence[Hit], where: str) -> str:
     """The sentence above a search's results, of which the page shows ROWS."""
     return f"{'The first ' if len(hits) > ROWS else ''}{min(len(hits), ROWS)} found in {where}."
@@ -699,6 +713,10 @@ def create_app(data: Path) -> FastAPI:
         listed = "lab.sql's views" + (f" and those of {project}'s view files" if project else "") + "."
         return page(request, "query", sql=sql, result=result, views=query.view_columns(con), listed=listed,
                     errors=request.app.state.views.errors(project), picker=True)
+
+    @app.get("/lab/about")
+    def about_page(request: Request) -> Response:
+        return page(request, "about", lines=about())
 
     @app.get("/lab/file")
     def file_page(request: Request, path: str = "", raw: str = "",
