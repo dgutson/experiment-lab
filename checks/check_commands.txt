@@ -250,24 +250,26 @@ id                               | text
 exit 0
 
 $ q --full "SELECT text FROM records WHERE id = '48-khz-is-the-most-accurate-rate'"
-text
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 48 kHz reached an accuracy of 0.93, against 0.88 at 44.1 kHz; the 96 kHz run ran out of memory. Next: keep 48 kHz and lower the bitrate, to find where accuracy starts to drop.
-(1 rows)
+exit 0
+
+$ q "SELECT text FROM records WHERE id = 'keep-48-khz'"
+48 kHz stays: it was the most accurate rate, and `FOLDER/home/audio-codec/tone.wav` sounds right.
+
+```mermaid
+flowchart LR
+  rate[48 kHz] --> bitrate[lower the bitrate next]
+```
+
+The rates were timed with FOLDER/home/audio-codec/bench.py.
 exit 0
 
 $ echo "SELECT count(*) AS runs FROM runs" | q
-runs
-----
-  11
-(1 rows)
+11
 exit 0
 
 $ q "CREATE TABLE t AS SELECT 1 AS x; SELECT x FROM t"
-x
--
 1
-(1 rows)
 exit 0
 
 $ q "CREATE TABLE t (x INT)"
@@ -277,10 +279,7 @@ Count
 exit 0
 
 $ q "SET TimeZone = 'UTC'; SELECT TIMESTAMPTZ '2026-01-01 00:00:00+00' AS t"
-t
--------------------------
 2026-01-01 00:00:00+00:00
-(1 rows)
 exit 0
 
 $ q --project nosuch .views

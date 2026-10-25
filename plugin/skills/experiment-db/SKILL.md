@@ -26,9 +26,10 @@ An experiment, in order:
   holds the folder, make it once there: `rec project NAME --text "what the project is, in one line"`.
 - `q "SQL"` runs DuckDB SQL over the views (those of `experiment_lab/lab.sql`, then the project's
   view files; `--project P` for another project's) on `lab.db`, attached read-only as the catalog
-  `lab`, and prints at most 40 rows (`--max N`, `--full` for long cells). `q .views` lists the views
-  and their columns. The views of `lab.sql` hold every project's rows; filter on their column
-  `project`. The tables are `lab.experiments`, `lab.runs`, `lab.params`, `lab.tags`, `lab.metrics`
+  `lab`, and prints at most 40 rows (`--max N`, `--full` for long cells); a result of one cell
+  prints it alone, whole, as stored (`q "SELECT text FROM records WHERE id = '...'"`). `q .views`
+  lists the views and their columns. The views of `lab.sql` hold every project's rows; filter on
+  their column `project`. The tables are `lab.experiments`, `lab.runs`, `lab.params`, `lab.tags`, `lab.metrics`
   (every value logged, with `step` and `time`) and `lab.records`.
 - `rec experiment NAME --text DESCRIPTION [--in PARENT] [--dead-end | --no-dead-end]` makes an
   experiment, or changes it when it exists. A new experiment needs a description, in Markdown: what
