@@ -1,7 +1,7 @@
 -- Views over the lab's database for q and the pages, which attach lab.db as
 -- the catalog lab (experiment_lab/query.py): lab.experiments, lab.runs,
--- lab.params, lab.tags, lab.metrics, lab.records. Each project's view files
--- (lab.experiments.views) run after this one and may use its views.
+-- lab.params, lab.tags, lab.metrics, lab.files, lab.records. Each project's
+-- view files (lab.experiments.views) run after this one and may use its views.
 
 -- A time of lab.db (milliseconds since 1970) as the views write it: local
 -- time, to the minute.
@@ -39,6 +39,11 @@ SELECT r.id AS run, r.experiment, x.project, r.name, r.status, r.start_time, t.t
     r.note
 FROM lab.runs r LEFT JOIN experiments x ON x.name = r.experiment
 LEFT JOIN t ON t.run = r.id LEFT JOIN p ON p.run = r.id LEFT JOIN m ON m.run = r.id;
+
+-- One row per file logged for a run: run, experiment, project, name (which may
+-- hold folders) and bytes. The copy is files/<run>/<name> in the data folder.
+CREATE VIEW files AS SELECT f.run, r.experiment, x.project, f.name, f.bytes
+FROM lab.files f JOIN lab.runs r ON r.id = f.run LEFT JOIN experiments x ON x.name = r.experiment;
 
 -- Decisions, findings, protocol rules and questions. experiment is the label a
 -- record is shown under; lab.records.experiment is the experiment it is filed

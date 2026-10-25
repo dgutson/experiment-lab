@@ -40,7 +40,7 @@ from markdown.treeprocessors import Treeprocessor
 from markupsafe import Markup
 
 from experiment_lab import query, records
-from experiment_lab.settings import data_folder, database
+from experiment_lab.settings import data_folder
 
 HERE = Path(__file__).parent
 ROWS = 1000  # rows shown per table
@@ -645,9 +645,9 @@ def create_app(data: Path) -> FastAPI:
             raise HTTPException(404, f"no run {rid}")
         r = dict(zip([d[0] for d in result.description], row))
         folder = data / "files" / rid
-        names = sorted(str(p.relative_to(folder)) for p in folder.rglob("*") if p.is_file())
-        files = [(n, (folder / n).stat().st_size, media(folder / n), f"{url('run', rid)}/file/{urllib.parse.quote(n)}")
-                 for n in names]
+        logged_files = con.execute("SELECT name, bytes FROM files WHERE run = ? ORDER BY name", [rid]).fetchall()
+        files = [(n, size, media(folder / n), f"{url('run', rid)}/file/{urllib.parse.quote(n)}")
+                 for n, size in logged_files]
         cited_by = [x for x in all_records(con) if f"run:{rid}" in x["evidence"]]
         logged = query_url("SELECT key, step, time, value FROM lab.metrics"
                            f" WHERE run = {query.literal(rid)} ORDER BY key, step, time")
@@ -728,7 +728,8 @@ def main() -> None:
     if not (port.isdigit() and 0 < int(port) < 65536):
         sys.exit(f"error: EXPERIMENT_LAB_PORT is {port!r}, not a port number")
     data = data_folder()
-    # made in another process, which prints why it failed: this one reads lab.db with DuckDB only
-    if not database(data).exists() and subprocess.run([sys.executable, "-m", "experiment_lab.lab"]).returncode:
+    # lab.db, or the tables it lacks, made in another process, which prints why it failed: this one reads
+    # lab.db with DuckDB only
+    if subprocess.run([sys.executable, "-m", "experiment_lab.lab"]).returncode:
         sys.exit(1)
     uvicorn.run(create_app(data), host="127.0.0.1", port=int(port), log_level="warning")

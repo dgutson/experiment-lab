@@ -5,7 +5,7 @@
 <h1>Views and query</h1>
 <form method="get">
 <textarea name="sql" rows="6" placeholder="SELECT kind, status, title FROM records ORDER BY time">{{ sql }}</textarea>
-<p><button type="submit">Run</button> <span class="note">DuckDB SQL over the views below and lab.db's tables (lab.experiments, lab.runs, lab.params, lab.tags, lab.metrics with every value logged, lab.records). Nothing it does is kept.</span></p>
+<p><button type="submit">Run</button> <span class="note">DuckDB SQL over the views below and lab.db's tables (lab.experiments, lab.runs, lab.params, lab.tags, lab.metrics with every value logged, lab.files, lab.records). Nothing it does is kept.</span></p>
 </form>
 {% if result %}{% if result.error %}<p class="error">{{ result.error }}</p>{% else %}{{ data_table(result) }}{% endif %}{% endif %}
 <h2>Views</h2>

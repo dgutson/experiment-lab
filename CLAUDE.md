@@ -94,8 +94,8 @@ changes, not for evals, checks or CI. After the change is on `main`:
   view files of one project, so that each project's views are in a database of their own and may
   reuse names. q, the pages, `from_mlflow.py`'s check and `checks/check_views.py` all read through it.
 - No process may have `lab.db` open with Python's sqlite3 while DuckDB reads it, since the two copies
-  of SQLite do not see each other's locks (`query.py`'s docstring). So lab-server makes a missing
-  `lab.db` in a child process, and `from_mlflow.py` closes its sqlite3 connections before its check.
+  of SQLite do not see each other's locks (`query.py`'s docstring). So lab-server makes `lab.db`, or
+  the tables it lacks, in a child process, and `from_mlflow.py` closes its sqlite3 connections before its check.
 - The pages (`pages.py`) keep one DuckDB database per project (`Views`), made again when
   `query.version` changes (the modification time of `lab.sql` or a view file, or the list of view
   files), and give each request a cursor of the project in the cookie `project`. Attaching costs
