@@ -6,7 +6,7 @@
 <h1>{{ name }}{{ dead_end_label(dead_end) }}</h1>
 {% if project_settings %}<p class="meta">project</p>{% endif %}
 {% if project_settings %}<p class="meta">Folder {{ project_settings.folder }} · files folder <a href="{{ file_url(project_settings.files) }}">{{ project_settings.files }}</a> ·
-  view files {{ project_settings.views|join(", ") or "none" }}</p>{% endif %}
+  view files {{ project_settings.views }}</p>{% endif %}
 {{ description }}
 {% if branches %}
 <h2>Branches</h2>

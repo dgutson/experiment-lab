@@ -639,7 +639,7 @@ def create_app(data: Path) -> FastAPI:
         t = shown(result, ROWS, CUT, ordered=True, link="run")
         rs = [r for r in all_records(con) if r["filed_in"] == name]
         project = folder and {"folder": shown_path(Path(folder)), "files": shown_path(Path(files)),
-                              "views": [shown_path(Path(v)) for v in views.split("; ") if v]}
+                              "views": ", ".join(shown_path(Path(v)) for v in views.split("; ") if v) or "none"}
         return page(request, "experiment", name=name, description=md(description, roots(con)), dead_end=dead_end,
                     above=above, branches=branches, project_settings=project, t=t,
                     query=query_url("SELECT * " + runs), records=rs)
