@@ -6,8 +6,9 @@ below the experiment that led to it, with the project at the top. `q` answers qu
 and records with one DuckDB SQL query; `rec` adds and changes projects, experiments and records;
 logging scripts write runs with the module `experiment_lab.lab`; pages at `/lab` show the records
 with their evidence, the experiment tree with a search of its texts, the experiments and their runs,
-the SQL views as tables, a read-only query box, the files under the projects' folders, and the
-version, repository and author of experiment-lab (About, from `pyproject.toml`). The
+the SQL views as tables, a read-only query box, the files under the projects' folders, every
+project with a button that deletes one (Projects), and the version, repository and author of
+experiment-lab (About, from `pyproject.toml`). The
 Records, Experiments, Views and query, and Files pages show the project picked at the top of them;
 the pages they link to show the same whatever is picked, and have no picker. A view's page shows the
 view of the project whose query page linked it, its rows sorted by every column from the first, which
@@ -54,6 +55,16 @@ and its clock duration (the time during which at least one of its runs was runni
 runs ran at the same time). Both say "not timed" when no run has a duration, and "running" while a
 run has not ended. The project's row covers all its experiments. A run measures its duration only when it is opened before the work starts, as a
 `with lab.run(...)` block around the work does.
+
+The Projects page lists every project, whatever the picker shows: when it was made, its description,
+its folder and the number of experiments below it and of their runs and records. Its Delete button
+asks first, in a dialog whose default button is Cancel, then deletes from `lab.db` the project, the
+experiments below it and their runs, with their params, tags, metrics and files, and records, and
+removes the runs' folders from `files/` in the data folder. The project's folder, files folder and
+view files are not touched, and nothing can bring the project back. lab-server runs the delete in
+a child process, since it reads `lab.db` only through DuckDB, and refuses it unless the request
+comes from its own page: the `Host` must be `127.0.0.1` or `localhost` and the `Origin` that same
+address, since a page of any website can post a form to `127.0.0.1`.
 
 ## Records
 
@@ -134,6 +145,7 @@ flowchart LR
     pagesdb -.->|"reads"| views
     pages -.->|"/lab/run/ID/file/"| files
     pages -.->|"/lab/file"| shown
+    pages -->|"a child process<br/>deletes a project"| lab
 ```
 
 There is one database of record, `lab.db`. The DuckDB databases hold no data, only the views over
@@ -141,7 +153,7 @@ it.
 
 | Database | Engine | Where | Written by | Read by | Lasts |
 |---|---|---|---|---|---|
-| `lab.db` | SQLite, WAL mode | data folder | `experiment_lab.lab` and `experiment_lab.records`, with Python's sqlite3: rec and the logging scripts | q and the pages, through DuckDB | always |
+| `lab.db` | SQLite, WAL mode | data folder | `experiment_lab.lab` and `experiment_lab.records`, with Python's sqlite3: rec, the logging scripts, and lab-server's child process that deletes a project | q and the pages, through DuckDB | always |
 | the pages' databases, one per project | DuckDB, in memory | the lab-server process | the pages: `lab.db` attached read-only as the catalog `lab`, then the views of `lab.sql` and of the project's view files | the pages, a cursor per request, with file access off | until `lab.sql`, one of the project's view files or its list of them changes |
 | q's database | DuckDB, in memory | q's process | q: `lab.db` attached read-only as the catalog `lab`, then the views of `lab.sql` and of the project's view files | the SQL given to q | one q call |
 

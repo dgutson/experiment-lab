@@ -1,0 +1,23 @@
+{% extends "lab/base.html" %}
+{% from "lab/macros.html" import no_project %}
+{% block title %}Projects{% endblock %}
+{% block main %}
+<h1>Projects</h1>
+{% if not listed %}{{ no_project() }}{% else %}
+<p class="meta">Every project, whatever the picker shows.</p>
+<div class="scroll"><table>
+<thead><tr><th>Project</th><th>Created</th><th>Description</th><th>Folder</th><th>Experiments</th><th>Runs</th><th>Records</th><th></th></tr></thead>
+<tbody>
+{% for p in listed %}<tr><td><a href="{{ url('experiment', p.name) }}">{{ p.name }}</a></td><td>{{ p.created }}</td><td>{{ p.description }}</td><td>{{ p.folder }}</td><td class="n">{{ p.experiments }}</td><td class="n">{{ p.runs }}</td><td class="n">{{ p.records }}</td>
+<td><button type="button" class="danger" onclick="this.nextElementSibling.showModal()">Delete</button>
+<dialog>
+<h2>{{ p.question }}</h2>
+<p>{{ p.deletes }}</p>
+<p class="meta">{{ p.kept }}</p>
+<form method="post" action="{{ p.delete_url }}" class="buttons"><button type="submit" formmethod="dialog" autofocus>Cancel</button> <button type="submit" class="danger">Delete project</button></form>
+</dialog></td></tr>
+{% endfor %}
+</tbody>
+</table></div>
+{% endif %}
+{% endblock %}

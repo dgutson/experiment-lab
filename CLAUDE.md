@@ -95,7 +95,8 @@ changes, not for evals, checks or CI. After the change is on `main`:
   reuse names. q, the pages and `checks/check_views.py` all read through it.
 - No process may have `lab.db` open with Python's sqlite3 while DuckDB reads it, since the two copies
   of SQLite do not see each other's locks (`query.py`'s docstring). So lab-server makes `lab.db`, or
-  the tables it lacks, in a child process.
+  the tables it lacks, and deletes a project (`python -m experiment_lab.lab --delete NAME`) in a
+  child process.
 - The pages (`pages.py`) keep one DuckDB database per project (`Views`), made again when
   `query.version` changes (the modification time of `lab.sql` or a view file, or the list of view
   files), and give each request a cursor of the project in the cookie `project`. Attaching costs

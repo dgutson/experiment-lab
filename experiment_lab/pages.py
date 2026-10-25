@@ -2,11 +2,14 @@
 with their evidence, its experiments as a tree with a search of their texts, its
 views with a query box, and its files folder. The pages they link to, of an
 experiment, a run, a record, a view or a file under the projects' folders and
-files folders, show the same whatever is picked, and have no picker.
+files folders, show the same whatever is picked, and have no picker, as do the
+Projects page, which lists every project with a button that deletes one, and
+the About page.
 lab-server serves them with uvicorn at http://127.0.0.1:$EXPERIMENT_LAB_PORT
 (default 5000).
 
-The pages only read. They keep one DuckDB database with lab.db attached
+The pages read lab.db only through DuckDB; lab-server makes lab.db, and
+deletes a project, in a child process. They keep one DuckDB database with lab.db attached
 read-only and the views, made again when lab.sql, a view file or a project's
 list of view files changes; each request reads through a cursor of its own,
 with file access off. A statement of a view file that fails is skipped, and
@@ -545,6 +548,51 @@ def about() -> dict[str, Cell]:
             "Author": Cell(meta["Author"], False, urls["Author"])}
 
 
+class ListedProject(NamedTuple):
+    """A row of the Projects page: a project, the number of experiments below
+    it and of their runs and records, and its delete dialog's sentences."""
+    name: str
+    created: str
+    description: str
+    folder: str
+    experiments: int
+    runs: int
+    records: int
+    question: str
+    deletes: str
+    kept: str
+    delete_url: str
+
+
+PROJECTS = """SELECT p.name, p.created, p.description, l.folder,
+    (SELECT count(*) FROM experiments x WHERE x.project = p.name AND x.depth > 0),
+    (SELECT count(*) FROM lab.runs r JOIN experiments x ON x.name = r.experiment WHERE x.project = p.name),
+    (SELECT count(*) FROM lab.records r JOIN experiments x ON x.name = r.experiment WHERE x.project = p.name)
+FROM experiments p JOIN lab.experiments l USING (name) WHERE p.depth = 0 ORDER BY p.name"""
+
+
+def listed_projects(con: DuckDBPyConnection) -> list[ListedProject]:
+    listed = []
+    for name, created, description, folder, experiments, runs, records_ in con.execute(PROJECTS).fetchall():
+        listed.append(ListedProject(
+            name, created, description, shown_path(Path(folder)), experiments, runs, records_,
+            question=f"Delete the project {name}?",
+            deletes=(f"This deletes from lab.db its {experiments} experiments, {runs} runs and {records_} records,"
+                     " and the runs' files in the data folder. It cannot be undone."),
+            kept=f"Its folder {shown_path(Path(folder))}, its files folder and its view files are not touched.",
+            delete_url="/lab/projects/delete?name=" + urllib.parse.quote(name)))
+    return listed
+
+
+def same_origin(request: Request) -> bool:
+    """Whether a request comes from a page of this server, which any website's
+    page can post a form to: its Host is 127.0.0.1 or localhost, not a website's
+    domain made to resolve to it, and its Origin that same address."""
+    host = request.headers.get("host", "")
+    return (urllib.parse.urlsplit(f"//{host}").hostname in ("127.0.0.1", "localhost")
+            and request.headers.get("origin") == f"http://{host}")
+
+
 def found(hits: Sequence[Hit], where: str) -> str:
     """The sentence above a search's results, of which the page shows ROWS."""
     return f"{'The first ' if len(hits) > ROWS else ''}{min(len(hits), ROWS)} found in {where}."
@@ -713,6 +761,23 @@ def create_app(data: Path) -> FastAPI:
         listed = "lab.sql's views" + (f" and those of {project}'s view files" if project else "") + "."
         return page(request, "query", sql=sql, result=result, views=query.view_columns(con), listed=listed,
                     errors=request.app.state.views.errors(project), picker=True)
+
+    @app.get("/lab/projects")
+    def projects_page(request: Request, con: DuckDBPyConnection = Depends(cursor)) -> Response:
+        return page(request, "projects", listed=listed_projects(con))
+
+    @app.post("/lab/projects/delete")
+    def delete_project(request: Request, name: str) -> Response:
+        if not same_origin(request):
+            raise HTTPException(403, "a project is deleted only from this server's Projects page")
+        if name not in request.app.state.views.projects():
+            raise HTTPException(404, f"no project {name}")
+        # lab.db is written in another process: this one reads it with DuckDB only
+        done = subprocess.run([sys.executable, "-m", "experiment_lab.lab", "--delete", name], capture_output=True,
+                              text=True, env=dict(os.environ, EXPERIMENT_LAB_DATA=str(data)), check=False)
+        if done.returncode:
+            raise HTTPException(500, done.stderr.strip())
+        return RedirectResponse("/lab/projects", status_code=303)
 
     @app.get("/lab/about")
     def about_page(request: Request) -> Response:
