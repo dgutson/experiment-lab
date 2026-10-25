@@ -1,0 +1,9 @@
+{% extends "lab/base.html" %}
+{% block title %}About{% endblock %}
+{% block main %}
+<h1>About</h1>
+<table>
+{% for label, c in lines.items() %}<tr><th>{{ label }}</th><td>{% if c.href %}<a href="{{ c.href }}">{{ c.text }}</a>{% else %}{{ c.text }}{% endif %}</td></tr>
+{% endfor %}
+</table>
+{% endblock %}

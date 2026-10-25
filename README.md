@@ -6,7 +6,8 @@ below the experiment that led to it, with the project at the top. `q` answers qu
 and records with one DuckDB SQL query; `rec` adds and changes projects, experiments and records;
 logging scripts write runs with the module `experiment_lab.lab`; pages at `/lab` show the records
 with their evidence, the experiment tree with a search of its texts, the experiments and their runs,
-the SQL views as tables, a read-only query box and the files under the projects' folders. The
+the SQL views as tables, a read-only query box, the files under the projects' folders, and the
+version, repository and author of experiment-lab (About, from `pyproject.toml`). The
 Records, Experiments, Views and query, and Files pages show the project picked at the top of them;
 the pages they link to show the same whatever is picked, and have no picker. A view's page shows the
 view of the project whose query page linked it, its rows sorted by every column from the first, which
