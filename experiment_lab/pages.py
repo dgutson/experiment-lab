@@ -471,8 +471,8 @@ def search(con: DuckDBPyConnection, words: Sequence[str], experiments: Sequence[
 
 def kind_of(item: str) -> tuple[str, str]:
     """The kind and value of an evidence item. One that is not of
-    records.EVIDENCE, which records.check refuses and from_mlflow copies from
-    MLflow as it is, is a file, a url or a text."""
+    records.EVIDENCE, which records.check refuses but lab.db may hold, is a
+    file, a url or a text."""
     kind, _, value = item.partition(":")
     if kind in records.EVIDENCE:
         return kind, value

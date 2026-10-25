@@ -3,8 +3,8 @@ FOLDER/lab-data, and FOLDER/home with the projects' folders. It is the evals'
 lab (evals/make_lab.py) with what the checks also need: a run with tags
 and files (an audio file and an image), a record of every kind, evidence of
 every kind, a text with a diagram and paths, and evidence items with no kind,
-as from_mlflow copies them. Its paths are absolute, so the server reads it with
-any home folder.
+which rec refuses but lab.db may hold. Its paths are absolute, so the server
+reads it with any home folder.
 
 usage: uv run python checks/make_scratch.py FOLDER
 then:  export EXPERIMENT_LAB_DATA=FOLDER/lab-data

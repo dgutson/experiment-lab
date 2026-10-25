@@ -1,5 +1,5 @@
-"""Runs rec, q, lab-server and lab-from-mlflow on a new lab that make_scratch.py
-makes, and compares what they print and their exit statuses with
+"""Runs rec, q and lab-server on a new lab that make_scratch.py makes, and
+compares what they print and their exit statuses with
 checks/check_commands.txt. The commands run in order on the same lab, each through
 bash in the folder of the project audio-codec, with this clone's commands first
 on PATH. With --update, it writes checks/check_commands.txt instead; read its diff
@@ -34,7 +34,7 @@ rec add idea "An idea" --in bitrate --text "x"
 rec add finding "Lost" --in nowhere --text "x"
 rec add finding "Empty" --in bitrate --text ""
 rec add finding "Unsure" --in bitrate --text "x" --status maybe
-rec add finding "Odd evidence" --in bitrate --text "x" --evidence mlflow:123
+rec add finding "Odd evidence" --in bitrate --text "x" --evidence ticket:123
 rec add finding "Bad time" --in bitrate --text "x" --time yesterday
 rec add finding "Taken" --in bitrate --text "x" --id keep-48-khz
 rec add finding "Elsewhere" --in "blur detector" --text "x"
@@ -84,8 +84,6 @@ EXPERIMENT_LAB_DATA=~/absent/lab-data q "SELECT 1"
 EXPERIMENT_LAB_PORT=abc lab-server
 EXPERIMENT_LAB_PORT=70000 lab-server
 EXPERIMENT_LAB_DATA=/proc/lab-data lab-server
-lab-from-mlflow ~/missing test --text "x"
-mkdir ~/old && touch ~/old/mlflow.db && lab-from-mlflow ~/old test --text "x"
 """.strip().splitlines()
 
 with tempfile.TemporaryDirectory() as folder:
