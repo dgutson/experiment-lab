@@ -47,6 +47,11 @@ tr.root td { background: var(--head); font-weight: 600; }
 tr.dead-end td { color: var(--muted); }
 audio, img.media { display: block; max-width: 100%; margin: 4px 0; }
 img.media { max-height: 320px; }
+button.danger { background: var(--bad); color: var(--bg); border: 1px solid var(--bad); border-radius: 4px; padding: 2px 8px; cursor: pointer; }
+dialog { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; max-width: min(36em, calc(100vw - 32px)); padding: 16px 20px; }
+dialog::backdrop { background: rgb(0 0 0 / 45%); }
+dialog h2 { margin-top: 0; }
+.buttons { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 </style>
 </head>
 <body>
@@ -59,6 +64,7 @@ img.media { max-height: 320px; }
   <a href="/lab/experiments">Experiments</a>
   <a href="/lab/query">Views and query</a>
   <a href="/lab/file">Files</a>
+  <a href="/lab/projects">Projects</a>
   <a href="/lab/about">About</a>
 </nav>
 <main>{% block main %}{% endblock %}</main>

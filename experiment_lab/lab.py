@@ -27,6 +27,7 @@ import contextlib
 import shutil
 import sqlite3
 import subprocess
+import sys
 import time
 import uuid
 from collections.abc import Iterable, Iterator, Mapping, Sequence
@@ -128,6 +129,21 @@ class Lab:
 
     def close(self) -> None:
         self.db.close()
+
+    def delete_project(self, name: str) -> None:
+        """Deletes the project and, through ON DELETE CASCADE, the experiments
+        below it with their runs and records; then the runs' folders in files/.
+        Nothing outside the data folder is touched."""
+        with self.write() as db:
+            if not db.execute("SELECT 1 FROM experiments WHERE name = ? AND parent IS NULL", (name,)).fetchone():
+                raise ValueError(f"no project {name}")
+            runs = [rid for (rid,) in db.execute(f"{BELOW} SELECT id FROM runs WHERE experiment IN"
+                                                  " (SELECT name FROM below)", (name,))]
+            db.execute("DELETE FROM experiments WHERE name = ?", (name,))
+        files = self.data / "files"
+        for folder in (files / rid for rid in runs):
+            if folder.parent == files and folder.is_dir():  # a run id with / or .. names no folder of files/
+                shutil.rmtree(folder)
 
     @contextlib.contextmanager
     def write(self) -> Iterator[sqlite3.Connection]:
@@ -295,8 +311,12 @@ class Run:
             db.execute("UPDATE runs SET status = ?, end_time = ? WHERE id = ?", (status, now(), self.id))
 
 
-if __name__ == "__main__":  # makes the data folder's lab.db, or the tables it lacks, for lab-server
+if __name__ == "__main__":  # for lab-server: makes lab.db, or the tables it lacks; --delete PROJECT deletes one
     try:
-        Lab().close()
-    except (OSError, sqlite3.Error) as e:
+        lab = Lab()
+        match sys.argv[1:]:
+            case ["--delete", project]:
+                lab.delete_project(project)
+        lab.close()
+    except (OSError, sqlite3.Error, ValueError) as e:
         raise SystemExit(f"error: {e}")
