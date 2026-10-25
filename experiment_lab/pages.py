@@ -585,7 +585,7 @@ def create_app(data: Path) -> FastAPI:
         with contextlib.closing(views.cursor(project)) as con:
             if name not in [v for v, _ in query.view_columns(con)]:
                 raise HTTPException(404, f"no view {name}")
-            sql = f'SELECT * FROM "{name}" ORDER BY ALL'
+            sql = f"SELECT * FROM {query.identifier(name)} ORDER BY ALL"
             return page(request, "view", name=name, project=project, query=query_url(sql),
                         t=shown(con.execute(sql), ROWS, CUT, ordered=True))
 

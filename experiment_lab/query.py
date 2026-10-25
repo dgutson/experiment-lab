@@ -72,6 +72,11 @@ def literal(text: str) -> str:
     return "'" + text.replace("'", "''") + "'"
 
 
+def identifier(name: str) -> str:
+    """name as a quoted SQL name, of a view for example."""
+    return '"' + name.replace('"', '""') + '"'
+
+
 def attach(data: Path) -> DuckDBPyConnection:
     """A new in-memory DuckDB database with lab.db attached as the catalog lab."""
     path = database(data)
