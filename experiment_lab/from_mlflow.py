@@ -333,7 +333,8 @@ def compare_views(old: DuckDBPyConnection, new: DuckDBPyConnection, move: Move) 
         new.execute("SELECT name, description FROM lab.experiments WHERE parent IS NOT NULL").fetchall())
     for view, _ in query.view_columns(old):
         if view not in ("runs", "records"):
-            ok &= compare(view, old.execute(f'FROM "{view}"').fetchall(), new.execute(f'FROM "{view}"').fetchall())
+            sql = "FROM " + query.identifier(view)
+            ok &= compare(view, old.execute(sql).fetchall(), new.execute(sql).fetchall())
     return ok
 
 

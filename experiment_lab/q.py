@@ -38,7 +38,8 @@ def show(t: query.Table) -> None:
     print("-+-".join("-" * w for w in widths))
     for r in rows:
         print(fmt(r))
-    print(f"({len(rows)} rows{', more not shown (--max N shows more)' if t['more'] else ''})")
+    print(f"({len(rows)} rows{', more not shown (--max N shows more; without ORDER BY, other rows may come first)'
+                              if t['more'] else ''})")
 
 
 def arguments() -> argparse.Namespace:

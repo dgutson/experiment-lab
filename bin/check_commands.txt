@@ -212,7 +212,7 @@ name
 -----------
 dither none
 dither tpdf
-(2 rows, more not shown (--max N shows more))
+(2 rows, more not shown (--max N shows more; without ORDER BY, other rows may come first))
 exit 0
 
 $ q "SELECT id, text FROM records WHERE id = '48-khz-is-the-most-accurate-rate'"

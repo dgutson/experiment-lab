@@ -67,13 +67,23 @@ def connect(data: Path, project: str | None = None) -> Database:
     return Database(con, make_views(con, project))
 
 
+def literal(text: str) -> str:
+    """text as an SQL string."""
+    return "'" + text.replace("'", "''") + "'"
+
+
+def identifier(name: str) -> str:
+    """name as a quoted SQL name, of a view for example."""
+    return '"' + name.replace('"', '""') + '"'
+
+
 def attach(data: Path) -> DuckDBPyConnection:
     """A new in-memory DuckDB database with lab.db attached as the catalog lab."""
     path = database(data)
     if not path.exists():
         raise FileNotFoundError(f"no database {path}; rec project or a logging script makes it")
     con = duckdb.connect()
-    con.execute(f"ATTACH '{str(path).replace("'", "''")}' AS lab (TYPE sqlite, READ_ONLY)")
+    con.execute(f"ATTACH {literal(str(path))} AS lab (TYPE sqlite, READ_ONLY)")
     return con
 
 

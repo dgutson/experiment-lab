@@ -9,7 +9,7 @@
 {% endfor %}
 </tbody>
 </table></div>
-<p class="note">{% if t.more %}The first {{ t.limit }} rows.{% else %}{{ t.rows|length }} rows.{% endif %}{% if t.cut %} Cells longer than {{ t.cut }} characters are cut; the query box's result shows them whole.{% endif %}</p>
+<p class="note">{{ t.note }}</p>
 {% endmacro %}
 
 {% macro record_links(rs) %}

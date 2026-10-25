@@ -67,6 +67,11 @@ class Failure(TypedDict):
     error: str
 
 
+class Shown(query.Table):
+    """A table as a page shows it, with the sentence under it."""
+    note: str
+
+
 class Listed(TypedDict):
     """A row of the view records, its evidence a list, and filed_in, the
     experiment it is in (experiment is the label it is shown under)."""
@@ -113,7 +118,7 @@ class Item(TypedDict, total=False):
     value: Required[str]
     served: bool
     media: str | None
-    table: query.Table | Failure
+    table: Shown | Failure
     label: str | None
 
 
@@ -181,7 +186,23 @@ def page(request: Request, template: str, status_code: int = 200, **context: obj
     return templates.TemplateResponse(request, f"lab/{template}.html", context, status_code=status_code)
 
 
-def run_sql(con: DuckDBPyConnection, sql: str, limit: int = ROWS, cut: int | None = CUT) -> query.Table | Failure:
+def query_url(sql: str) -> str:
+    """The query page that runs sql."""
+    return "/lab/query?sql=" + urllib.parse.quote(sql)
+
+
+def shown(result: DuckDBPyConnection, limit: int, cut: int | None, ordered: bool = False) -> Shown:
+    """query.table's result and the sentence under it, which says how many
+    rows it has, which ones when some are left out (ordered: the query's ORDER
+    BY gives every row its place) and whether cells are cut."""
+    t = query.table(result, limit, cut)
+    rows = (f"{len(t['rows'])} rows." if not t["more"] else f"The first {limit} rows." if ordered else
+            f"The first {limit} rows the query returned; without ORDER BY, other rows may come first on another load.")
+    cells = f" Cells longer than {t['cut']} characters are cut; the query box's result shows them whole." if t["cut"] else ""
+    return Shown(**t, note=rows + cells)
+
+
+def run_sql(con: DuckDBPyConnection, sql: str, limit: int = ROWS, cut: int | None = CUT) -> Shown | Failure:
     """The last statement's rows as a table, or the error text."""
     try:
         if any(s.type in REFUSED for s in con.extract_statements(sql)):
@@ -189,7 +210,7 @@ def run_sql(con: DuckDBPyConnection, sql: str, limit: int = ROWS, cut: int | Non
         con.begin()
         try:
             result = query.run(con, sql)
-            return Failure(error="the statement returns no rows") if result is None else query.table(result, limit, cut)
+            return Failure(error="the statement returns no rows") if result is None else shown(result, limit, cut)
         finally:
             con.rollback()
     except (duckdb.Error, ValueError) as e:
@@ -505,15 +526,16 @@ def create_app(data: Path) -> FastAPI:
             parent = (con.execute("SELECT parent FROM lab.experiments WHERE name = ?", [parent]).fetchone() or [None])[0]
         branches = con.execute("SELECT name, dead_end FROM lab.experiments WHERE parent = ? ORDER BY created, name",
                                [name]).fetchall()
+        runs = f"FROM runs WHERE experiment = {query.literal(name)} ORDER BY start_time DESC, name, run"
         result = con.execute(f"""SELECT run, name, status, {TIME.format("start_time")} AS started,
-                round((end_time - start_time) / 1000, 1) AS seconds, params
-            FROM runs WHERE experiment = ? ORDER BY start_time DESC""", [name])
-        t = query.table(result, ROWS, CUT)
+                round((end_time - start_time) / 1000, 1) AS seconds, params {runs}""")
+        t = shown(result, ROWS, CUT, ordered=True)
         rs = [r for r in all_records(con) if r["filed_in"] == name]
         project = folder and {"folder": shown_path(Path(folder)), "files": shown_path(Path(files)),
                               "views": [shown_path(Path(v)) for v in views.split("; ") if v]}
         return page(request, "experiment", name=name, description=md(description, roots(con)), dead_end=dead_end,
-                    above=above, branches=branches, project_settings=project, t=t, records=rs)
+                    above=above, branches=branches, project_settings=project, t=t,
+                    query=query_url("SELECT * " + runs), records=rs)
 
     @app.get("/lab/run/{rid}")
     def run_page(request: Request, rid: str, con: DuckDBPyConnection = Depends(cursor)) -> Response:
@@ -555,15 +577,17 @@ def create_app(data: Path) -> FastAPI:
 
     @app.get("/lab/view/{name}")
     def view_page(request: Request, name: str, project: str | None = None) -> Response:
-        """A view of the project's database; without project, of lab.sql's."""
+        """A view of the project's database, without project of lab.sql's, sorted
+        by every column so that each load shows the same rows."""
         views = request.app.state.views
         if project is not None and project not in views.projects():
             raise HTTPException(404, f"no project {project}")
         with contextlib.closing(views.cursor(project)) as con:
             if name not in [v for v, _ in query.view_columns(con)]:
                 raise HTTPException(404, f"no view {name}")
-            return page(request, "view", name=name, project=project,
-                        t=query.table(con.execute(f'FROM "{name}"'), ROWS, CUT))
+            sql = f"SELECT * FROM {query.identifier(name)} ORDER BY ALL"
+            return page(request, "view", name=name, project=project, query=query_url(sql),
+                        t=shown(con.execute(sql), ROWS, CUT, ordered=True))
 
     @app.get("/lab/query")
     def query_page(request: Request, sql: str = "", con: DuckDBPyConnection = Depends(cursor)) -> Response:
