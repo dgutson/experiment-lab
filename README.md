@@ -4,11 +4,13 @@ Experiments' runs, and the decisions, findings, protocol rules and open question
 several projects in one SQLite database, `lab.db`. A project's experiments form a tree: each one
 below the experiment that led to it, with the project at the top. `q` answers questions about runs
 and records with one DuckDB SQL query; `rec` adds and changes projects, experiments and records;
-logging scripts write runs with the module `experiment_lab.lab`; pages at `/lab` show, for the
-project picked at the top, the records with their evidence, the experiment tree with a search of
-its texts, the experiments and their runs, the SQL views as tables, a read-only query box and the
-files under the projects' folders. It is meant for a coding agent and a person working on the same
-experiments: the agent reads and writes with `q` and `rec`, the person reads the pages.
+logging scripts write runs with the module `experiment_lab.lab`; pages at `/lab` show the records
+with their evidence, the experiment tree with a search of its texts, the experiments and their runs,
+the SQL views as tables, a read-only query box and the files under the projects' folders. The
+Records, Experiments, Views and query, and Files pages show the project picked at the top of them;
+the pages they link to show the same whatever is picked, and have no picker. A view's page shows the
+view of the project whose query page linked it. It is meant for a coding agent and a person working
+on the same experiments: the agent reads and writes with `q` and `rec`, the person reads the pages.
 
 | Path | What it is |
 |---|---|
@@ -297,13 +299,13 @@ an image is shown next to its link.
 uv run --script ~/experiment-lab/bin/check_pages.py [--shots FOLDER] [URL]
 ```
 
-It opens every page of the server at URL (default `http://127.0.0.1:$EXPERIMENT_LAB_PORT`) and
-fails unless each returns 200. It visits the pages of every project, picking each with the cookie
-the project picker sets. It then opens the pages with diagrams, audio players or images, and the
-first page of each kind, in the installed Google Chrome, in the light and the dark scheme, and
-checks that each diagram is drawn or shows Mermaid's error, each player loads its audio, each image
-shows, the page follows the scheme and fetches nothing from another host. With `--shots`, it saves
-screenshots of the pages with diagrams.
+It opens every page of the server at URL (default `http://127.0.0.1:$EXPERIMENT_LAB_PORT`) and fails
+unless each returns 200 and only the four pages of the picked project show the picker. It visits the
+pages of every project, picking each with the cookie the project picker sets. It then opens the
+pages with diagrams, audio players or images, and the first page of each kind, in the installed
+Google Chrome, in the light and the dark scheme, and checks that each diagram is drawn or shows
+Mermaid's error, each player loads its audio, each image shows, the page follows the scheme and
+fetches nothing from another host. With `--shots`, it saves screenshots of the pages with diagrams.
 
 ## Changing the DuckDB version
 

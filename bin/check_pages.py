@@ -3,14 +3,14 @@
 # dependencies = ["playwright==1.63.0"]
 # ///
 """Checks the /lab pages of a running lab server. For each project of the
-picker, every page reachable from /lab/ must return 200; the pages link only
-files that /lab/file serves. Every page with a ```mermaid block, an audio player
-or an image shown in place, and the first page of each kind for each project,
-is then opened in Chrome in the light and in the dark scheme: each block must be
-drawn or show Mermaid's error (the errors are printed), each player must load
-its audio and each image must show, its background must follow the scheme, and
-it must make no request to another host. Pages with diagrams are saved as
-screenshots.
+picker, every page reachable from /lab/ must return 200, and only the pages of
+picks() may show the picker; the pages link only files that /lab/file serves.
+Every page with a ```mermaid block, an audio player or an image shown in place,
+and the first page of each kind for each project, is then opened in Chrome in
+the light and in the dark scheme: each block must be drawn or show Mermaid's
+error (the errors are printed), each player must load its audio and each image
+must show, its background must follow the scheme, and it must make no request to
+another host. Pages with diagrams are saved as screenshots.
 
 usage: uv run --script bin/check_pages.py [--shots FOLDER] [URL]
 
@@ -38,6 +38,7 @@ from playwright.sync_api import Page, sync_playwright
 
 BACKGROUND = {"light": "rgb(255, 255, 255)", "dark": "rgb(13, 17, 23)"}  # --bg in base.html
 SHOWN = ('class="language-mermaid"', "<audio ", '<img class="media"')  # what Chrome must draw, play or show
+PICKER = '<select aria-label="Project"'
 # The players' and images' sources that do not load, each after at most 30 s.
 NOT_LOADED = """() => {
   const loads = (element, start, done) => Promise.race([
@@ -67,6 +68,7 @@ class Answer(NamedTuple):
 class Fetched(NamedTuple):
     status: int
     shows: bool  # has something of SHOWN
+    picker: bool
 
 
 class Visit(NamedTuple):
@@ -109,6 +111,13 @@ def follow(source: str, target: str) -> bool:
     return {"file": False, "run file": False, "run": kind(target) == "run file"}.get(kind(source), True)
 
 
+def picks(path: str) -> bool:
+    """Whether the page shows the picker: the records, experiments and query
+    pages, and the files page of the picked project (no path)."""
+    query = urllib.parse.parse_qs(urllib.parse.urlsplit(path).query)
+    return kind(path) in ("index", "experiments", "query") or kind(path) == "file" and "path" not in query
+
+
 def cookie(project: str) -> str:
     """The cookie that picks the project, as the picker sets it."""
     return f"project={urllib.parse.quote(project, safe='')}"
@@ -139,7 +148,7 @@ def crawl(base: str, project: str | None) -> dict[str, Fetched]:
             fetched = list(pool.map(lambda p: (p, fetch(base, p, project)), frontier))
             frontier = []
             for path, (status, content_type, body) in fetched:
-                found[path] = Fetched(status, any(s in body for s in SHOWN))
+                found[path] = Fetched(status, any(s in body for s in SHOWN), PICKER in body)
                 if status != 200 or content_type != "text/html":
                     continue
                 links = Links()
@@ -173,6 +182,14 @@ def to_draw(pages: Mapping[Visit, Fetched]) -> list[Visit]:
         if f.shows:
             drawn.setdefault(v.path, v)
     return sorted({*first.values(), *drawn.values()}, key=str)
+
+
+def wrong(pages: Mapping[Visit, Fetched]) -> list[str]:
+    """The pages that do not return 200, and those that show the picker but
+    should not, or the other way round."""
+    return [f"{f.status} {v.project} {v.path}" if f.status != 200 else
+            f"{v.project} {v.path}: the picker is {'shown' if f.picker else 'missing'}"
+            for v, f in pages.items() if f.status != 200 or f.picker != picks(v.path)]
 
 
 def see(page: Page, url: str, host: str) -> Seen:
@@ -233,9 +250,8 @@ def main() -> None:
         a.shots.mkdir(parents=True, exist_ok=True)
     base = a.url.rstrip("/")
     pages = crawl_all(base)
-    found = [f"{f.status} {v.project} {v.path}" for v, f in pages.items() if f.status != 200]
     shown = to_draw(pages)
-    found += draw(base, shown, a.shots)
+    found = wrong(pages) + draw(base, shown, a.shots)
     for problem in found:
         print("PROBLEM", problem)
     if found:
