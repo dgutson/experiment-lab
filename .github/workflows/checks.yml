@@ -13,13 +13,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.3.2  # it has no major-version tag
-      - name: Type check
-        run: |
-          uv sync
-          uv run pyright
+      - name: Install the checks' tools
+        run: uv sync
+      - name: Types, by mypy
+        run: uv run mypy
+      - name: Types, by pyright
+        run: uv run pyright
       - name: Every function is annotated
         run: uv run ruff check experiment_lab bin
-      - name: No annotation nests too deep
+      - name: No annotation nests too deep (pylint-complex-struct)
         run: uv run pylint experiment_lab bin
       - name: DuckDB reads attached SQLite tables correctly
         run: uv run --script bin/sqlite_filter_bug.py

@@ -15,9 +15,16 @@ lab-from-mlflow = "experiment_lab.from_mlflow:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# The checks' tools, which uv sync installs into .venv; Playwright for pyright to read bin/check_pages.py
+# The checks' tools, which uv sync installs into .venv; Playwright for the type checkers to read
+# bin/check_pages.py, and types-Markdown for mypy to read markdown
 [dependency-groups]
-dev = ["pyright==1.1.414", "ruff==0.17.2", "pylint==4.1.3", "pylint-complex-struct==0.2.2", "playwright==1.63.0"]
+dev = ["mypy==2.4.0", "types-Markdown==3.10.2.20261007", "pyright==1.1.414", "ruff==0.17.2", "pylint==4.1.3",
+       "pylint-complex-struct==0.2.2", "playwright==1.63.0"]
+
+[tool.mypy]
+files = ["experiment_lab", "bin"]
+mypy_path = "evals"  # make_lab, which bin/make_scratch.py imports
+strict = true
 
 [tool.pyright]
 venvPath = "."
@@ -30,9 +37,11 @@ extraPaths = ["evals"]  # make_lab, which bin/make_scratch.py imports
 select = ["ANN"]
 
 # Only pylint-complex-struct's messages: annotations that nest too deep, and a
-# returned tuple of different types, which should be a NamedTuple
+# returned tuple of different types, which should be a NamedTuple. pylint
+# otherwise exits 0 when the plugin does not load, having checked nothing.
 [tool.pylint.main]
 load-plugins = ["pylint_complex_struct"]
+fail-on = ["bad-plugin-value", "unknown-option-value"]
 
 [tool.pylint."messages control"]
 disable = ["all"]

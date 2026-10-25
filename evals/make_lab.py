@@ -16,6 +16,7 @@ usage: python3 make_lab.py [PROJECT]
 """
 import os
 import sys
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from experiment_lab import records
@@ -23,6 +24,8 @@ from experiment_lab.lab import Lab
 
 DAY, MINUTE = 86_400_000, 60_000
 T0 = 1_788_220_800_000  # 2026-09-01 00:00 UTC
+
+type RunRow = tuple[str, Mapping[str, object], Mapping[str, float], str, str]  # name, params, metrics, status, note
 
 BENCH = '''"""Times the encoder at three frame sizes."""
 import time
@@ -46,7 +49,7 @@ ORDER BY sharpness DESC;
 """
 
 
-def runs(lab, experiment, day, rows):
+def runs(lab: Lab, experiment: str, day: int, rows: Iterable[RunRow]) -> None:
     """Logs finished runs of two minutes each, one a day apart from T0 + day."""
     for i, (name, params, metrics, status, note) in enumerate(rows):
         start = T0 + day * DAY + i * 3 * MINUTE
@@ -56,11 +59,11 @@ def runs(lab, experiment, day, rows):
             db.execute("UPDATE runs SET status = ?, end_time = ? WHERE id = ?", (status, start + 2 * MINUTE, run.id))
 
 
-def finding(lab, experiment, title, text, day):
+def finding(lab: Lab, experiment: str, title: str, text: str, day: int) -> None:
     records.add(lab, experiment, "finding", title, text=text, author="owner", time=T0 + day * DAY)
 
 
-def main(here=None):
+def main(here: str | None = None) -> None:
     audio, vision = (Path.cwd() if name == here else Path.home() / name for name in ("audio-codec", "vision"))
     for folder, name, text in ((audio, "bench.py", BENCH), (vision, "views.sql", VIEWS)):
         folder.mkdir(exist_ok=True)

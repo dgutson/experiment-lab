@@ -140,8 +140,9 @@ class Lab:
         worktree of the current git repository, else the current folder; files,
         the folder its files page shows, is by default its folder; views lists
         its view files."""
-        changes = {"description": description or None, "folder": folder and absolute(folder),
-                   "files": files and absolute(files), "views": None if views is None else "; ".join(map(absolute, views))}
+        changes = {"description": description or None, "folder": absolute(folder) if folder else None,
+                   "files": absolute(files) if files else None,
+                   "views": None if views is None else "; ".join(map(absolute, views))}
         with self.write() as db:
             found = db.execute("SELECT parent FROM experiments WHERE name = ?", (name,)).fetchone()
             if found is None:
@@ -198,7 +199,7 @@ class Lab:
 
     def path(self, name: str | None) -> list[str]:
         """The names from the experiment's project down to it."""
-        names = []
+        names: list[str] = []
         while name is not None:
             found = self.db.execute("SELECT parent FROM experiments WHERE name = ?", (name,)).fetchone()
             if found is None:

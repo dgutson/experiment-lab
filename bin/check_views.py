@@ -55,7 +55,8 @@ def read(copy: bool, project: str | None) -> dict[str, Sum]:
 
 
 same = True
-for project in [name for name, _ in query.projects(query.attach(data_folder()))] or [None]:
+names: list[str | None] = [name for name, _ in query.projects(query.attach(data_folder()))]
+for project in names or [None]:
     direct, copied = read(False, project), read(True, project)
     for name in direct:
         agree = "same" if direct[name] == copied[name] else "DIFFERENT"

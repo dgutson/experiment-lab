@@ -7,8 +7,8 @@ over the views> or record:<id>. Only the standard library, as lab.py.
 """
 import re
 import sqlite3
-from collections.abc import Collection, Iterable
-from typing import NamedTuple, TypedDict
+from collections.abc import Collection, Iterable, Mapping
+from typing import Any, NamedTuple, TypedDict
 
 from experiment_lab.lab import BELOW, Lab, now
 
@@ -45,12 +45,20 @@ def split(evidence: str | None) -> Evidence:
     return [item for item in (evidence or "").split("; ") if item]
 
 
+def as_record(r: Mapping[str, Any]) -> Record:
+    """A row of records, its evidence a list, or a record with fields changed,
+    as a Record; a KeyError if a key is missing."""
+    return Record(id=r["id"], experiment=r["experiment"], label=r["label"], kind=r["kind"], title=r["title"],
+                  text=r["text"], author=r["author"], status=r["status"], answers=r["answers"],
+                  evidence=r["evidence"], time=r["time"])
+
+
 def check(r: Record, fields: Collection[str] = ("kind", "status", "text", "evidence")) -> None:
     """Checks those of fields that are kind (one of KINDS), status (one of
     STATUSES), text (not empty) and evidence (items of EVIDENCE)."""
-    for field, allowed in (("kind", KINDS), ("status", STATUSES)):
-        if field in fields and r[field] not in allowed:
-            raise ValueError(f"{field} {r[field]!r} is not one of {', '.join(allowed)}")
+    for field, value, allowed in (("kind", r["kind"], KINDS), ("status", r["status"], STATUSES)):
+        if field in fields and value not in allowed:
+            raise ValueError(f"{field} {value!r} is not one of {', '.join(allowed)}")
     if "text" in fields and not r["text"].strip():
         raise ValueError(f"a record needs a text: {r['title']}")
     if "evidence" in fields:
@@ -71,7 +79,7 @@ def get(lab: Lab, rid: str) -> Record | None:
     if row is None:
         return None
     r = dict(zip([d[0] for d in cursor.description], row))
-    return Record(**{**r, "evidence": split(r["evidence"])})
+    return as_record({**r, "evidence": split(r["evidence"])})
 
 
 def open_records(lab: Lab, project: str | None = None) -> list[OpenRecord]:
@@ -139,7 +147,7 @@ def change(lab: Lab, rid: str, **fields: str | Evidence) -> Record:
     r = get(lab, rid)
     if r is None:
         raise ValueError(f"no record {rid}")
-    r = Record(**{**r, **fields})
+    r = as_record({**r, **fields})
     check(r, fields)
     with lab.write() as db:
         save(db, r)

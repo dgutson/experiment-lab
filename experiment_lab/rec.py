@@ -82,12 +82,10 @@ def run_tree(lab: Lab, a: argparse.Namespace) -> None:
     path = lab.path(top)
     folder = lab.db.execute("SELECT folder FROM experiments WHERE name = ?", (top,)).fetchone()[0]
     print(f"{top}  ({shown(folder)})" if folder else " › ".join(path))
-    children = {}
-    for name, parent, dead_end in lab.db.execute("SELECT name, parent, dead_end FROM experiments ORDER BY created, name"):
-        children.setdefault(parent, []).append((name, dead_end))
 
     def walk(name: str, depth: int) -> None:
-        for child, dead_end in children.get(name, []):
+        for child, dead_end in lab.db.execute("SELECT name, dead_end FROM experiments WHERE parent = ?"
+                                              " ORDER BY created, name", (name,)).fetchall():
             print("  " * depth + child + ("  [dead end]" if dead_end else ""))
             walk(child, depth + 1)
 

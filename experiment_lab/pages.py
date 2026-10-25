@@ -83,6 +83,10 @@ class Listed(TypedDict):
     filed_in: str
 
 
+type Listing = list[Listed]
+type Labeled = dict[str, Listing]  # records by the label they are shown under
+
+
 class Node(TypedDict):
     """An experiment in the tree of tree()."""
     name: str
@@ -264,7 +268,9 @@ def all_records(con: DuckDBPyConnection, project: str | None = None) -> list[Lis
     rows = con.execute("SELECT r.*, l.experiment AS filed_in FROM records r JOIN lab.records l USING (id)"
                        f"{where} ORDER BY r.time, r.id", [project] if project else [])
     columns = [d[0] for d in rows.description]
-    return [Listed(**{**r, "evidence": records.split(r["evidence"])})
+    return [Listed(id=r["id"], time=r["time"], project=r["project"], experiment=r["experiment"], kind=r["kind"],
+                   title=r["title"], text=r["text"], author=r["author"], status=r["status"], answers=r["answers"],
+                   evidence=records.split(r["evidence"]), filed_in=r["filed_in"])
             for r in (dict(zip(columns, values)) for values in rows.fetchall())]
 
 
@@ -285,7 +291,7 @@ def covered(spans: Iterable[Span]) -> int:
 
 def ended_runs(con: DuckDBPyConnection, project: str | None) -> dict[str, Spans]:
     """The spans of the project's ended runs, per experiment."""
-    spans = {}
+    spans: dict[str, Spans] = {}
     for name, start, end in con.execute("SELECT r.experiment, r.start_time, r.end_time FROM lab.runs r JOIN experiments x"
                                         " ON x.name = r.experiment WHERE x.project = ? AND r.end_time IS NOT NULL",
                                         [project]).fetchall():
@@ -321,7 +327,7 @@ def tree(con: DuckDBPyConnection, project: str | None) -> Nodes:
     its parent) and branch (the lines that draw the tree before its name). The
     project's records, started, running, processing and clock are those of the
     whole project."""
-    result = con.execute(f"""WITH r AS (SELECT experiment, min(start_time) AS t0,
+    rows = con.execute(f"""WITH r AS (SELECT experiment, min(start_time) AS t0,
                  bool_or(status = 'RUNNING') AS running FROM lab.runs GROUP BY ALL),
              c AS (SELECT experiment, count(*) AS n FROM lab.records GROUP BY ALL),
              own AS (SELECT e.name, e.parent, e.dead_end, e.created, coalesce(c.n, 0) AS records,
@@ -333,16 +339,16 @@ def tree(con: DuckDBPyConnection, project: str | None) -> Nodes:
                  if(parent IS NULL, min(t0) OVER (), t0) AS t0,
                  if(parent IS NULL, bool_or(running) OVER (), running) AS running FROM own)
         SELECT name, parent, dead_end, records, {TIME.format("t0")} AS started, running
-        FROM shown ORDER BY created, name""", [project])
-    columns, rows = [d[0] for d in result.description], result.fetchall()
+        FROM shown ORDER BY created, name""", [project]).fetchall()
     spans = ended_runs(con, project)
-    children = {}
-    for values in rows:
-        e = dict(zip(columns, values))
-        own = spans.get(e["name"], []) if e["parent"] else [s for ss in spans.values() for s in ss]
+    children: dict[str | None, Nodes] = {}
+    for name, parent, dead_end, count, started, running in rows:
+        own = spans.get(name, []) if parent else [s for ss in spans.values() for s in ss]
         processing, clock = sum(end - start for start, end in own), covered(own)
-        e["processing"], e["clock"] = duration(processing) if processing else "", duration(clock) if clock else ""
-        children.setdefault(e["parent"], []).append(Node(**e))
+        children.setdefault(parent, []).append(Node(
+            name=name, parent=parent, dead_end=dead_end, records=count, started=started, running=running,
+            processing=duration(processing) if processing else "", clock=duration(clock) if clock else "",
+            above=[], branch=""))
     return drawn(children)
 
 
@@ -380,7 +386,7 @@ def evidence_item(item: str, con: DuckDBPyConnection, own: DuckDBPyConnection, t
     e = Item(kind=kind, value=value)
     if kind == "file":
         target = served(value, tops)
-        e["served"], e["media"] = target is not None, target and media(target)
+        e["served"], e["media"] = target is not None, media(target) if target else None
     elif kind == "sql":
         e["table"] = run_sql(own, value, EVIDENCE_ROWS)
     elif kind == "run":
@@ -455,7 +461,7 @@ def create_app(data: Path) -> FastAPI:
     def index(request: Request, con: DuckDBPyConnection = Depends(cursor)) -> Response:
         project = request.state.project
         rs = all_records(con, project)
-        by = {}
+        by: dict[str, Labeled] = {}
         for r in rs:
             by.setdefault(r["filed_in"], {}).setdefault(r["experiment"], []).append(r)
         for labels in by.values():
@@ -488,7 +494,7 @@ def create_app(data: Path) -> FastAPI:
         if found is None:
             raise HTTPException(404, f"no experiment {name}")
         description, parent, dead_end, folder, files, views = found
-        above = []
+        above: list[str] = []
         while parent is not None:
             above.insert(0, parent)
             parent = (con.execute("SELECT parent FROM lab.experiments WHERE name = ?", [parent]).fetchone() or [None])[0]

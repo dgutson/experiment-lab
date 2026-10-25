@@ -55,6 +55,7 @@ NOT_LOADED = """() => {
 }"""
 
 type Attribute = tuple[str, str | None]
+type Kind = tuple[str | None, str]  # a project and a kind of page
 
 
 class Answer(NamedTuple):
@@ -87,7 +88,7 @@ class Seen(NamedTuple):
 class Links(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
-        self.links = []
+        self.links: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[Attribute]) -> None:
         href = dict(attrs).get("href")
@@ -123,9 +124,11 @@ def fetch(base: str, path: str, project: str | None) -> Answer:
         return Answer(e.code, e.headers.get_content_type(), "")
 
 
-def projects(base: str) -> list[str]:
-    """The projects the picker offers."""
-    return [html.unescape(p) for p in re.findall(r"<option[^>]*>([^<]*)</option>", fetch(base, "/lab/", None).body)]
+def projects(base: str) -> list[str | None]:
+    """The projects the picker offers; [None], no project, if it offers none."""
+    found: list[str | None] = [html.unescape(p) for p in re.findall(r"<option[^>]*>([^<]*)</option>",
+                                                                    fetch(base, "/lab/", None).body)]
+    return found or [None]
 
 
 def crawl(base: str, project: str | None) -> dict[str, Fetched]:
@@ -151,7 +154,7 @@ def crawl(base: str, project: str | None) -> dict[str, Fetched]:
 def crawl_all(base: str) -> dict[Visit, Fetched]:
     """The pages of every project the picker offers; prints how many of each
     kind answered with each status."""
-    pages = {Visit(project, path): found for project in projects(base) or [None]
+    pages = {Visit(project, path): found for project in projects(base)
              for path, found in crawl(base, project).items()}
     counts = collections.Counter((v.project, kind(v.path), f.status) for v, f in pages.items())
     for (project, k, status), n in sorted(counts.items(), key=str):
@@ -162,7 +165,8 @@ def crawl_all(base: str) -> dict[Visit, Fetched]:
 def to_draw(pages: Mapping[Visit, Fetched]) -> list[Visit]:
     """The first page of each kind for each project, and each page with
     something of SHOWN once, with the first project it was found with."""
-    first, drawn = {}, {}
+    first: dict[Kind, Visit] = {}
+    drawn: dict[str, Visit] = {}
     for v, f in pages.items():
         if f.status == 200 and kind(v.path) != "run file":
             first.setdefault((v.project, kind(v.path)), v)
