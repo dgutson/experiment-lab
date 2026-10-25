@@ -73,6 +73,8 @@ q "CREATE TABLE t (x INT)"
 q "SET TimeZone = 'UTC'; SELECT TIMESTAMPTZ '2026-01-01 00:00:00+00' AS t"
 q --project nosuch .views
 q "SELECT nosuch FROM runs"
+q "SELECT name FROM lab.experiments WHERE depth = 0"
+q "SELECT r.project FROM lab.records r"
 q --max 0 "SELECT 1 AS x"
 q --max -1 "SELECT 1 AS x"
 EXPERIMENT_LAB_DATA=~/absent/lab-data q "SELECT 1"

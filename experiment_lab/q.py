@@ -16,11 +16,13 @@ views have every project's rows; their column project tells them apart.
 Several statements may be given; the last one's rows are printed, at most
 --max of them (40), with cells cut at 80 characters unless --full. A result of
 one row and one column prints that cell alone, whole and with its line breaks,
-as in q "SELECT text FROM records WHERE id = '...'". .keys lists each key of the
+as in q "SELECT text FROM records WHERE id = '...'". An error about a column
+that is not found names the views that have it. .keys lists each key of the
 tags, params and metrics of the project's runs, with the number of runs that
 have it.
 """
 import argparse
+import re
 import sys
 
 import duckdb
@@ -85,12 +87,27 @@ def keys(con: DuckDBPyConnection, project: str | None) -> DuckDBPyConnection:
     return con.execute(KEYS, [project])
 
 
+def views_with(con: DuckDBPyConnection, error: duckdb.BinderException) -> str:
+    """For an error about a column that is not found, a line naming the views
+    that have that column; '' if none has it."""
+    found = re.search(r'(?:Referenced column|column named) "([^"]+)"', str(error))
+    if not found:
+        return ""
+    names = [v.name for v in query.view_columns(con) if found[1] in v.columns.split(", ")]
+    if not names:
+        return ""
+    return f"\ncolumn {found[1]} is in the view{'s' if len(names) > 1 else ''} {', '.join(names)}"
+
+
 def answer(con: DuckDBPyConnection, sql: str, limit: int, cut: int | None, project: str | None) -> None:
     if sql.strip() == ".views":
         for name, columns in query.view_columns(con):
             print(f"{name}: {columns}")
         return
-    result = keys(con, project) if sql.strip() == ".keys" else query.run(con, sql)
+    try:
+        result = keys(con, project) if sql.strip() == ".keys" else query.run(con, sql)
+    except duckdb.BinderException as e:
+        raise ValueError(f"{e}{views_with(con, e)}") from e
     if result is None:
         print("ok")
         return
