@@ -1,11 +1,11 @@
 """Runs rec, q, lab-server and lab-from-mlflow on a new lab that make_scratch.py
 makes, and compares what they print and their exit statuses with
-bin/check_commands.txt. The commands run in order on the same lab, each through
+checks/check_commands.txt. The commands run in order on the same lab, each through
 bash in the folder of the project audio-codec, with this clone's commands first
-on PATH. With --update, it writes bin/check_commands.txt instead; read its diff
+on PATH. With --update, it writes checks/check_commands.txt instead; read its diff
 before committing it.
 
-usage: uv run python bin/check_commands.py [--update]
+usage: uv run python checks/check_commands.py [--update]
 """
 import difflib
 import os
@@ -16,7 +16,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SAVED = ROOT / "bin" / "check_commands.txt"
+SAVED = ROOT / "checks" / "check_commands.txt"
 COMMANDS = """
 rec tree
 rec tree "16-bit output"
@@ -76,7 +76,7 @@ mkdir ~/old && touch ~/old/mlflow.db && lab-from-mlflow ~/old test --text "x"
 """.strip().splitlines()
 
 with tempfile.TemporaryDirectory() as folder:
-    subprocess.run([sys.executable, ROOT / "bin" / "make_scratch.py", folder], check=True)
+    subprocess.run([sys.executable, ROOT / "checks" / "make_scratch.py", folder], check=True)
     env = dict(os.environ, HOME=f"{folder}/home", EXPERIMENT_LAB_DATA=f"{folder}/lab-data",
                PATH=f"{Path(sys.executable).parent}:{os.environ['PATH']}",
                PYTHONUNBUFFERED="1", COLUMNS="100", NO_COLOR="1", LC_ALL="C.UTF-8")  # the same output anywhere

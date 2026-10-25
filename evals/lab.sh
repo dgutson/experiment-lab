@@ -2,7 +2,7 @@
 # A case's starting point, in the run's home folder: the package experiment_lab
 # in ~/experiment-lab, where the skill says the clone is; DuckDB's SQLite
 # extension, since the run has no network to download it; and the lab of
-# make_lab.py. It runs under bin/evals.sh, whose venv, with the clone's
+# make_lab.py. It runs under evals/run.sh, whose venv, with the clone's
 # package installed, is first on PATH.
 #   lab.sh [PROJECT]    PROJECT's folder is the current folder; none without it
 set -euo pipefail

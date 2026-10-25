@@ -20,23 +20,23 @@ jobs:
       - name: Types, by pyright
         run: uv run pyright
       - name: Every function is annotated
-        run: uv run ruff check experiment_lab bin
+        run: uv run ruff check experiment_lab checks
       - name: No annotation nests too deep (pylint-complex-struct)
-        run: uv run pylint experiment_lab bin
+        run: uv run pylint experiment_lab checks
       - name: DuckDB reads attached SQLite tables correctly
-        run: uv run --script bin/sqlite_filter_bug.py
-      - name: Commands print what bin/check_commands.txt holds
-        run: uv run python bin/check_commands.py
+        run: uv run --script checks/sqlite_filter_bug.py
+      - name: Commands print what checks/check_commands.txt holds
+        run: uv run python checks/check_commands.py
       - name: Make a lab to check
         run: |
-          uv run python bin/make_scratch.py "$RUNNER_TEMP/lab"
+          uv run python checks/make_scratch.py "$RUNNER_TEMP/lab"
           echo "EXPERIMENT_LAB_DATA=$RUNNER_TEMP/lab/lab-data" >> "$GITHUB_ENV"
       - name: Views read the same with lab.db attached and copied
-        run: uv run --script bin/check_views.py
+        run: uv run --script checks/check_views.py
       - name: Pages
         run: |
           PATH=$PWD/.venv/bin:$PATH bin/start.sh
-          uv run --script bin/check_pages.py --shots "$RUNNER_TEMP/shots"
+          uv run --script checks/check_pages.py --shots "$RUNNER_TEMP/shots"
       - name: Keep the screenshots and the server's log
         if: failure()
         uses: actions/upload-artifact@v7

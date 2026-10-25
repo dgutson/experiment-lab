@@ -6,7 +6,7 @@ every kind, a text with a diagram and paths, and evidence items with no kind,
 as from_mlflow copies them. Its paths are absolute, so the server reads it with
 any home folder.
 
-usage: uv run python bin/make_scratch.py FOLDER
+usage: uv run python checks/make_scratch.py FOLDER
 then:  export EXPERIMENT_LAB_DATA=FOLDER/lab-data
 """
 import math

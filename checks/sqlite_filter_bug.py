@@ -8,7 +8,7 @@ maps built from two attached SQLite tables must count the 50 rows that match
 raising the DuckDB pin in pyproject.toml, set the new version above and run
 this and check_views.py; both must pass.
 
-usage: uv run --script sqlite_filter_bug.py
+usage: uv run --script checks/sqlite_filter_bug.py
 """
 import os
 import sqlite3

@@ -9,7 +9,7 @@ sorted rows; the two ways must agree. Before raising the DuckDB pin in pyproject
 version above and run this and sqlite_filter_bug.py while nothing is logged
 to the lab.
 
-usage: uv run --script bin/check_views.py
+usage: uv run --script checks/check_views.py
 """
 import sys
 from pathlib import Path

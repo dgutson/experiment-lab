@@ -21,11 +21,11 @@ for a coding agent and a person working on the same experiments: the agent reads
 | `experiment_lab/lab.sql` | the views `experiments`, `runs`, `records` and `texts`, which q and the pages query |
 | `experiment_lab/lab.py` | logging projects, experiments and runs from Python, with the standard library only |
 | `bin/start.sh` | starts the pages' server, `lab-server`, in the background |
-| `bin/check_pages.py` | opens every page of a running server and checks it |
-| `bin/check_views.py`, `bin/sqlite_filter_bug.py` | checks to run before changing the DuckDB version |
-| `bin/check_commands.py` | runs the commands on a new lab and compares what they print with `bin/check_commands.txt` |
-| `bin/make_scratch.py` | makes a lab with data in it, for the checks and for trying changes |
-| `evals/` | the skill's eval cases |
+| `checks/check_pages.py` | opens every page of a running server and checks it |
+| `checks/check_views.py`, `checks/sqlite_filter_bug.py` | checks to run before changing the DuckDB version |
+| `checks/check_commands.py` | runs the commands on a new lab and compares what they print with `checks/check_commands.txt` |
+| `checks/make_scratch.py` | makes a lab with data in it, for the checks and for trying changes |
+| `evals/` | the skill's eval cases, and `run.sh`, which runs them |
 | `plugin/` | a Claude Code plugin holding the skill `experiment-db`, which tells the agent how to use q, rec and `lab.py` |
 
 The commands, installed with the package: `q`, `rec`, `lab-server` and `lab-from-mlflow`.
@@ -189,7 +189,7 @@ from the current folder, so it needs no editing.
 `evals/` holds eval cases for the skill, outside `plugin/` so that an installed plugin does not
 copy them. In each case, an agent given the plugin, and one without it, does a task in a small lab
 of its own (`evals/make_lab.py`), and graders check the commands it ran, what rec printed and what
-it answered. `bin/evals.sh` runs them with this clone's code through `claude plugin eval`, which
+it answered. `evals/run.sh` runs them with this clone's code through `claude plugin eval`, which
 takes the options given (for example `--case dead-end --runs 1 --model sonnet`), and puts the
 results in `evals/results/`. `evals/baseline.md` has the last full run's scores and costs.
 
@@ -298,7 +298,7 @@ an image is shown next to its link.
 ## Checking the pages
 
 ```sh
-uv run --script ~/experiment-lab/bin/check_pages.py [--shots FOLDER] [URL]
+uv run --script ~/experiment-lab/checks/check_pages.py [--shots FOLDER] [URL]
 ```
 
 It opens every page of the server at URL (default `http://127.0.0.1:$EXPERIMENT_LAB_PORT`) and fails
@@ -311,11 +311,11 @@ fetches nothing from another host. With `--shots`, it saves screenshots of the p
 
 ## Changing the DuckDB version
 
-DuckDB is pinned in `pyproject.toml`, `bin/check_views.py` and `bin/sqlite_filter_bug.py`. Set the
+DuckDB is pinned in `pyproject.toml`, `checks/check_views.py` and `checks/sqlite_filter_bug.py`. Set the
 new version in the two scripts first and run both while nothing is logged to the lab:
 
 ```sh
-cd ~/experiment-lab && uv run --script bin/check_views.py && uv run --script bin/sqlite_filter_bug.py
+cd ~/experiment-lab && uv run --script checks/check_views.py && uv run --script checks/sqlite_filter_bug.py
 ```
 
 check_views.py must end with "the two reads agree" and sqlite_filter_bug.py must say "fixed". Then

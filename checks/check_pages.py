@@ -12,7 +12,7 @@ error (the errors are printed), each player must load its audio and each image
 must show, its background must follow the scheme, and it must make no request to
 another host. Pages with diagrams are saved as screenshots.
 
-usage: uv run --script bin/check_pages.py [--shots FOLDER] [URL]
+usage: uv run --script checks/check_pages.py [--shots FOLDER] [URL]
 
 URL is http://127.0.0.1:$EXPERIMENT_LAB_PORT (default 5000) unless given. It
 uses the installed Google Chrome; Playwright downloads no browser. Links on
