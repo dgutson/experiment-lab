@@ -3,7 +3,9 @@ name = "experiment-lab"
 version = "0.2.0"
 description = "Decisions, findings, protocol rules and questions about experiments, next to the experiments' runs: q, rec and the /lab pages."
 requires-python = ">=3.12"
-dependencies = ["duckdb==1.5.6", "fastapi==0.143.0", "jinja2==3.1.6", "markdown==3.11", "uvicorn==0.54.0"]
+# pytz for DuckDB's Python client to return a TIMESTAMP WITH TIME ZONE value
+dependencies = ["duckdb==1.5.6", "fastapi==0.143.0", "jinja2==3.1.6", "markdown==3.11", "pytz==2026.5",
+                "uvicorn==0.54.0"]
 
 [project.scripts]
 q = "experiment_lab.q:main"
