@@ -30,9 +30,10 @@ An experiment, in order:
   prints it alone, whole, as stored (`q "SELECT text FROM records WHERE id = '...'"`). `q .views`
   lists the views and their columns, and `q .keys` the keys of the project's runs' tags, params and
   metrics, with how many runs have each; a key no run has gives NULL, with no error. The views of
-  `lab.sql` hold every project's rows; filter on their column `project`. The tables are
-  `lab.experiments`, `lab.runs`, `lab.params`, `lab.tags`, `lab.metrics` (every value logged, with
-  `step` and `time`) and `lab.records`.
+  `lab.sql` hold every project's rows; filter on their column `project`. Query the views: the tables
+  `lab.experiments`, `lab.runs`, `lab.params`, `lab.tags`, `lab.metrics` and `lab.records` hold only
+  what is stored, for what the views leave out, such as every value logged of a metric, with its
+  `step` and `time` (`lab.metrics`).
 - `rec experiment NAME --text DESCRIPTION [--in PARENT] [--dead-end | --no-dead-end]` makes an
   experiment, or changes it when it exists. A new experiment needs a description, in Markdown: what
   it measures and why, in the words a later search would use.

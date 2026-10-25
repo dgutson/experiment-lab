@@ -320,6 +320,25 @@ LINE 1: SELECT nosuch FROM runs
                ^
 exit 1
 
+$ q "SELECT name FROM lab.experiments WHERE depth = 0"
+error: Binder Error: Referenced column "depth" not found in FROM clause!
+Candidate bindings: "description", "parent", "created", "dead_end"
+
+LINE 1: SELECT name FROM lab.experiments WHERE depth = 0
+                                               ^
+column depth is in the view experiments
+exit 1
+
+$ q "SELECT r.project FROM lab.records r"
+error: Binder Error: Table "r" does not have a column named "project"
+
+Candidate bindings: : "text"
+
+LINE 1: SELECT r.project FROM lab.records r
+               ^
+column project is in the views experiments, records, runs, texts
+exit 1
+
 $ q --max 0 "SELECT 1 AS x"
 usage: q [-h] [--project PROJECT] [--max MAX] [--full] [sql]
 q: error: --max must be 1 or more
