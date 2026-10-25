@@ -1,7 +1,6 @@
 {# A table of query.table's result. With link, the first column (an id) is
-   not shown and the second links to link followed by that id. ordered: the
-   query's ORDER BY gives every row its place. #}
-{% macro data_table(t, link=none, ordered=false) %}
+   not shown and the second links to link followed by that id. #}
+{% macro data_table(t, link=none) %}
 {% set skip = 1 if link else 0 %}
 <div class="scroll"><table class="sortable">
 <thead><tr>{% for c in t.columns[skip:] %}<th>{{ c }}</th>{% endfor %}</tr></thead>
@@ -10,7 +9,7 @@
 {% endfor %}
 </tbody>
 </table></div>
-<p class="note">{% if t.more %}The first {{ t.limit }} rows{% if not ordered %} the query returned; without ORDER BY, other rows may come first on another load{% endif %}.{% else %}{{ t.rows|length }} rows.{% endif %}{% if t.cut %} Cells longer than {{ t.cut }} characters are cut; the query box's result shows them whole.{% endif %}</p>
+<p class="note">{{ t.note }}</p>
 {% endmacro %}
 
 {% macro record_links(rs) %}
