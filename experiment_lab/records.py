@@ -3,7 +3,8 @@ table records in lab.db. rec and any script add and change them here, so the
 same rules hold: a record needs a text, a new question is open and any other
 record closed unless a status is given, and a record that answers an open
 question closes it. Evidence items are run:<run id>, file:<path>, sql:<query
-over the views> or record:<id>. Only the standard library, as lab.py.
+over the views> or record:<id>, the run or record existing. Only the standard
+library, as lab.py.
 """
 import re
 import sqlite3
@@ -17,6 +18,7 @@ from experiment_lab.lab import BELOW, Lab, now
 KINDS = ("question", "decision", "protocol", "finding")  # in the order the pages show them
 STATUSES = ("open", "closed", "superseded")
 EVIDENCE = ("run", "file", "sql", "record")
+ID_TABLES = {"run": "runs", "record": "records"}  # the table whose id an item of that kind names
 
 type Evidence = list[str]
 
@@ -55,23 +57,29 @@ def as_record(r: Mapping[str, Any]) -> Record:
                   evidence=r["evidence"], time=r["time"])
 
 
-def check(r: Record, fields: Collection[str] = ("kind", "status", "text", "evidence")) -> None:
+def check(lab: Lab, r: Record, fields: Collection[str] = ("kind", "status", "text", "evidence")) -> None:
     """Checks those of fields that are kind (one of KINDS), status (one of
-    STATUSES), text (not empty) and evidence (items of EVIDENCE)."""
+    STATUSES), text (not empty) and evidence (items of EVIDENCE, a run or
+    record that exists)."""
     for field, value, allowed in (("kind", r["kind"], KINDS), ("status", r["status"], STATUSES)):
         if field in fields and value not in allowed:
             raise ValueError(f"{field} {value!r} is not one of {', '.join(allowed)}")
     if "text" in fields and not r["text"].strip():
         raise ValueError(f"a record needs a text: {r['title']}")
     if "evidence" in fields:
-        check_evidence(r["evidence"])
+        check_evidence(lab, r["evidence"])
 
 
-def check_evidence(items: Iterable[str]) -> None:
+def check_evidence(lab: Lab, items: Iterable[str]) -> None:
+    """Refuses an item of no kind of EVIDENCE, and a run: or record: item
+    whose id no run or record has."""
     for item in items:
         kind, _, value = item.partition(":")
         if kind not in EVIDENCE or not value:
             raise ValueError(f"evidence {item!r} is not one of {', '.join(k + ':...' for k in EVIDENCE)}")
+        if kind in ID_TABLES and not lab.db.execute(f"SELECT 1 FROM {ID_TABLES[kind]} WHERE id = ?",
+                                                     (value,)).fetchone():
+            raise ValueError(f"evidence {item!r}: there is no {kind} {value}")
 
 
 def in_linked_worktree(items: Iterable[str]) -> list[str]:
@@ -113,14 +121,17 @@ def open_records(lab: Lab, project: str | None = None) -> list[OpenRecord]:
 
 def free_id(lab: Lab, rid: str | None, title: str) -> str:
     """rid, which must be lower-case letters, digits and dashes and not taken;
-    without it, an id made from the title that is not taken."""
+    without it, an id made from the title, cut at the last word that ends
+    within 40 characters, that is not taken."""
     if rid:
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", rid):
             raise ValueError(f"an id is lower-case letters, digits and dashes: {rid}")
         if get(lab, rid):
             raise ValueError(f"{rid} exists; change it instead")
         return rid
-    base = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:40].rstrip("-")
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    words = re.match(r".{1,40}(?=-|$)", slug)  # a first word of over 40 characters is cut inside
+    base = words[0] if words else slug[:40]
     rid, n = base, 2
     while get(lab, rid):
         rid, n = f"{base}-{n}", n + 1
@@ -152,7 +163,7 @@ def add(lab: Lab, experiment: str, kind: str, title: str, *, text: str, label: s
     r = Record(id=rid, experiment=experiment, label=label or experiment, kind=kind, title=title, text=text,
                author=author, status=status or ("open" if kind == "question" else "closed"), answers=answers,
                evidence=list(evidence), time=time or now())
-    check(r)
+    check(lab, r)
     changed = [r]
     with lab.write() as db:
         save(db, r)
@@ -172,7 +183,7 @@ def change(lab: Lab, rid: str, **fields: str | Evidence) -> Record:
         raise ValueError(f"no record {rid}")
     lab.check_experiment(r["experiment"])
     r = as_record({**r, **fields})
-    check(r, fields)
+    check(lab, r, fields)
     with lab.write() as db:
         save(db, r)
     return r
