@@ -41,7 +41,9 @@ closes that question. Evidence items are run:<run id>, file:<path>, sql:<query
 over the views> or record:<id>; add and set warn about a file: item in a linked
 git worktree, where a later checkout can change the file. set changes kind, title, text, by, status,
 experiment, answers or evidence (items separated by ";"). add, set and open
-then print the project's open records.
+then print the project's open records. The --text of project, experiment and
+add may be -, which reads the text from stdin, without its last line breaks:
+a quoted heredoc (--text - <<'EOF') needs no escaping.
 
 run starts a run, RUNNING, in an existing experiment, for work that runs
 outside the Python that logs it, and prints its id; end ends a RUNNING run,
@@ -67,6 +69,11 @@ SETTABLE = ("kind", "title", "text", "by", "status", "experiment", "answers", "e
 def ms(t: datetime.datetime | None) -> int | None:
     """t in milliseconds since 1970; None if None."""
     return None if t is None else int(t.timestamp() * 1000)
+
+
+def given_text(value: str) -> str:
+    """value; for -, stdin's text without its last line breaks."""
+    return sys.stdin.read().rstrip("\n") if value == "-" else value
 
 
 def show(r: records.Record) -> None:
@@ -169,14 +176,14 @@ def parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True)
     project = sub.add_parser("project", parents=[replace])
     project.add_argument("name")
-    project.add_argument("--text")
+    project.add_argument("--text", type=given_text)
     project.add_argument("--folder")
     project.add_argument("--files")
     project.add_argument("--views", nargs="*")
     project.set_defaults(run=run_project)
     exp = sub.add_parser("experiment", parents=[named, replace])
     exp.add_argument("name")
-    exp.add_argument("--text")
+    exp.add_argument("--text", type=given_text)
     exp.add_argument("--in", dest="parent", metavar="PARENT")
     exp.add_argument("--dead-end", action=argparse.BooleanOptionalAction)
     exp.set_defaults(run=run_experiment)
@@ -188,7 +195,7 @@ def parser() -> argparse.ArgumentParser:
     add.add_argument("title")
     add.add_argument("--in", dest="container", required=True, metavar="EXPERIMENT")
     add.add_argument("--experiment")
-    add.add_argument("--text", required=True)
+    add.add_argument("--text", required=True, type=given_text)
     add.add_argument("--by", default="agent")
     add.add_argument("--status")
     add.add_argument("--answers", default="")

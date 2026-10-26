@@ -55,7 +55,14 @@ An experiment, in order:
   `2026-09-10T12:00`. `rec set ID FIELD=VALUE` (`status=closed`, `title=...`, `evidence=a;b`);
   `rec open`. Evidence items: `run:<run id>`, `file:<~ or absolute path>`, `sql:<query over the
   views>`, `record:<id>`. rec writes `lab.db` itself; no server is needed, and a text has no length
-  limit.
+  limit. `--text -` reads the text from stdin (for `rec experiment` and `rec project` too), so a
+  text with line breaks, quotes or backticks goes in a quoted heredoc, which needs no escaping:
+
+  ```sh
+  rec add finding "TITLE" --in NAME --evidence run:<run id> --text - <<'EOF'
+  What the runs showed, in Markdown.
+  EOF
+  ```
 - Evidence must show later what it showed when the record was written. Log a file that a later run
   or checkout can overwrite, and numbers, in a run (`run.log_file`, below) and cite `run:<run id>`;
   `file:` is for a file that stays as it is, such as one committed to git. rec warns about a
