@@ -96,6 +96,20 @@ rec end "$(q "SELECT run FROM runs WHERE name = 'background job'")"
 id=$(rec run bitrate "late job" --start 2026-09-10T12:00) && rec end "$id" --at 2026-09-10T11:00
 rec end x --status RUNNING
 rec end x --at yesterday
+cd ~ && rec add finding "From home" --in bitrate --text "x"
+cd ~ && rec experiment "home test" --in bitrate --text "x"
+cd ~ && rec experiment bitrate --dead-end
+cd ~ && rec set keep-48-khz status=closed
+cd ~ && rec run bitrate "from home"
+cd ~ && python -c "from experiment_lab.lab import Lab; Lab().run('bitrate', 'from a script')"
+cd ~ && rec add finding "From home, named" --in bitrate --text "x" --project audio-codec
+cd ~ && python -c "from experiment_lab.lab import Lab; print(Lab(project='audio-codec').run('bitrate', 'from a script').id)"
+rec experiment sharpness --in "blur detector" --text "Scores sharpness by edges." --project vision
+rec add question "Do edges score sharpness?" --in sharpness --text "Not measured yet." --project vision
+rec open --project vision
+rec tree --project vision
+rec add finding "Named elsewhere" --in bitrate --text "x" --project vision
+rec open --project nosuch
 EXPERIMENT_LAB_PORT=abc lab-server
 EXPERIMENT_LAB_PORT=70000 lab-server
 EXPERIMENT_LAB_DATA=/proc/lab-data lab-server

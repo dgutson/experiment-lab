@@ -11,12 +11,13 @@ usage: rec project NAME --text DESCRIPTION [--folder F] [--files F] [--views FIL
        rec open
        rec run EXPERIMENT NAME [--note T] [--start T]
        rec end RUN [--status FINISHED|FAILED|KILLED] [--at T]
+       (each but project takes --project P)
 
 The experiments form a tree whose roots are the projects. rec works in the
-project whose folder holds the current folder (or its git repository's main
-worktree), and uses only that project's experiments; from a folder no project
-holds, it reaches every project's experiments by name, which are unique across
-the lab, and a new experiment needs --in.
+project --project names, else in the one whose folder holds the current folder
+(or its git repository's main worktree), and uses only that project's
+experiments, runs and records; with no project, it refuses them, and open
+prints every project's open records.
 
 project makes a project, once, from its folder (by default the current git
 repository's main worktree, else the current folder), with a one-line
@@ -157,6 +158,9 @@ def run_end(lab: Lab, a: argparse.Namespace) -> None:
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
+    p.set_defaults(project=None)
+    named = argparse.ArgumentParser(add_help=False)  # the options of every command but project
+    named.add_argument("--project", metavar="P")
     sub = p.add_subparsers(dest="command", required=True)
     project = sub.add_parser("project")
     project.add_argument("name")
@@ -165,16 +169,16 @@ def parser() -> argparse.ArgumentParser:
     project.add_argument("--files")
     project.add_argument("--views", nargs="*")
     project.set_defaults(run=run_project)
-    exp = sub.add_parser("experiment")
+    exp = sub.add_parser("experiment", parents=[named])
     exp.add_argument("name")
     exp.add_argument("--text")
     exp.add_argument("--in", dest="parent", metavar="PARENT")
     exp.add_argument("--dead-end", action=argparse.BooleanOptionalAction)
     exp.set_defaults(run=run_experiment)
-    tree = sub.add_parser("tree")
+    tree = sub.add_parser("tree", parents=[named])
     tree.add_argument("top", nargs="?", metavar="EXPERIMENT")
     tree.set_defaults(run=run_tree)
-    add = sub.add_parser("add")
+    add = sub.add_parser("add", parents=[named])
     add.add_argument("kind")
     add.add_argument("title")
     add.add_argument("--in", dest="container", required=True, metavar="EXPERIMENT")
@@ -187,18 +191,18 @@ def parser() -> argparse.ArgumentParser:
     add.add_argument("--id")
     add.add_argument("--time", type=datetime.datetime.fromisoformat)
     add.set_defaults(run=run_add)
-    setp = sub.add_parser("set")
+    setp = sub.add_parser("set", parents=[named])
     setp.add_argument("id")
     setp.add_argument("assignments", nargs="+", metavar="FIELD=VALUE")
     setp.set_defaults(run=run_set)
-    sub.add_parser("open").set_defaults(run=lambda lab, _: show_open(lab))
-    run = sub.add_parser("run")
+    sub.add_parser("open", parents=[named]).set_defaults(run=lambda lab, _: show_open(lab))
+    run = sub.add_parser("run", parents=[named])
     run.add_argument("experiment")
     run.add_argument("name")
     run.add_argument("--note", default="")
     run.add_argument("--start", type=datetime.datetime.fromisoformat)
     run.set_defaults(run=run_run)
-    end = sub.add_parser("end")
+    end = sub.add_parser("end", parents=[named])
     end.add_argument("id", metavar="RUN")
     end.add_argument("--status", choices=("FINISHED", "FAILED", "KILLED"), default="FINISHED")
     end.add_argument("--at", type=datetime.datetime.fromisoformat)
@@ -209,7 +213,7 @@ def parser() -> argparse.ArgumentParser:
 def main() -> None:
     a = parser().parse_args()
     try:
-        a.run(Lab(), a)
+        a.run(Lab(project=a.project), a)
     except (ValueError, OSError, sqlite3.Error) as e:
         sys.exit(f"error: {e}")
 

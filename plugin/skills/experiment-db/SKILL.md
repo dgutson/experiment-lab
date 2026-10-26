@@ -24,11 +24,11 @@ An experiment, in order:
   clone at `~/experiment-lab`. If `q` is not on the PATH, ask the owner where experiment-lab is.
   The data folder is `$EXPERIMENT_LAB_DATA`, default `~/lab-data`; the database is its `lab.db`.
 - The lab holds several projects. q, rec and `lab.py` work in the project of the current folder
-  (the one whose folder holds it or its git repository's main worktree). If rec says no project
-  holds the folder, make it once there: `rec project NAME --text "what the project is, in one line"`.
-  A script works in the project of its working folder, not of the folder the script is in; from a
-  folder no project holds, rec and `lab.py` reach every project's experiments by name, and a new
-  experiment there needs `--in` (`parent=`) naming its parent or the project.
+  (the one whose folder holds it or its git repository's main worktree). A script works in the
+  project of its working folder, not of the folder the script is in. From another folder, name the
+  project: `--project P` for q and rec, `Lab(project="P")` in a script; with no project, rec and
+  `lab.py` write nothing. If rec says no project holds the folder and the work is a new project,
+  make it once there: `rec project NAME --text "what the project is, in one line"`.
 - `q "SQL"` runs DuckDB SQL over the project's views (those of `experiment_lab/lab.sql`, which hold
   only its rows, then its view files; `--project P` for another project's, `--all` for lab.sql's
   views over every project) on `lab.db`, attached read-only as the catalog `lab`, and prints at

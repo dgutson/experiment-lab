@@ -64,8 +64,7 @@ def main(where: str) -> None:
     wav(tone)
     png(plot)
 
-    lab = Lab()
-    os.chdir(lab.data)
+    lab = Lab(project="audio-codec")
     with lab.run("sample rate sweep", "rate 48000, listened to", params={"rate": 48000}) as run:
         run.log_metrics({"accuracy": 0.93})
         run.set_tags({"outcome": "pass"})

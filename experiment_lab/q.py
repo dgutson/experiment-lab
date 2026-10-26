@@ -31,7 +31,7 @@ import duckdb
 from duckdb import DuckDBPyConnection
 
 from experiment_lab import query
-from experiment_lab.lab import holding
+from experiment_lab.lab import working_project
 from experiment_lab.settings import data_folder
 
 KEYS = """WITH own AS (SELECT r.id FROM lab.runs r JOIN experiments x ON x.name = r.experiment)
@@ -78,10 +78,7 @@ def project_of(con: DuckDBPyConnection, a: argparse.Namespace) -> str | None:
     the current folder; None, every project, with --all."""
     if a.all:
         return None
-    projects = query.projects(con)
-    if a.project and a.project not in [p.name for p in projects]:
-        raise ValueError(f"no project {a.project}")
-    project = a.project or holding(projects)
+    project = working_project(query.projects(con), a.project)
     if project is None:
         raise ValueError("no project holds this folder; --project P names one, --all reads every project")
     return project

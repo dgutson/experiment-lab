@@ -39,12 +39,11 @@ A project is an experiment with no parent. `rec project NAME --text "what the pr
 once in the project's folder, makes it; its folder is the main worktree of the current git
 repository, else the current folder (`--folder` sets another). The project of the current folder is
 the one whose folder holds it, or holds the main worktree of its git repository, so that every
-worktree of a repository shares one project. rec, q and `lab.py` work in that project: q's views
-hold only its rows (`--project P` reads another project's, `--all` every project's), and from a
-project's folder rec and `lab.py` refuse another project's experiments. A script works in the project
-of its working folder, not of the folder the script is in. From a folder no project holds, q needs
-`--project` or `--all`; rec and `lab.py` reach every project's experiments by name, and a new
-experiment there needs `--in` (`parent=`) naming the experiment or project it goes below.
+worktree of a repository shares one project. rec, q and `lab.py` work in that project, or in the one
+named by `--project P` (`Lab(project="P")` in a script): q's views hold only its rows (`--all` reads
+every project's), and rec and `lab.py` refuse another project's experiments, runs and records. A
+script works in the project of its working folder, not of the folder the script is in. With no
+project, q needs `--project` or `--all`, and rec and `lab.py` write nothing.
 
 `rec experiment NAME --text "what it measures and why"` makes an experiment directly below the
 project, or below an earlier experiment with `--in PARENT`; given again, `--in` moves it with the
@@ -237,7 +236,7 @@ Work that runs outside the Python that logs it, such as a background job, anothe
 is timed by a run opened before it starts and ended by another process. `rec run EXPERIMENT NAME
 [--note T] [--start T]` starts the run and prints its id. When the work ends, a script logs its
 params, metrics and files through `lab.run_by_id(run_id)`, which refuses an id that is no run of the
-current folder's project, and calls `run.end()`; or `rec end RUN [--status FINISHED|FAILED|KILLED]
+lab's project, and calls `run.end()`; or `rec end RUN [--status FINISHED|FAILED|KILLED]
 [--at T]` ends it. `run.end(at=ms)` and `--at` give an end earlier than now; `rec end` refuses a run
 that has ended and an end before the run's start.
 
