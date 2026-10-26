@@ -37,9 +37,10 @@ The commands, installed with the package: `q`, `rec` and `lab-server`.
 
 A project is an experiment with no parent. `rec project NAME --text "what the project is"`, run
 once in the project's folder, makes it; its folder is the main worktree of the current git
-repository, else the current folder (`--folder` sets another). The project of the current folder is
-the one whose folder holds it, or holds the main worktree of its git repository, so that every
-worktree of a repository shares one project. rec, q and `lab.py` work in that project, or in the one
+repository, else the current folder (`--folder` sets another, `--folder .` the current folder). The
+project of the current folder is the one whose folder holds it, or holds the folder at the same
+place in the main worktree of its git repository, so that every worktree of a repository works in
+the same projects. rec, q and `lab.py` work in that project, or in the one
 named by `--project P` (`Lab(project="P")` in a script): q's views hold only its rows (`--all` reads
 every project's), and rec and `lab.py` refuse another project's experiments, runs and records. A
 script works in the project of its working folder, not of the folder the script is in. With no

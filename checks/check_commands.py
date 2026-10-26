@@ -65,6 +65,10 @@ cd ~/speech && rec experiment vad --text "Voice activity detection." && rec tree
 echo "CREATE VIEW broken AS SELECT nosuch FROM runs;" > ~/speech/views.sql
 cd ~/speech && rec project speech --views views.sql missing.sql && q .views
 cd ~/speech && rec project speech --text "Detects speech in recordings."
+git -c init.defaultBranch=main init -q ~/mono && git -C ~/mono -c user.name=x -c user.email=x commit -q --allow-empty -m x && mkdir ~/mono/sub && cd ~/mono && rec project mono --text "A repository with a project in a subfolder."
+cd ~/mono/sub && rec project inner --text "The project of a subfolder."
+cd ~/mono/sub && rec project inner --text "The project of a subfolder." --folder . && rec experiment "subfolder test" --text "x"
+git -C ~/mono worktree add -q ~/mono-b && mkdir ~/mono-b/sub && cd ~/mono-b/sub && rec tree && cd .. && rec tree
 EXPERIMENT_LAB_DATA=~/missing/lab-data rec open
 EXPERIMENT_LAB_DATA=/proc/lab-data rec open
 q "SELECT name, status FROM runs WHERE experiment = 'sample rate sweep' ORDER BY name"

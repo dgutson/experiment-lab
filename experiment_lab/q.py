@@ -10,7 +10,8 @@ The database is lab.db in the data folder ($EXPERIMENT_LAB_DATA, else
 lab.experiments, lab.runs, lab.params, lab.tags, lab.metrics (every value
 logged), lab.files (the files logged for runs) and lab.records. The views are those of experiment_lab/lab.sql, then
 those of the view files of the project of the current folder (the one whose
-folder holds it or its git repository's main worktree), or of --project; a
+folder holds it or the folder at the same place in its git repository's main
+worktree), or of --project; a
 statement of a view file that fails is printed on stderr and skipped. lab.sql's
 views hold that project's rows only; with --all, they hold every project's and
 no view file runs. From a folder no project holds, q needs --project or --all.
