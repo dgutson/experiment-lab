@@ -42,7 +42,9 @@ An experiment, in order:
   of a metric, with its `step` and `time` (`lab.metrics`).
 - `rec experiment NAME --text DESCRIPTION [--in PARENT] [--dead-end | --no-dead-end]` makes an
   experiment, or changes it when it exists. A new experiment needs a description, in Markdown: what
-  it measures and why, in the words a later search would use.
+  it measures and why, in the words a later search would use. Names are unique across the lab: with
+  a description other than an existing experiment's own, rec refuses; a new experiment needs another
+  name, and `--replace` changes the existing one's description (the same for `rec project`).
   `rec add KIND "TITLE" --in EXPERIMENT --text T [--experiment LABEL] [--by WHO] [--status S]
   [--answers ID] [--evidence ITEM ...] [--id ID] [--time T]` records a decision, finding, protocol
   rule or question, KIND `decision`, `finding`, `protocol` or `question`, in an existing experiment,

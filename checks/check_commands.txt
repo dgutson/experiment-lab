@@ -16,7 +16,7 @@ open in audio-codec (1):
   does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
 exit 0
 
-$ rec project audio-codec --text "A lossy audio codec for voice recordings, at 48 kHz."
+$ rec project audio-codec --text "A lossy audio codec for voice recordings, at 48 kHz." --replace
 project audio-codec, folder ~/audio-codec, files ~/audio-codec, views none
 exit 0
 
@@ -139,7 +139,24 @@ open in audio-codec (2):
 exit 0
 
 $ rec experiment "blur detector" --text "x"
-error: 'blur detector' is in the project vision, not in audio-codec, whose folder this is
+error: 'blur detector' is in the project vision, not in audio-codec, whose folder this is; experiment names are unique across the lab, so a new experiment needs another name
+exit 1
+
+$ rec experiment "noise shaping" --text "A new idea."
+error: experiment noise shaping exists (audio-codec › 16-bit output › noise shaping); a new experiment needs another name; --replace (replace=True) changes its description
+exit 1
+
+$ rec experiment bitrate --in "sample rate sweep" --text "Lowers the bitrate at 48 kHz until accuracy drops."
+experiment audio-codec › sample rate sweep › bitrate
+exit 0
+
+$ rec experiment bitrate --text "Lowers the bitrate until accuracy drops." --replace && q "SELECT description FROM experiments WHERE name = 'bitrate'"
+experiment audio-codec › sample rate sweep › bitrate
+Lowers the bitrate until accuracy drops.
+exit 0
+
+$ rec project audio-codec --text "A new project."
+error: project audio-codec exists (folder FOLDER/home/audio-codec); a new project needs another name; --replace (replace=True) changes its description
 exit 1
 
 $ rec tree "blur detector"
@@ -182,6 +199,10 @@ files: run, experiment, project, name, bytes
 records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
 runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, started, ended, minutes, note
 texts: kind, id, project, experiment, title, text
+exit 0
+
+$ cd ~/speech && rec project speech --text "Detects speech in recordings."
+project speech, folder ~/speech, files ~/speech, views FOLDER/home/speech/views.sql; FOLDER/home/speech/missing.sql
 exit 0
 
 $ EXPERIMENT_LAB_DATA=~/missing/lab-data rec open
