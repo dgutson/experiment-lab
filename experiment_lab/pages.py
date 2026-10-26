@@ -1,12 +1,12 @@
 """The /lab pages. Four show the project picked at the top of them: its records
 with their evidence and a search of them, its experiments as a tree with a
-search of them, its views with a query box, and its files folder. The pages
-they link to, of an experiment, a run, a record, a view or a file under the
-projects' folders and files folders, show the same whatever is picked, and
-show their project's name
-in the picker's place, with the picker's width so that the links after it stay
-where they are. The Projects page, which lists every project with a button
-that deletes one, and the About page leave that place empty.
+search of them, their runs and records, its views with a query box, and its
+files folder. The pages they link to, of an experiment, a run, a record, a view
+or a file under the projects' folders and files folders, show the same whatever
+is picked, and show their project's name in the picker's place, with the
+picker's width so that the links after it stay where they are. The Projects
+page, which lists every project with a button that deletes one, and the About
+page leave that place empty.
 lab-server serves them with uvicorn at http://127.0.0.1:$EXPERIMENT_LAB_PORT
 (default 5000).
 
@@ -150,14 +150,6 @@ class Node(TypedDict):
 
 
 type Nodes = list[Node]
-
-
-class FoundExperiment(NamedTuple):
-    """An experiment that the Experiments page's search found, and its description around the first word found."""
-    experiment: Node
-    snippet: str
-
-
 type LabelRecords = tuple[str | None, Listing]  # a label and the records under it; None: the experiment's name
 
 
@@ -183,6 +175,15 @@ class Item(TypedDict, total=False):
     label: str
     href: str | None
     media: str | None
+
+
+class Hit(TypedDict):
+    """An experiment, run or record that a search found."""
+    kind: str
+    id: str
+    experiment: str
+    title: str
+    snippet: str
 
 
 class Pieces(NamedTuple):
@@ -513,17 +514,19 @@ def experiment_records(e: Node, labels: Labeled) -> ExperimentRecords:
                          for label, rows in sorted(labels.items(), key=lambda lr: lr[0].lower())])
 
 
-def under(nodes: Iterable[Node], node: str | None, below: bool) -> Nodes:
-    """node and those below it when below, else every node."""
-    return [e for e in nodes if not below or e["name"] == node or node in e["above"]]
+def under(nodes: Iterable[Node], node: str | None, below: bool) -> list[str]:
+    """The names of node and those below it when below, else of every node."""
+    return [e["name"] for e in nodes if not below or e["name"] == node or node in e["above"]]
 
 
-def found_experiments(con: DuckDBPyConnection, nodes: Nodes, words: Sequence[str]) -> list[FoundExperiment]:
-    """Up to ROWS + 1 of nodes whose name and description hold every word, ignoring case."""
-    descriptions = dict(con.execute("SELECT name, description FROM experiments"
-                                    " WHERE holds_words(name || chr(10) || description, ?)", [" ".join(words)]).fetchall())
-    return [FoundExperiment(e, snippet(descriptions[e["name"]], words))
-            for e in nodes if e["name"] in descriptions][:ROWS + 1]
+def search(con: DuckDBPyConnection, words: Sequence[str], experiments: Sequence[str]) -> list[Hit]:
+    """Up to ROWS + 1 of the experiments, runs and records of experiments whose
+    title and text (the view experiments_runs_records) hold every word, ignoring case."""
+    found = con.execute("SELECT kind, id, experiment, title, text FROM experiments_runs_records"
+                        " WHERE experiment IN (SELECT unnest(?::VARCHAR[])) AND holds_words(title || chr(10) || text, ?)"
+                        f" ORDER BY kind, experiment, title LIMIT {ROWS + 1}", [experiments, " ".join(words)]).fetchall()
+    return [Hit(kind=kind, id=i, experiment=experiment, title=title, snippet=snippet(text, words))
+            for kind, i, experiment, title, text in found]
 
 
 def found_records(con: DuckDBPyConnection, rs: Listing, words: Sequence[str]) -> list[FoundRecord]:
@@ -727,13 +730,14 @@ def create_app(data: Path) -> FastAPI:
     @app.get("/lab/experiments")
     def experiments(request: Request, node: str = "", find: str = "", below: str = "",
                     con: DuckDBPyConnection = Depends(cursor)) -> Response:
-        """The project's experiments as a tree, and those whose name and
-        description hold every word of find, ignoring case: below node when
-        below is given, else in the whole project."""
+        """The project's experiments as a tree, and those of its experiments,
+        runs and records whose title and text (the view experiments_runs_records) hold every word
+        of find, ignoring case: below node when below is given, else in the
+        whole project."""
         words = searched(find)
         nodes = tree(con)
         node = node if node in [e["name"] for e in nodes] else request.state.project
-        hits = found_experiments(con, under(nodes, node, bool(below)), words) if words else None
+        hits = search(con, words, under(nodes, node, bool(below))) if words else None
         where = f"{node} and below it" if below else request.state.project
         return page(request, "experiments", nodes=nodes, node=node, find=find, below=bool(below) or not words,
                     hits=hits and hits[:ROWS], found=None if hits is None else found(hits, where), picker=True)
