@@ -1,9 +1,9 @@
 """Runs SQL over the views of the lab's database and prints the result as a
 compact table.
 
-usage: q [--project P] [--max N] [--full] "SQL"   (SQL from stdin when omitted)
-       q [--project P] .views                     (each view and its columns)
-       q [--project P] [--max N] .keys            (the keys of the project's runs)
+usage: q [--project P | --all] [--max N] [--full] "SQL"   (SQL from stdin when omitted)
+       q [--project P | --all] .views                     (each view and its columns)
+       q [--project P | --all] [--max N] .keys            (the keys of the runs)
 
 The database is lab.db in the data folder ($EXPERIMENT_LAB_DATA, else
 ~/lab-data), attached read-only as the catalog lab with the tables
@@ -12,15 +12,16 @@ logged), lab.files (the files logged for runs) and lab.records. The views are th
 those of the view files of the project of the current folder (the one whose
 folder holds it or its git repository's main worktree), or of --project; a
 statement of a view file that fails is printed on stderr and skipped. lab.sql's
-views have every project's rows; their column project tells them apart.
+views hold that project's rows only; with --all, they hold every project's and
+no view file runs. From a folder no project holds, q needs --project or --all.
 Several statements may be given; the last one's rows are printed, at most
 --max of them (40), with cells cut at 80 characters unless --full. A result of
 one row and one column prints that cell alone, whole and with its line breaks,
 as in q "SELECT text FROM records WHERE id = '...'". An error about a column
 that is not found names the views that have it, and earlier statements of
 type SELECT, whose rows are not printed, are named on stderr. .keys lists each key of the
-tags, params and metrics of the project's runs, with the number of runs that
-have it.
+tags, params and metrics of the runs in the view runs, with the number of runs
+that have it.
 """
 import argparse
 import re
@@ -33,7 +34,7 @@ from experiment_lab import query
 from experiment_lab.lab import holding
 from experiment_lab.settings import data_folder
 
-KEYS = """WITH own AS (SELECT r.id FROM lab.runs r JOIN experiments x ON x.name = r.experiment WHERE x.project = $1)
+KEYS = """WITH own AS (SELECT r.id FROM lab.runs r JOIN experiments x ON x.name = r.experiment)
 SELECT 'tags' AS "table", key, count(*) AS runs FROM lab.tags WHERE run IN (FROM own) GROUP BY key
 UNION ALL SELECT 'params', key, count(*) FROM lab.params WHERE run IN (FROM own) GROUP BY key
 UNION ALL SELECT 'metrics', key, count(DISTINCT run) FROM lab.metrics WHERE run IN (FROM own) GROUP BY key
@@ -60,7 +61,9 @@ def show(t: query.Table, cut: int | None, ordered: bool) -> None:
 
 def arguments() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
-    p.add_argument("--project")
+    which = p.add_mutually_exclusive_group()
+    which.add_argument("--project")
+    which.add_argument("--all", action="store_true")
     p.add_argument("--max", type=int, default=40)
     p.add_argument("--full", action="store_true")
     p.add_argument("sql", nargs="?")
@@ -70,23 +73,18 @@ def arguments() -> argparse.Namespace:
     return a
 
 
-def make_views(con: DuckDBPyConnection, project: str | None) -> str | None:
-    """Makes the views of lab.sql and of the view files of project, else of the
-    project of the current folder, and returns that project (None if none);
-    prints the errors of the view files on stderr."""
+def project_of(con: DuckDBPyConnection, a: argparse.Namespace) -> str | None:
+    """The project whose rows the views hold: --project, else the project of
+    the current folder; None, every project, with --all."""
+    if a.all:
+        return None
     projects = query.projects(con)
-    if project and project not in [p.name for p in projects]:
-        raise ValueError(f"no project {project}")
-    project = project or holding(projects)
-    for error in query.errors(query.make_views(con, project)):
-        print(error, file=sys.stderr)
-    return project
-
-
-def keys(con: DuckDBPyConnection, project: str | None) -> DuckDBPyConnection:
+    if a.project and a.project not in [p.name for p in projects]:
+        raise ValueError(f"no project {a.project}")
+    project = a.project or holding(projects)
     if project is None:
-        raise ValueError("no project holds this folder; --project P names one")
-    return con.execute(KEYS, [project])
+        raise ValueError("no project holds this folder; --project P names one, --all reads every project")
+    return project
 
 
 def views_with(con: DuckDBPyConnection, error: duckdb.BinderException) -> str:
@@ -113,13 +111,13 @@ def sql_result(con: DuckDBPyConnection, sql: str) -> DuckDBPyConnection | None:
     return last.result
 
 
-def answer(con: DuckDBPyConnection, sql: str, limit: int, cut: int | None, project: str | None) -> None:
+def answer(con: DuckDBPyConnection, sql: str, limit: int, cut: int | None) -> None:
     if sql.strip() == ".views":
         for name, columns in query.view_columns(con):
             print(f"{name}: {columns}")
         return
     asks_keys = sql.strip() == ".keys"
-    result = keys(con, project) if asks_keys else sql_result(con, sql)
+    result = con.execute(KEYS) if asks_keys else sql_result(con, sql)
     if result is None:
         print("ok")
         return
@@ -135,7 +133,9 @@ def main() -> None:
     sql = a.sql if a.sql is not None else sys.stdin.read()
     try:
         con = query.attach(data_folder())
-        answer(con, sql, a.max, None if a.full else 80, make_views(con, a.project))
+        for error in query.errors(query.make_views(con, project_of(con, a))):
+            print(error, file=sys.stderr)
+        answer(con, sql, a.max, None if a.full else 80)
     except (duckdb.Error, FileNotFoundError, ValueError) as e:
         sys.exit(f"error: {e}")
 

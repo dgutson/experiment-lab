@@ -2,18 +2,21 @@
 -- the catalog lab (experiment_lab/query.py): lab.experiments, lab.runs,
 -- lab.params, lab.tags, lab.metrics, lab.files, lab.records. Each project's
 -- view files (lab.experiments.views) run after this one and may use its views.
+-- query.py makes the macro current_project() first: the project whose rows the
+-- views hold, or NULL for every project's (q --all).
 
 -- A time of lab.db (milliseconds since 1970) as the views write it: local
 -- time, to the minute.
 CREATE MACRO local_time(ms) AS strftime(to_timestamp(ms / 1000), '%Y-%m-%dT%H:%M');
 
--- One row per experiment: its project (the root of its tree; a project is its
--- own), parent, depth (0 for a project), path (the names from the project down,
--- joined by ' › '), whether it is a dead end (an idea that failed), description,
--- and when it was made (local time).
+-- One row per experiment of current_project(): its project (the root of its
+-- tree; a project is its own), parent, depth (0 for a project), path (the
+-- names from the project down, joined by ' › '), whether it is a dead end (an
+-- idea that failed), description, and when it was made (local time).
 CREATE VIEW experiments AS
 WITH RECURSIVE tree AS (
-    SELECT name, name AS project, 0 AS depth, name AS path FROM lab.experiments WHERE parent IS NULL
+    SELECT name, name AS project, 0 AS depth, name AS path FROM lab.experiments
+    WHERE parent IS NULL AND name = coalesce(current_project(), name)
     UNION ALL
     SELECT e.name, t.project, t.depth + 1, t.path || ' › ' || e.name
     FROM lab.experiments e JOIN tree t ON e.parent = t.name)
@@ -37,20 +40,20 @@ WITH t AS (SELECT run, map_from_entries(list(struct_pack(k := key, v := value) O
 SELECT r.id AS run, r.experiment, x.project, r.name, r.status, r.start_time, t.tags, p.params, m.metrics, r.end_time,
     local_time(r.start_time) AS started, local_time(r.end_time) AS ended, (r.end_time - r.start_time) / 60000.0 AS minutes,
     r.note
-FROM lab.runs r LEFT JOIN experiments x ON x.name = r.experiment
+FROM lab.runs r JOIN experiments x ON x.name = r.experiment
 LEFT JOIN t ON t.run = r.id LEFT JOIN p ON p.run = r.id LEFT JOIN m ON m.run = r.id;
 
 -- One row per file logged for a run: run, experiment, project, name (which may
 -- hold folders) and bytes. The copy is files/<run>/<name> in the data folder.
 CREATE VIEW files AS SELECT f.run, r.experiment, x.project, f.name, f.bytes
-FROM lab.files f JOIN lab.runs r ON r.id = f.run LEFT JOIN experiments x ON x.name = r.experiment;
+FROM lab.files f JOIN lab.runs r ON r.id = f.run JOIN experiments x ON x.name = r.experiment;
 
 -- Decisions, findings, protocol rules and questions. experiment is the label a
 -- record is shown under; lab.records.experiment is the experiment it is filed
 -- in, and project that experiment's project. time is local time.
 CREATE VIEW records AS SELECT r.id, local_time(r.time) AS time, x.project,
     r.label AS experiment, r.kind, r.title, r.text, r.author, r.status, r.answers, r.evidence
-    FROM lab.records r LEFT JOIN experiments x ON x.name = r.experiment;
+    FROM lab.records r JOIN experiments x ON x.name = r.experiment;
 
 -- The text of each experiment, run and record, for searching: an experiment's
 -- description; a run's note, then its params and tags as key=value lines; a
@@ -62,7 +65,7 @@ UNION ALL
 SELECT 'run', r.id, x.project, r.experiment, r.name, concat_ws(chr(10), r.note,
     (SELECT string_agg(key || '=' || value, chr(10) ORDER BY key) FROM lab.params p WHERE p.run = r.id),
     (SELECT string_agg(key || '=' || value, chr(10) ORDER BY key) FROM lab.tags t WHERE t.run = r.id))
-FROM lab.runs r LEFT JOIN experiments x ON x.name = r.experiment
+FROM lab.runs r JOIN experiments x ON x.name = r.experiment
 UNION ALL
 SELECT 'record', r.id, x.project, r.experiment, r.title, r.text
-FROM lab.records r LEFT JOIN experiments x ON x.name = r.experiment;
+FROM lab.records r JOIN experiments x ON x.name = r.experiment;

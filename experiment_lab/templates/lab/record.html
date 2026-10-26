@@ -15,7 +15,7 @@
 <h3>Query</h3>
 <pre>{{ e.value }}</pre>
 {% if e.table.error %}<p class="error">{{ e.table.error }}</p>{% else %}{{ data_table(e.table) }}{% endif %}
-<p class="note"><a href="{{ query_url(e.value) }}">Open in the query box</a></p>
+<p class="note"><a href="{{ query_url(e.value, r.project) }}">Open in the query box</a></p>
 {% else %}
 <p>{{ e.prefix }}{% if e.href %}<a href="{{ e.href }}">{{ e.label }}</a>{% else %}{{ e.label }}{% endif %}</p>
 {{ in_place(e.media, e.href) }}

@@ -90,16 +90,20 @@ changes, not for evals, checks or CI. After the change is on `main`:
   standard library and Python's sqlite3, so a logging script imports them with `PYTHONPATH` alone.
   Every write is one `Lab.write()` transaction (`BEGIN IMMEDIATE`). `settings.py` and `__init__.py`
   must stay importable without the package's dependencies too.
-- Readers: `query.py` attaches `lab.db` read-only to an in-memory DuckDB and runs `lab.sql`, then the
-  view files of one project, so that each project's views are in a database of their own and may
-  reuse names. q, the pages and `checks/check_views.py` all read through it.
+- Readers: `query.py` attaches `lab.db` read-only to an in-memory DuckDB, makes the macro
+  `current_project()` and runs `lab.sql`, whose views keep that project's rows, then the project's
+  view files, so that each project's views are in a database of their own and may reuse names. With
+  no project, `lab.sql`'s views hold every project's rows. q, the pages and `checks/check_views.py`
+  all read through it.
 - No process may have `lab.db` open with Python's sqlite3 while DuckDB reads it, since the two copies
   of SQLite do not see each other's locks (`query.py`'s docstring). So lab-server makes `lab.db`, or
   the tables it lacks, and deletes a project (`python -m experiment_lab.lab --delete NAME`) in a
   child process.
 - The pages (`pages.py`) keep one DuckDB database per project (`Views`), made again when
   `query.version` changes (the modification time of `lab.sql` or a view file, or the list of view
-  files), and give each request a cursor of the project in the cookie `project`. Attaching costs
+  files), and give each request a cursor of the project in the query parameter `project`, else in
+  the cookie `project`; the pages of an experiment, a run or a record and the Projects page read
+  the database of no project (`every_project`). Attaching costs
   about 140 ms, since each new DuckDB database loads the SQLite extension again. File access
   is off and the configuration locked. SQL from the query box and from `sql:` evidence runs in a
   transaction that is rolled back; `REFUSED` lists the statement types that would act outside it.

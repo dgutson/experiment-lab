@@ -9,9 +9,11 @@ lab-server serves them with uvicorn at http://127.0.0.1:$EXPERIMENT_LAB_PORT
 (default 5000).
 
 The pages read lab.db only through DuckDB; lab-server makes lab.db, and
-deletes a project, in a child process. They keep one DuckDB database with lab.db attached
-read-only and the views, made again when lab.sql, a view file or a project's
-list of view files changes; each request reads through a cursor of its own,
+deletes a project, in a child process. They keep one DuckDB database per
+project with lab.db attached read-only and the project's views, and one whose
+views hold every project's rows, for the pages that show the same whatever is
+picked, each made again when lab.sql, a view file or a project's list of view
+files changes; each request reads through a cursor of its own,
 with file access off. A statement of a view file that fails is skipped, and
 its error shown on the records page and the view list. SQL from the query box
 and from sql: evidence runs in a transaction that is rolled back, so nothing
@@ -193,20 +195,25 @@ class Views:
             return [name for name, _ in query.projects(con)]
 
 
-def cursor(request: Request) -> Iterator[DuckDBPyConnection]:
+def cursor(request: Request, project: str | None = None) -> Iterator[DuckDBPyConnection]:
     """A cursor of the picked project's database. It also sets
-    request.state.projects and request.state.project: the one picked, kept in
-    the cookie project, else the first."""
+    request.state.projects and request.state.project: the one picked, project
+    if given, else the one kept in the cookie project, else the first."""
     views = request.app.state.views
     projects = views.projects()
-    picked = urllib.parse.unquote(request.cookies.get("project", ""))
+    if project is not None and project not in projects:
+        raise HTTPException(404, f"no project {project}")
+    picked = project or urllib.parse.unquote(request.cookies.get("project", ""))
     request.state.projects = projects
     request.state.project = picked if picked in projects else next(iter(projects), None)
-    con = views.cursor(request.state.project)
-    try:
+    with contextlib.closing(views.cursor(request.state.project)) as con:
         yield con
-    finally:
-        con.close()
+
+
+def every_project(request: Request) -> Iterator[DuckDBPyConnection]:
+    """A cursor of the database whose views hold every project's rows."""
+    with contextlib.closing(request.app.state.views.cursor(None)) as con:
+        yield con
 
 
 def page(request: Request, template: str, status_code: int = 200, **context: object) -> Response:
@@ -231,9 +238,9 @@ def view_url(name: str, project: str | None) -> str:
     return "/lab/view/" + urllib.parse.quote(name) + (f"?project={urllib.parse.quote(project)}" if project else "")
 
 
-def query_url(sql: str) -> str:
-    """The query page that runs sql."""
-    return "/lab/query?sql=" + urllib.parse.quote(sql)
+def query_url(sql: str, project: str | None) -> str:
+    """The query page that runs sql in the project's database."""
+    return "/lab/query?sql=" + urllib.parse.quote(sql) + (f"&project={urllib.parse.quote(project)}" if project else "")
 
 
 templates.env.globals.update(url=url, file_url=file_url, view_url=view_url, query_url=query_url)
@@ -350,12 +357,11 @@ def md(text: str | None, roots: Iterable[Path]) -> Markup:
     return Markup(m.convert(text or ""))
 
 
-def all_records(con: DuckDBPyConnection, project: str | None = None) -> list[Listed]:
-    """Every record, or the project's, with its evidence as a list; experiment
-    is its label and filed_in the experiment it is in."""
-    where = " WHERE r.project = ?" if project else ""
+def all_records(con: DuckDBPyConnection) -> list[Listed]:
+    """The records of the view records, with their evidence as a list;
+    experiment is its label and filed_in the experiment it is in."""
     rows = con.execute("SELECT r.*, l.experiment AS filed_in FROM records r JOIN lab.records l USING (id)"
-                       f"{where} ORDER BY r.time, r.id", [project] if project else [])
+                       " ORDER BY r.time, r.id")
     columns = [d[0] for d in rows.description]
     return [Listed(id=r["id"], time=r["time"], project=r["project"], experiment=r["experiment"], kind=r["kind"],
                    title=r["title"], text=r["text"], author=r["author"], status=r["status"], answers=r["answers"],
@@ -384,12 +390,11 @@ def covered(spans: Iterable[Span]) -> int:
     return total
 
 
-def ended_runs(con: DuckDBPyConnection, project: str | None) -> dict[str, Spans]:
-    """The spans of the project's ended runs, per experiment."""
+def ended_runs(con: DuckDBPyConnection) -> dict[str, Spans]:
+    """The spans of the ended runs of the view runs, per experiment."""
     spans: dict[str, Spans] = {}
-    for name, start, end in con.execute("SELECT r.experiment, r.start_time, r.end_time FROM lab.runs r JOIN experiments x"
-                                        " ON x.name = r.experiment WHERE x.project = ? AND r.end_time IS NOT NULL",
-                                        [project]).fetchall():
+    for name, start, end in con.execute("SELECT experiment, start_time, end_time FROM runs"
+                                        " WHERE end_time IS NOT NULL").fetchall():
         spans.setdefault(name, []).append((start, end))
     return spans
 
@@ -412,7 +417,7 @@ def drawn(children: Mapping[str | None, Nodes]) -> Nodes:
     return out
 
 
-def tree(con: DuckDBPyConnection, project: str | None) -> Nodes:
+def tree(con: DuckDBPyConnection) -> Nodes:
     """The project's experiments, each followed by those below it, siblings in
     the order they were made. Each is a dict: name, parent, dead_end, records
     (how many, empty if none), started (when its first run started, or with no runs when it
@@ -428,14 +433,14 @@ def tree(con: DuckDBPyConnection, project: str | None) -> Nodes:
              own AS (SELECT e.name, e.parent, e.dead_end, e.created, coalesce(c.n, 0) AS records,
                  coalesce(r.t0, e.created) AS t0, coalesce(r.running, false) AS running
              FROM lab.experiments e JOIN experiments x USING (name)
-             LEFT JOIN r ON r.experiment = e.name LEFT JOIN c ON c.experiment = e.name WHERE x.project = ?),
+             LEFT JOIN r ON r.experiment = e.name LEFT JOIN c ON c.experiment = e.name),
              shown AS (SELECT name, parent, dead_end, created,
                  if(parent IS NULL, sum(records) OVER (), records) AS records,
                  if(parent IS NULL, min(t0) OVER (), t0) AS t0,
                  if(parent IS NULL, bool_or(running) OVER (), running) AS running FROM own)
         SELECT name, parent, dead_end, records, local_time(t0) AS started, running
-        FROM shown ORDER BY created, name""", [project]).fetchall()
-    spans = ended_runs(con, project)
+        FROM shown ORDER BY created, name""").fetchall()
+    spans = ended_runs(con)
     children: dict[str | None, Nodes] = {}
     for name, parent, dead_end, count, started, running in rows:
         own = spans.get(name, []) if parent else [s for ss in spans.values() for s in ss]
@@ -647,7 +652,7 @@ def create_app(data: Path) -> FastAPI:
     @app.get("/lab/")
     def index(request: Request, con: DuckDBPyConnection = Depends(cursor)) -> Response:
         project = request.state.project
-        rs = all_records(con, project)
+        rs = all_records(con)
         by: dict[str, Labeled] = {}
         for r in rs:
             by.setdefault(r["filed_in"], {}).setdefault(r["experiment"], []).append(r)
@@ -655,7 +660,7 @@ def create_app(data: Path) -> FastAPI:
             for rows in labels.values():
                 rows.sort(key=lambda r: (records.KINDS.index(r["kind"]), r["time"]))
         return page(request, "index", open=[r for r in rs if r["status"] == "open"],
-                    experiments=[experiment_records(e, by[e["name"]]) for e in tree(con, project) if e["name"] in by],
+                    experiments=[experiment_records(e, by[e["name"]]) for e in tree(con) if e["name"] in by],
                     errors=request.app.state.views.errors(project), picker=True)
 
     @app.get("/lab/experiments")
@@ -667,7 +672,7 @@ def create_app(data: Path) -> FastAPI:
         whole project."""
         if len(find) > LONGEST_FIND:
             raise HTTPException(400, f"the search is longer than {LONGEST_FIND} characters")
-        nodes = tree(con, request.state.project)
+        nodes = tree(con)
         node = node if node in [e["name"] for e in nodes] else request.state.project
         words = find.lower().split()
         hits = search(con, words, under(nodes, node, bool(below))) if words else None
@@ -676,15 +681,15 @@ def create_app(data: Path) -> FastAPI:
                     hits=hits and hits[:ROWS], found=None if hits is None else found(hits, where), picker=True)
 
     @app.get("/lab/experiment/{name:path}")
-    def experiment(request: Request, name: str, con: DuckDBPyConnection = Depends(cursor)) -> Response:
+    def experiment(request: Request, name: str, con: DuckDBPyConnection = Depends(every_project)) -> Response:
         found = con.execute("SELECT description, parent, dead_end, folder, files, views FROM lab.experiments"
                             " WHERE name = ?", [name]).fetchone()
         if found is None:
             raise HTTPException(404, f"no experiment {name}")
         description, parent, dead_end, folder, files, views = found
-        above: list[str] = []
+        path = [name]  # from the project down
         while parent is not None:
-            above.insert(0, parent)
+            path.insert(0, parent)
             parent = (con.execute("SELECT parent FROM lab.experiments WHERE name = ?", [parent]).fetchone() or [None])[0]
         branches = con.execute("SELECT name, dead_end FROM lab.experiments WHERE parent = ? ORDER BY created, name",
                                [name]).fetchall()
@@ -696,11 +701,11 @@ def create_app(data: Path) -> FastAPI:
         project = folder and {"folder": shown_path(Path(folder)), "files": shown_path(Path(files)),
                               "views": ", ".join(shown_path(Path(v)) for v in views.split("; ") if v) or "none"}
         return page(request, "experiment", name=name, description=md(description, roots(con)), dead_end=dead_end,
-                    above=above, branches=branches, project_settings=project, t=t,
-                    query=query_url("SELECT * " + runs), records=rs)
+                    above=path[:-1], branches=branches, project_settings=project, t=t,
+                    query=query_url("SELECT * " + runs, path[0]), records=rs)
 
     @app.get("/lab/run/{rid}")
-    def run_page(request: Request, rid: str, con: DuckDBPyConnection = Depends(cursor)) -> Response:
+    def run_page(request: Request, rid: str, con: DuckDBPyConnection = Depends(every_project)) -> Response:
         result = con.execute("SELECT *, concat_ws(' to ', started, ended) AS span FROM runs WHERE run = ?", [rid])
         row = result.fetchone()
         if row is None:
@@ -712,7 +717,7 @@ def create_app(data: Path) -> FastAPI:
                  for n, size in logged_files]
         cited_by = [x for x in all_records(con) if f"run:{rid}" in x["evidence"]]
         logged = query_url("SELECT key, step, time, value FROM lab.metrics"
-                           f" WHERE run = {query.literal(rid)} ORDER BY key, step, time")
+                           f" WHERE run = {query.literal(rid)} ORDER BY key, step, time", r["project"])
         return page(request, "run", r=r, note=md(r["note"], roots(con)), files=files, cited_by=cited_by, logged=logged,
                     run_values=run_values(r))
 
@@ -725,7 +730,7 @@ def create_app(data: Path) -> FastAPI:
         return send(target)
 
     @app.get("/lab/record/{rid}")
-    def record_page(request: Request, rid: str, con: DuckDBPyConnection = Depends(cursor)) -> Response:
+    def record_page(request: Request, rid: str, con: DuckDBPyConnection = Depends(every_project)) -> Response:
         rs = {r["id"]: r for r in all_records(con)}
         if rid not in rs:
             raise HTTPException(404, f"no record {rid}")
@@ -739,18 +744,14 @@ def create_app(data: Path) -> FastAPI:
                     answered_by=answered_by, cited_by=cited_by, by=r["author"] or "?")
 
     @app.get("/lab/view/{name}")
-    def view_page(request: Request, name: str, project: str | None = None) -> Response:
-        """A view of the project's database, without project of lab.sql's, sorted
-        by every column so that each load shows the same rows."""
-        views = request.app.state.views
-        if project is not None and project not in views.projects():
-            raise HTTPException(404, f"no project {project}")
-        with contextlib.closing(views.cursor(project)) as con:
-            if name not in [v for v, _ in query.view_columns(con)]:
-                raise HTTPException(404, f"no view {name}")
-            sql = f"SELECT * FROM {query.identifier(name)} ORDER BY ALL"
-            return page(request, "view", name=name, project=project, query=query_url(sql),
-                        t=shown(con.execute(sql), ROWS, CUT, ordered=True))
+    def view_page(request: Request, name: str, con: DuckDBPyConnection = Depends(cursor)) -> Response:
+        """A view of the project's database, sorted by every column so that
+        each load shows the same rows."""
+        if name not in [v for v, _ in query.view_columns(con)]:
+            raise HTTPException(404, f"no view {name}")
+        sql = f"SELECT * FROM {query.identifier(name)} ORDER BY ALL"
+        return page(request, "view", name=name, query=query_url(sql, request.state.project),
+                    t=shown(con.execute(sql), ROWS, CUT, ordered=True))
 
     @app.get("/lab/query")
     def query_page(request: Request, sql: str = "", con: DuckDBPyConnection = Depends(cursor)) -> Response:
@@ -763,7 +764,7 @@ def create_app(data: Path) -> FastAPI:
                     errors=request.app.state.views.errors(project), picker=True)
 
     @app.get("/lab/projects")
-    def projects_page(request: Request, con: DuckDBPyConnection = Depends(cursor)) -> Response:
+    def projects_page(request: Request, con: DuckDBPyConnection = Depends(every_project)) -> Response:
         return page(request, "projects", listed=listed_projects(con))
 
     @app.post("/lab/projects/delete")

@@ -1,6 +1,7 @@
 """DuckDB SQL over the lab's database, for q and the pages: lab.db attached
-read-only as the catalog lab, then the views of lab.sql and of one project's
-view files, so that projects may use the same view names.
+read-only as the catalog lab, then the views of lab.sql, which hold one
+project's rows, and of that project's view files, so that projects may use the
+same view names. With no project, lab.sql's views hold every project's rows.
 
 DuckDB reads lab.db through its own copy of SQLite, and two copies of SQLite in
 one process do not see each other's locks
@@ -108,8 +109,10 @@ def version(con: DuckDBPyConnection, project: str | None) -> list[Stamp]:
 
 
 def make_views(con: DuckDBPyConnection, project: str | None) -> list[Source]:
-    """Runs lab.sql, then the project's view files. A statement that fails is
-    skipped and the others still run."""
+    """Makes the macro current_project(), the project whose rows lab.sql's views
+    hold (NULL: every project's), and runs lab.sql, then the project's view
+    files. A statement that fails is skipped and the others still run."""
+    con.execute(f"CREATE MACRO current_project() AS {literal(project) if project else 'NULL::VARCHAR'}")
     return [Source(path=path, mtime=mtime, errors=run_file(con, path)) for path, mtime in version(con, project)]
 
 

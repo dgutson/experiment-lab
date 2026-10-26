@@ -60,6 +60,12 @@ q "SET TimeZone = 'UTC'; SELECT name, started, ended, minutes FROM runs WHERE ex
 q .views
 q --project vision .views
 q --project vision "FROM blur_scores"
+q "SELECT DISTINCT project FROM runs"
+q --project vision "SELECT DISTINCT project FROM runs"
+q --all "SELECT DISTINCT project FROM runs ORDER BY project"
+q --all .views
+q --all --project vision .views
+cd ~ && q "SELECT DISTINCT project FROM runs"
 q .keys
 q --project vision .keys
 q --max 2 .keys
@@ -85,7 +91,7 @@ id=$(rec run bitrate "background job" --note "Ran in a background job." --start 
 rec run nowhere "a run"
 rec run "blur detector" "a run"
 rec end nosuch
-rec end "$(q --project vision "SELECT run FROM runs WHERE project = 'vision' ORDER BY name LIMIT 1")"
+rec end "$(q --project vision "SELECT run FROM runs ORDER BY name LIMIT 1")"
 rec end "$(q "SELECT run FROM runs WHERE name = 'background job'")"
 id=$(rec run bitrate "late job" --start 2026-09-10T12:00) && rec end "$id" --at 2026-09-10T11:00
 rec end x --status RUNNING
