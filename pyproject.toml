@@ -1,6 +1,6 @@
 [project]
 name = "experiment-lab"
-version = "0.2.0"
+version = "0.3.0"
 description = "Decisions, findings, protocol rules and questions about experiments, next to the experiments' runs: q, rec and the /lab pages."
 requires-python = ">=3.12"
 authors = [{name = "Daniel Gutson"}]

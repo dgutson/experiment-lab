@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: find-past-work
-description: Asked whether something was tried, the agent searches the view texts; the subject is in no experiment's name.
+description: Asked whether something was tried, the agent searches the view experiments_runs_records; the subject is in no experiment's name.
 context:
   scaffold_script: setup.sh
 execution:
@@ -14,10 +14,10 @@ graders:
     type: tool_used
     tool: Skill
     input_match: experiment-db
-  - name: searched-texts
+  - name: searched
     type: tool_used
     tool: Bash
-    input_match: texts
+    input_match: experiments_runs_records
   - name: names-experiment
     type: regex
     pattern: '16-bit output'

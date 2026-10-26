@@ -7,11 +7,11 @@
 <p class="meta">The experiments of {{ project }}, as a tree: each one below the experiment that led to it. Select one with the round button to search below it.</p>
 <form action="/lab/experiments">
 <div class="find">
-<input type="search" name="find" value="{{ find }}" placeholder="Search texts" aria-label="Search texts">
+<input type="search" name="find" value="{{ find }}" placeholder="Search experiments" aria-label="Search experiments">
 <label><input type="checkbox" name="below" value="1"{% if below %} checked{% endif %}> only below <strong id="node-name">{{ node }}</strong></label>
 <button type="submit">Search</button>
 </div>
-<p class="note">The search finds the experiments, runs and records whose title or text holds every word searched for, in any letter case. The text is an experiment's description, a run's note, params and tags, or a record's text. In SQL, this is the view texts.</p>
+<p class="note">The search finds the experiments, runs and records whose title or text holds every word searched for, in any letter case. The text is an experiment's description, a run's note, params and tags, or a record's text. In SQL, this is the view experiments_runs_records and the macro holds_words.</p>
 {% if found %}
 <h2>Found</h2>
 <p class="note">{{ found }}</p>

@@ -61,7 +61,7 @@ CREATE VIEW records AS SELECT r.id, local_time(r.time) AS time, x.project,
 -- description; a run's note, then its params and tags as key=value lines; a
 -- record's text. kind is experiment, run or record, id the name or id that its
 -- page (/lab/<kind>/<id>) takes, and experiment the one it is in.
-CREATE VIEW texts AS
+CREATE VIEW experiments_runs_records AS
 SELECT 'experiment' AS kind, name AS id, project, name AS experiment, name AS title, description AS text FROM experiments
 UNION ALL
 SELECT 'run', r.id, x.project, r.experiment, r.name, concat_ws(chr(10), r.note,
@@ -71,3 +71,9 @@ FROM lab.runs r JOIN experiments x ON x.name = r.experiment
 UNION ALL
 SELECT 'record', r.id, x.project, r.experiment, r.title, r.text
 FROM lab.records r JOIN experiments x ON x.name = r.experiment;
+
+-- Whether text holds every word of words (split at white space), in any
+-- letter case: the search boxes of the pages, as in
+-- SELECT id, kind, status, title FROM records WHERE holds_words(title || ' ' || text, 'sample rate').
+CREATE MACRO holds_words(text, words) AS
+    list_bool_and([contains(lower(text), w) FOR w IN string_split_regex(lower(words), '\s+')]);

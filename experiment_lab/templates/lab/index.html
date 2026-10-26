@@ -6,6 +6,26 @@
 {% if not project %}{{ no_project() }}{% else %}
 <p class="meta">The decisions, findings, protocol rules and questions of {{ project }}, by the experiment they are filed in, in the order of the experiment tree. Click a column heading to sort.</p>
 {{ view_errors(errors) }}
+<form action="/lab/">
+<div class="find">
+<input type="search" name="find" value="{{ find }}" placeholder="Search records" aria-label="Search records">
+<button type="submit">Search</button>
+</div>
+</form>
+<p class="note">The search finds the records whose title or text holds every word searched for, in any letter case. In SQL, this is the macro holds_words.</p>
+{% if found %}
+<h2>Found</h2>
+<p class="note">{{ found }}</p>
+{% if hits %}
+<table class="sortable">
+<thead><tr><th>Kind</th><th>Status</th><th>Title</th><th>Experiment</th><th>Text</th></tr></thead>
+<tbody>
+{% for h in hits %}<tr class="{{ h.record.status }}"><td>{{ h.record.kind }}</td><td>{{ h.record.status }}</td><td><a href="{{ url('record', h.record.id) }}">{{ h.record.title }}</a>{{ answered(h.record) }}</td><td>{{ h.record.experiment }}</td><td>{{ h.snippet }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% endif %}
+{% endif %}
 <h2>Open</h2>
 {% if open %}
 <table class="sortable">
