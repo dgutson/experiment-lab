@@ -280,22 +280,26 @@ def shown(result: DuckDBPyConnection, limit: int, cut: int | None, ordered: bool
     which says how many rows it has, which ones when some are left out
     (ordered: the query's ORDER BY gives every row its place) and whether cells
     are cut. With link, a kind of page that url() takes, the first column (an
-    id) is not shown and the second links to the page of that id."""
+    id) is not shown and the second links to the page of that id; a cell that
+    is a path /lab/file serves links to it."""
     t = query.table(result, limit, cut)
+    tops = roots(result)
     rows = (f"{len(t['rows'])} rows." if not t["more"] else f"The first {limit} rows." if ordered else
             f"The first {limit} rows the query returned; without ORDER BY, other rows may come first on another load.")
     cells = f" Cells longer than {t['cut']} characters are cut; the query box's result shows them whole." if t["cut"] else ""
     return Shown(columns=t["columns"][1:] if link else t["columns"],
-                 rows=[row_cells(r, t["numeric"], link) for r in t["rows"]], note=rows + cells,
+                 rows=[row_cells(r, t["numeric"], link, tops) for r in t["rows"]], note=rows + cells,
                  hidden_note=hidden_note)
 
 
-def row_cells(row: query.Row, numeric: Sequence[bool], link: str | None) -> Cells:
-    """A row of query.table as a page shows it; with link, the second value,
-    or the first when it is empty, links to the page of the first."""
+def row_cells(row: query.Row, numeric: Sequence[bool], link: str | None, tops: Iterable[Path]) -> Cells:
+    """A row of query.table as a page shows it, a path that /lab/file serves
+    (tops) linked to it; with link, the second value, or the first when it is
+    empty, links to the page of the first."""
+    cells = [Cell(v, n, file_href(v, tops)) for v, n in zip(row, numeric)]
     if link is None:
-        return [Cell(v, n) for v, n in zip(row, numeric)]
-    return [Cell(row[1] or row[0], numeric[1], url(link, row[0])), *map(Cell, row[2:], numeric[2:])]
+        return cells
+    return [Cell(row[1] or row[0], numeric[1], url(link, row[0])), *cells[2:]]
 
 
 def run_sql(con: DuckDBPyConnection, sql: str, limit: int = ROWS, cut: int | None = CUT) -> Shown | Failure:
@@ -336,6 +340,12 @@ def served(path: str, roots: Iterable[Path]) -> Path | None:
     return target if any(target.is_relative_to(r) for r in roots) and target.exists() else None
 
 
+def file_href(text: str, roots: Iterable[Path]) -> str | None:
+    """The page of the file or folder at text when all of text is a path (PATH)
+    that /lab/file serves, else None."""
+    return file_url(text) if PATH.fullmatch(text) and served(text, roots) else None
+
+
 def media(path: Path) -> str | None:
     """"audio" or "image" for a file the pages play or show in place, else None."""
     kind = mimetypes.guess_type(path.name)[0] or ""
@@ -369,7 +379,7 @@ class PathLinks(Treeprocessor):
         if root.tag in ("pre", "a"):
             return
         if root.tag == "code":
-            if root.text and PATH.fullmatch(root.text) and served(root.text, self.roots):
+            if root.text and file_href(root.text, self.roots):
                 root.append(link(root.text))
                 root.text = None
             return
@@ -595,11 +605,11 @@ def folder(request: Request, target: Path, tops: Iterable[Path], picker: bool, l
                 parent=shown_path(target.parent) if target != top else None, picker=picker, label=label)
 
 
-def run_values(r: Mapping[str, Any]) -> dict[str, RunValues]:
+def run_values(r: Mapping[str, Any], tops: Iterable[Path]) -> dict[str, RunValues]:
     """The run's params, latest metrics and tags, those it has, by the
     heading its page shows them under: keys in order ignoring case, values as
-    query.cell writes them."""
-    return {title: {k: Cell(query.cell(v), isinstance(v, (int, float)))
+    query.cell writes them, a path that /lab/file serves (tops) linked to it."""
+    return {title: {k: Cell(query.cell(v), isinstance(v, (int, float)), file_href(query.cell(v), tops))
                     for k, v in sorted(values.items(), key=lambda kv: kv[0].lower())}
             for title, values in (("Params", r["params"]), ("Latest metrics", r["metrics"]), ("Tags", r["tags"]))
             if values}
@@ -780,8 +790,9 @@ def create_app(data: Path) -> FastAPI:
         cited_by = [x for x in all_records(con) if f"run:{rid}" in x["evidence"]]
         logged = query_url("SELECT key, step, time, value FROM lab.metrics"
                            f" WHERE run = {query.literal(rid)} ORDER BY key, step, time", r["project"])
-        return page(request, "run", r=r, note=md(r["note"], roots(con)), files=files, cited_by=cited_by, logged=logged,
-                    run_values=run_values(r), label=r["project"])
+        tops = roots(con)
+        return page(request, "run", r=r, note=md(r["note"], tops), files=files, cited_by=cited_by, logged=logged,
+                    run_values=run_values(r, tops), label=r["project"])
 
     @app.get("/lab/run/{rid}/file/{path:path}")
     def run_file(rid: str, path: str) -> FileResponse:

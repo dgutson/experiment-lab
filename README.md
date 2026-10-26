@@ -410,9 +410,10 @@ To change the version, take `package/dist/mermaid.min.js` and `package/LICENSE` 
 `/lab/file?path=P` shows the file or folder P, a `~/` or absolute path, when it is under a project's
 folder or files folder, and answers 404 for anything else. A folder is shown as a list of its files,
 a `.md` file as Markdown (`&raw=1` for its text), an HTML file with scripts off, a text file as plain
-text, and any other file as it is. The pages link to `/lab/file` each `file:` item of a record and
-each `~/` or absolute path in a Markdown text, also one that is all of a code span, when
-`/lab/file` serves it; a relative path is not linked. On a record's page, a folder's page and a
+text, and any other file as it is. The pages link to `/lab/file` each `file:` item of a record,
+each `~/` or absolute path in a Markdown text, also one that is all of a code span, and each table
+cell, such as a run's param or tag, that is all such a path, when `/lab/file` serves it; a relative
+path is not linked. On a record's page, a folder's page and a
 run's page, an audio file has a player next to its link, which fetches nothing until it plays, and
 an image is shown next to its link.
 

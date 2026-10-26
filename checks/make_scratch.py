@@ -1,10 +1,10 @@
 """Makes a lab for the checks in FOLDER, which must not exist: the data folder
 FOLDER/lab-data, and FOLDER/home with the projects' folders. It is the evals'
-lab (evals/make_lab.py) with what the checks also need: a run with tags
-and files (an audio file and an image), a record of every kind, evidence of
-every kind, a text with a diagram and paths, and evidence items with no kind,
-which rec refuses but lab.db may hold. Its paths are absolute, so the server
-reads it with any home folder.
+lab (evals/make_lab.py) with what the checks also need: a run with tags, a
+path as a param and files (an audio file and an image), a record of every
+kind, evidence of every kind, a text with a diagram and paths, and evidence
+items with no kind, which rec refuses but lab.db may hold. Its paths are
+absolute, so the server reads it with any home folder.
 
 usage: uv run python checks/make_scratch.py FOLDER
 then:  export EXPERIMENT_LAB_DATA=FOLDER/lab-data
@@ -65,7 +65,8 @@ def main(where: str) -> None:
     png(plot)
 
     lab = Lab(project="audio-codec")
-    with lab.run("sample rate sweep", "rate 48000, listened to", params={"rate": 48000}) as run:
+    with lab.run("sample rate sweep", "rate 48000, listened to",
+                 params={"rate": 48000, "script": str(bench)}) as run:
         run.log_metrics({"accuracy": 0.93})
         run.set_tags({"outcome": "pass"})
         run.log_file(tone)
