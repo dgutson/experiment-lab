@@ -19,73 +19,137 @@ for a coding agent and a person working on the same experiments: the agent reads
 
 ## Installation
 
-Each computer has a lab of its own: a database, the commands `q`, `rec` and `lab-server`, and the
-pages at http://127.0.0.1:5000/lab. Installing has two parts, and both are needed:
+Installing sets up a lab on this computer: one database for every project's experiments, runs and
+records, the commands that write and read it, and the pages that show it. Labs on different
+computers share nothing. There are two parts, and Claude Code needs both:
 
-- the package, which gives the commands and the pages' server, installed from a terminal;
-- the Claude Code plugin, which holds only the skill `experiment-lab:experiment-db`: the agent's
-  instructions for using the commands. It does not install them.
+- The package gives three commands. `rec` writes projects, experiments and records; `q` answers
+  questions about them with an SQL query; `lab-server` serves the pages at
+  http://127.0.0.1:5000/lab. Claude Code runs `rec` and `q`; you read the pages.
+- The Claude Code plugin gives one skill, `experiment-lab:experiment-db`: instructions that tell
+  Claude Code when and how to run `rec` and `q`. Without it, Claude Code does not know about them.
+  It does not install them.
 
-It needs Linux (`start.sh` uses `setsid` and `ionice`), git,
-[uv](https://docs.astral.sh/uv/getting-started/installation/), and network access the first time q
-or the pages read the database, when DuckDB downloads its SQLite reader.
+Requirements:
 
-1. In a terminal, install the commands and start the server:
+- Linux with `curl`, `setsid` and `ionice`, which `bin/start.sh` uses.
+- git, [uv](https://docs.astral.sh/uv/getting-started/installation/) and Claude Code.
+- Network access during the install, and the first time `q` or the pages read the database, when
+  DuckDB downloads its SQLite extension into `~/.duckdb/extensions/`.
+
+Each step says where to type its commands: in a terminal, or in the prompt of a Claude Code
+session. A terminal command also runs from Claude Code's prompt with `!` before it.
+
+1. Install the commands. In a terminal:
 
    ```sh
    git clone https://github.com/dgutson/experiment-lab ~/experiment-lab
    uv tool install --editable ~/experiment-lab
+   ```
+
+   Clone to `~/experiment-lab` and nowhere else: the skill tells Claude Code that the code is
+   there. uv puts the commands in `~/.local/bin`. If uv warns that this folder is not on your PATH,
+   run `uv tool update-shell` and open a new terminal. `rec --help` then prints rec's usage.
+
+2. Start the server. In a terminal:
+
+   ```sh
    ~/experiment-lab/bin/start.sh
    ```
 
-   uv puts the commands in `~/.local/bin`. If the shell does not find `rec`, `uv tool update-shell`
-   adds that folder to the PATH of the terminals opened after it. The server runs in the background
-   until the computer restarts; after a restart, run `~/experiment-lab/bin/start.sh` again.
+   It prints `running at http://127.0.0.1:5000/lab`; open that address to see the pages. The
+   server runs in the background until the computer restarts; after a restart, run `start.sh`
+   again. Only the pages need it: `rec`, `q` and logging scripts work without it. The lab's data,
+   the database `lab.db` and the runs' files, is in `~/lab-data` (see
+   [The data folder and a project's settings](#the-data-folder-and-a-projects-settings)).
 
-2. Install the plugin, in a terminal:
+3. Install the plugin. The first command adds this repository as a marketplace, Claude Code's name
+   for a source of plugins. The second installs the plugin from it. Run them either in a terminal:
 
    ```sh
    claude plugin marketplace add dgutson/experiment-lab
    claude plugin install experiment-lab@experiment-lab-marketplace
    ```
 
-   or the same in Claude Code: `/plugin marketplace add dgutson/experiment-lab`, then
-   `/plugin install experiment-lab@experiment-lab-marketplace`. A Claude Code session that was
-   already running loads the plugin with `/reload-plugins`.
+   or in the prompt of a Claude Code session, one line at a time:
 
-3. Make the project: optional. The first time the agent records something in a folder that no
-   project holds, it makes the project there, with the name rec's message suggests (the folder's)
-   and a description it writes. Make it yourself to choose the name, which cannot be changed later
-   (the description can, with `--replace`). In a terminal, in the project's folder:
+   ```text
+   /plugin marketplace add dgutson/experiment-lab
+   /plugin install experiment-lab@experiment-lab-marketplace
+   ```
+
+   The terminal commands install it for your user, so it works in every folder; if `/plugin install`
+   asks for a scope, choose user. Claude Code sessions started afterwards have the skill; a session
+   already running gets it after `/reload-plugins`. In a terminal, `claude plugin list` shows
+   `experiment-lab@experiment-lab-marketplace` with `Status: ✔ enabled`.
+
+4. Make a project, or let Claude Code make it. A project groups the experiments, runs and records
+   of one piece of work. Its folder is normally that work's git repository. `rec` and `q` work in
+   the project whose folder contains the current folder, so Claude Code, started in the repository
+   or any folder inside it, works in that project without any setting (see
+   [Projects and the experiment tree](#projects-and-the-experiment-tree)).
+
+   You can skip this step. Then, the first time Claude Code records something in a folder outside
+   every project's folder, `rec` refuses and suggests `rec project NAME`, where NAME is the name of
+   the repository's folder, or of the current folder outside git. Claude Code then makes the
+   project, with that name or one it picks, and a one-line description it writes.
+
+   Make the project yourself to choose its name, since a project cannot be renamed. In a terminal,
+   in the repository:
 
    ```sh
    cd ~/src/my-project
    rec project my-project --text "What the project is, in one line."
    ```
 
-   Its folder is the main worktree of the git repository, else the current folder (see
-   [Projects and the experiment tree](#projects-and-the-experiment-tree)).
+   It prints `project my-project, folder ~/src/my-project, files ~/src/my-project, views none`.
+   Inside a git repository, the project's folder is the repository's top folder, from whatever
+   folder inside it you run the command; with `git worktree`, it is the main worktree's. Outside
+   git, it is the current folder. To change the description, run the same command with the new
+   `--text` and `--replace`.
 
-The agent needs nothing in its prompt or settings: q and rec find the project from the folder it
-works in. Open http://127.0.0.1:5000/lab to read what it files.
+Then work in Claude Code in that folder as usual. It uses the skill when a task is about
+experiments, their runs and numbers, or the decisions, findings, protocol rules and open questions
+about them; you can also ask it to record a decision or a finding. What it records shows at
+http://127.0.0.1:5000/lab; the picker at the top of a page chooses the project.
 
 ### Updating
 
-In a terminal:
+In a terminal, in this order:
 
-```sh
-git -C ~/experiment-lab pull
-claude plugin marketplace update experiment-lab-marketplace
-claude plugin update experiment-lab@experiment-lab-marketplace
-pkill -x lab-server; while pgrep -x lab-server > /dev/null; do sleep 1; done
-~/experiment-lab/bin/start.sh
-```
+1. Get the new code:
 
-The install is editable, so q and rec run the pulled code at once, and lab-server after the restart
-of the last two lines. The loop waits for the old server to end, since start.sh exits while one
-answers. When the pull changes `pyproject.toml`, also run
-`uv tool install --editable ~/experiment-lab --reinstall`. A Claude Code session that is running
-loads the new plugin with `/reload-plugins`.
+   ```sh
+   git -C ~/experiment-lab pull
+   ```
+
+   `q` and `rec` run it at once: uv installed the clone itself, not a copy (`--editable`). If
+   `pyproject.toml` is among the files git lists, reinstall:
+
+   ```sh
+   uv tool install --editable ~/experiment-lab --reinstall
+   ```
+
+2. Update the plugin. The first command fetches the marketplace's list of plugins, the second
+   installs the new version:
+
+   ```sh
+   claude plugin marketplace update experiment-lab-marketplace
+   claude plugin update experiment-lab@experiment-lab-marketplace
+   ```
+
+   A Claude Code session that is running gets the new version after `/reload-plugins`.
+
+3. Restart the server, which still runs the old code:
+
+   ```sh
+   pkill -x lab-server; while pgrep -x lab-server > /dev/null; do sleep 1; done
+   ~/experiment-lab/bin/start.sh
+   ```
+
+   The loop waits for the old server to stop, since start.sh starts nothing while a server answers
+   on the port. start.sh must print `running at …`; `already running at …` means the old server
+   did not stop.
 
 ## Projects and the experiment tree
 
