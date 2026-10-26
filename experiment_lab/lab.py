@@ -19,9 +19,12 @@ parent is given, and from a project's folder only that project's experiments
 are used.
 
 A run ends FINISHED when its with block ends, FAILED on an exception, KILLED
-on Ctrl-C; without a with block, call end(). Several processes may write at
-once without a server: the database is in WAL mode, every write is one short
-transaction, and a writer waits up to a minute for another's to end.
+on Ctrl-C; without a with block, call end(). For work that runs elsewhere, a
+run started before it (rec run, or lab.run without with) is ended by another
+process: lab.run_by_id(run_id).end(), end(at=ms) for an earlier end, or rec
+end. Several processes may write at once without a server: the database is in
+WAL mode, every write is one short transaction, and a writer waits up to a
+minute for another's to end.
 """
 import contextlib
 import shutil
@@ -259,6 +262,15 @@ class Lab:
             run.set_tags(tags)
         return run
 
+    def run_by_id(self, rid: str) -> "Run":
+        """The run of that id, for a process other than the one that started
+        it; it must be in the project of the current folder."""
+        found = self.db.execute("SELECT experiment FROM runs WHERE id = ?", (rid,)).fetchone()
+        if found is None:
+            raise ValueError(f"no run {rid}")
+        self.check_experiment(found[0])
+        return Run(self, rid)
+
 
 class Run:
     def __init__(self, lab: Lab, rid: str) -> None:
@@ -306,9 +318,11 @@ class Run:
                        (self.id, target.relative_to(folder).as_posix(), target.stat().st_size))
         return target
 
-    def end(self, status: str = "FINISHED") -> None:
+    def end(self, status: str = "FINISHED", at: int | None = None) -> None:
+        """Ends the run with status, at the time at (milliseconds since 1970;
+        now unless given)."""
         with self.lab.write() as db:
-            db.execute("UPDATE runs SET status = ?, end_time = ? WHERE id = ?", (status, now(), self.id))
+            db.execute("UPDATE runs SET status = ?, end_time = ? WHERE id = ?", (status, at or now(), self.id))
 
 
 if __name__ == "__main__":  # for lab-server: makes lab.db, or the tables it lacks; --delete PROJECT deletes one

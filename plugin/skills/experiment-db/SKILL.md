@@ -15,6 +15,8 @@ An experiment, in order:
 2. `rec experiment NAME --text DESCRIPTION`, with `--in PARENT` when it follows from the result of
    PARENT, an experiment of `rec tree`; without it for an idea unrelated to the earlier ones.
 3. The work, inside `with lab.run(...)` (below), so that the lab measures how long each run took.
+   For work that runs elsewhere (a background job or agent, another tool), `rec run` before it
+   starts (below).
 4. `rec add finding "TITLE" --in NAME --text "what the runs showed" --evidence run:<run id>`.
 5. If the idea failed, `rec experiment NAME --dead-end`, and the finding says why.
 
@@ -65,6 +67,12 @@ An experiment, in order:
   Open the run before the work starts, with the work inside the `with` block; the owner's pages add
   up an experiment's run durations. A run ends FINISHED
   when the `with` block ends and FAILED on an exception.
+- Work that runs outside the Python that logs it: `rec run EXPERIMENT NAME [--note T]` before it
+  starts prints the run's id. When it ends, log its results and end the run from a script,
+  `run = lab.run_by_id("<run id>")`, then `run.log_metrics(...)`, `run.log_file(...)`, `run.end()`;
+  or `rec end <run id> [--status FAILED|KILLED]`. `--at 2026-09-10T12:58` (`run.end(at=ms)`) gives
+  an end earlier than now, and `rec run --start T` a start earlier than now. A run logged after the
+  work without its times shows a duration of seconds, which the pages count as measured.
 - The owner reads the same records, experiments, runs and views at http://127.0.0.1:5000/lab, and
   searches them on its Experiments page, which searches `texts` the same way. The pages link a `file:`
   item, and a `~/` or absolute path in any text, to the file when it is under a project's folder or

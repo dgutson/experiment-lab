@@ -81,6 +81,15 @@ q "SELECT r.project FROM lab.records r"
 q --max 0 "SELECT 1 AS x"
 q --max -1 "SELECT 1 AS x"
 EXPERIMENT_LAB_DATA=~/absent/lab-data q "SELECT 1"
+id=$(rec run bitrate "background job" --note "Ran in a background job." --start 2026-09-10T12:00) && echo "$id" && rec end "$id" --at 2026-09-10T12:58 && q "SELECT name, status, started, ended, minutes, note FROM runs WHERE run = '$id'"
+rec run nowhere "a run"
+rec run "blur detector" "a run"
+rec end nosuch
+rec end "$(q --project vision "SELECT run FROM runs WHERE project = 'vision' ORDER BY name LIMIT 1")"
+rec end "$(q "SELECT run FROM runs WHERE name = 'background job'")"
+id=$(rec run bitrate "late job" --start 2026-09-10T12:00) && rec end "$id" --at 2026-09-10T11:00
+rec end x --status RUNNING
+rec end x --at yesterday
 EXPERIMENT_LAB_PORT=abc lab-server
 EXPERIMENT_LAB_PORT=70000 lab-server
 EXPERIMENT_LAB_DATA=/proc/lab-data lab-server

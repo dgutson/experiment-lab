@@ -53,8 +53,9 @@ The Experiments page shows the tree with, for each experiment, its records, when
 started (with no runs, when it was made), its processing duration (the sum of its runs' durations)
 and its clock duration (the time during which at least one of its runs was running, shorter when
 runs ran at the same time). Both say "not timed" when no run has a duration, and "running" while a
-run has not ended. The project's row covers all its experiments. A run measures its duration only when it is opened before the work starts, as a
-`with lab.run(...)` block around the work does.
+run has not ended. The project's row covers all its experiments. A run measures its duration only
+when it is opened before the work starts, as a `with lab.run(...)` block around the work does, or
+`rec run` before work that runs elsewhere (below).
 
 The Projects page lists every project, whatever the picker shows: when it was made, its description,
 its folder and the number of experiments below it and of their runs and records. Its Delete button
@@ -227,6 +228,14 @@ with lab.run("rate test", "run 1", params={"rate": 48000}, note="Markdown") as r
 
 A run ends FINISHED when its `with` block ends, FAILED on an exception and KILLED on Ctrl-C; without
 a `with` block, call `run.end()`.
+
+Work that runs outside the Python that logs it, such as a background job, another tool or a person,
+is timed by a run opened before it starts and ended by another process. `rec run EXPERIMENT NAME
+[--note T] [--start T]` starts the run and prints its id. When the work ends, a script logs its
+params, metrics and files through `lab.run_by_id(run_id)`, which refuses an id that is no run of the
+current folder's project, and calls `run.end()`; or `rec end RUN [--status FINISHED|FAILED|KILLED]
+[--at T]` ends it. `run.end(at=ms)` and `--at` give an end earlier than now; `rec end` refuses a run
+that has ended and an end before the run's start.
 
 To record a decision or finding from a script, `experiment_lab.records.add` does what `rec add`
 does.
