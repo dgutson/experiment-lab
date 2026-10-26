@@ -391,10 +391,10 @@ def covered(spans: Iterable[Span]) -> int:
 
 
 def ended_runs(con: DuckDBPyConnection) -> dict[str, Spans]:
-    """The spans of the ended runs of the view runs, per experiment."""
+    """The spans of the ended runs of the experiments of the view experiments, per experiment."""
     spans: dict[str, Spans] = {}
-    for name, start, end in con.execute("SELECT experiment, start_time, end_time FROM runs"
-                                        " WHERE end_time IS NOT NULL").fetchall():
+    for name, start, end in con.execute("SELECT r.experiment, r.start_time, r.end_time FROM lab.runs r JOIN experiments x"
+                                        " ON x.name = r.experiment WHERE r.end_time IS NOT NULL").fetchall():
         spans.setdefault(name, []).append((start, end))
     return spans
 
