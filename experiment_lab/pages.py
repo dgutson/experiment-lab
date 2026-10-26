@@ -93,9 +93,21 @@ class Shown(TypedDict):
     hidden_note: str
 
 
+class Answer(NamedTuple):
+    """A record that answers a question."""
+    id: str
+    title: str
+    kind: str
+
+
+type Answers = list[Answer]
+
+
 class Listed(TypedDict):
     """A row of the view records, its evidence a list, and filed_in, the
-    experiment it is in (experiment is the label it is shown under)."""
+    experiment it is in (experiment is the label it is shown under);
+    answered_by, the records that answer it, and unanswered, whether it is a
+    question closed with none."""
     id: str
     time: str
     project: str
@@ -108,6 +120,8 @@ class Listed(TypedDict):
     answers: str
     evidence: list[str]
     filed_in: str
+    answered_by: Answers
+    unanswered: bool
 
 
 type Listing = list[Listed]
@@ -376,10 +390,16 @@ def all_records(con: DuckDBPyConnection) -> list[Listed]:
     rows = con.execute("SELECT r.*, l.experiment AS filed_in FROM records r JOIN lab.records l USING (id)"
                        " ORDER BY r.time, r.id")
     columns = [d[0] for d in rows.description]
+    rs = [dict(zip(columns, values)) for values in rows.fetchall()]
+    answers: dict[str, Answers] = {}
+    for r in rs:
+        answers.setdefault(r["answers"], []).append(Answer(r["id"], r["title"], r["kind"]))
     return [Listed(id=r["id"], time=r["time"], project=r["project"], experiment=r["experiment"], kind=r["kind"],
                    title=r["title"], text=r["text"], author=r["author"], status=r["status"], answers=r["answers"],
-                   evidence=records.split(r["evidence"]), filed_in=r["filed_in"])
-            for r in (dict(zip(columns, values)) for values in rows.fetchall())]
+                   evidence=records.split(r["evidence"]), filed_in=r["filed_in"],
+                   answered_by=answers.get(r["id"], []),
+                   unanswered=r["kind"] == "question" and r["status"] == "closed" and r["id"] not in answers)
+            for r in rs]
 
 
 def duration(ms: float) -> str:
@@ -751,7 +771,7 @@ def create_app(data: Path) -> FastAPI:
         tops = roots(con)
         with contextlib.closing(request.app.state.views.cursor(r["project"])) as own:
             evidence = [evidence_item(item, con, own, tops, rs) for item in r["evidence"]]
-        answered_by = [x for x in rs.values() if x["answers"] == rid]
+        answered_by = [(x, md(x["text"], tops)) for x in rs.values() if x["answers"] == rid]
         cited_by = [x for x in rs.values() if f"record:{rid}" in x["evidence"]]
         return page(request, "record", r=r, text=md(r["text"], tops), evidence=evidence, answers=rs.get(r["answers"]),
                     answered_by=answered_by, cited_by=cited_by, by=r["author"] or "?", label=r["project"])

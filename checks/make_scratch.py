@@ -82,6 +82,8 @@ def main(where: str) -> None:
                 text="Every change to the dither is heard on headphones before it is kept.")
     records.add(lab, "noise shaping", "question", "Does noise shaping lower the audible noise?",
                 text="Not measured yet.")
+    records.add(lab, "noise gate", "question", "Does the gate need a hold time?", status="closed",
+                text="Not measured before the gate was dropped.")
     copied = records.add(lab, "noise gate", "finding", "Pauses sound clipped",
                          text="The gate cut the ends of words.")[0]
     copied["evidence"] = [str(tone), "https://github.com/dgutson/experiment-lab", "owner reply in chat"]
