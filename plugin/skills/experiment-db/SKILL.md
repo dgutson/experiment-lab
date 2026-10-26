@@ -52,7 +52,7 @@ An experiment, in order:
   and `--answers` closes that question. A new question is open and any other record closed;
   `--status open|closed|superseded` sets another. `--id` gives a short id (lower-case letters,
   digits and dashes), else rec makes one from the title's first words and prints it; `--time` a
-  local time as `2026-09-10T12:00`. `rec set ID FIELD=VALUE` (`status=closed`, `title=...`,
+  local time as `"2026-09-10 12:00"`. `rec set ID FIELD=VALUE` (`status=closed`, `title=...`,
   `evidence=a;b`); add and set print how many records are open, and `rec open` lists them.
   Evidence items: `run:<run id>`, `file:<~ or absolute path>`, `sql:<query over the views>`,
   `record:<id>`; rec refuses a run or record id that does not exist. rec writes `lab.db` itself;
@@ -93,7 +93,7 @@ An experiment, in order:
 - Work that runs outside the Python that logs it: `rec run EXPERIMENT NAME [--note T]` before it
   starts prints the run's id. When it ends, log its results and end the run from a script,
   `run = lab.run_by_id("<run id>")`, then `run.log_metrics(...)`, `run.log_file(...)`, `run.end()`;
-  or `rec end <run id> [--status FAILED|KILLED]`. `--at 2026-09-10T12:58` (`run.end(at=ms)`) gives
+  or `rec end <run id> [--status FAILED|KILLED]`. `--at "2026-09-10 12:58"` (`run.end(at=ms)`) gives
   an end earlier than now, and `rec run --start T` a start earlier than now. A run logged after the
   work without its times shows a duration of seconds, which the pages count as measured.
 - The owner reads the same records, experiments, runs and views at http://127.0.0.1:5000/lab, and
@@ -113,7 +113,7 @@ An experiment, in order:
 | `records` | record | id, time, project, experiment (the label it is shown under), kind, title, text, author, status, answers, evidence (items joined by `; `) |
 | `texts` | experiment, run and record | kind (`experiment`, `run` or `record`), id, project, experiment, title, text: an experiment's description; a run's note, then its params and tags as `key=value` lines; a record's text |
 
-`created`, `time`, `started` and `ended` are local time, to the minute (`2026-08-31T21:03`).
+`created`, `time`, `started` and `ended` are local time, to the minute (`2026-08-31 21:03`).
 `local_time(ms)` writes any time of the tables (milliseconds, as `lab.metrics.time`) the same way.
 
 The project's own view files are listed in its row of `lab.experiments`, column `views`; read

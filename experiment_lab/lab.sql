@@ -7,7 +7,7 @@
 
 -- A time of lab.db (milliseconds since 1970) as the views write it: local
 -- time, to the minute.
-CREATE MACRO local_time(ms) AS strftime(to_timestamp(ms / 1000), '%Y-%m-%dT%H:%M');
+CREATE MACRO local_time(ms) AS strftime(to_timestamp(ms / 1000), '%Y-%m-%d %H:%M');
 
 -- One row per experiment of current_project(): its project (the root of its
 -- tree; a project is its own), parent, depth (0 for a project), path (the
