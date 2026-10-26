@@ -71,3 +71,9 @@ FROM lab.runs r JOIN experiments x ON x.name = r.experiment
 UNION ALL
 SELECT 'record', r.id, x.project, r.experiment, r.title, r.text
 FROM lab.records r JOIN experiments x ON x.name = r.experiment;
+
+-- Whether text holds every word of words (split at white space), in any
+-- letter case: the search boxes of the pages, as in
+-- SELECT id, kind, status, title FROM records WHERE holds_words(title || ' ' || text, 'sample rate').
+CREATE MACRO holds_words(text, words) AS
+    list_bool_and([contains(lower(text), w) FOR w IN string_split_regex(lower(words), '\s+')]);

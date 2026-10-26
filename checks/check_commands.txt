@@ -267,6 +267,21 @@ rate 96000              | FAILED
 (5 rows)
 exit 0
 
+$ q "SELECT kind, id, experiment, title FROM texts WHERE holds_words(title || ' ' || text, 'RATE sweep') ORDER BY kind, id"
+kind       | id                    | experiment        | title
+-----------+-----------------------+-------------------+-----------------------
+experiment | sample rate sweep     | sample rate sweep | sample rate sweep
+record     | which-rate-do-we-keep | sample rate sweep | Which rate do we keep?
+(2 rows)
+exit 0
+
+$ q "SELECT id, kind, status, title FROM records WHERE holds_words(title || ' ' || text, 'gate  hold') ORDER BY id"
+id                             | kind     | status | title
+-------------------------------+----------+--------+--------------------------------
+does-the-gate-need-a-hold-time | question | closed | Does the gate need a hold time?
+(1 rows)
+exit 0
+
 $ q "SET TimeZone = 'UTC'; SELECT name, started, ended, minutes FROM runs WHERE experiment = 'sample rate sweep' ORDER BY name LIMIT 2"
 name       | started          | ended            | minutes
 -----------+------------------+------------------+--------

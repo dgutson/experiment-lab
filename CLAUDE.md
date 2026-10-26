@@ -111,7 +111,7 @@ changes, not for evals, checks or CI. After the change is on `main`:
   link (`url`, `file_url`, `view_url` and `query_url`, which the templates may call) and piece of
   SQL as the page shows it, and a name in SQL text through `query.literal` or `query.identifier`. A
   template's `if` only shows or hides markup or picks an attribute or a class.
-- `lab.sql` is the one set of views, with the macro `local_time`, that q and the pages run. DuckDB 1.5.5 returned wrong rows for
+- `lab.sql` is the one set of views, with the macros `local_time` and `holds_words` (the search), that q and the pages run. DuckDB 1.5.5 returned wrong rows for
   a filter over attached SQLite tables (`checks/sqlite_filter_bug.py`), which is why
   `checks/check_views.py` exists.
 

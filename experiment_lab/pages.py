@@ -1,5 +1,6 @@
 """The /lab pages. Four show the project picked at the top of them: its records
-with their evidence, its experiments as a tree with a search of their texts, its
+with their evidence and a search of them, its experiments as a tree with a
+search of their texts, its
 views with a query box, and its files folder. The pages they link to, of an
 experiment, a run, a record, a view or a file under the projects' folders and
 files folders, show the same whatever is picked, and show their project's name
@@ -125,6 +126,12 @@ class Listed(TypedDict):
 
 
 type Listing = list[Listed]
+
+
+class FoundRecord(NamedTuple):
+    """A record that the Records page's search found, and its text around the first word found."""
+    record: Listed
+    snippet: str
 type Labeled = dict[str, Listing]  # records by the label they are shown under
 
 
@@ -485,6 +492,18 @@ def tree(con: DuckDBPyConnection) -> Nodes:
     return drawn(children)
 
 
+def records_by_experiment(rs: Listing) -> dict[str, Labeled]:
+    """The records by the experiment they are filed in, then by the label they
+    are shown under, each label's in the order of KINDS, then by time."""
+    by: dict[str, Labeled] = {}
+    for r in rs:
+        by.setdefault(r["filed_in"], {}).setdefault(r["experiment"], []).append(r)
+    for labels in by.values():
+        for rows in labels.values():
+            rows.sort(key=lambda r: (records.KINDS.index(r["kind"]), r["time"]))
+    return by
+
+
 def experiment_records(e: Node, labels: Labeled) -> ExperimentRecords:
     """The experiment's records, by label in the order of their names
     ignoring case, as the records page shows them."""
@@ -503,12 +522,25 @@ def under(nodes: Iterable[Node], node: str | None, below: bool) -> list[str]:
 def search(con: DuckDBPyConnection, words: Sequence[str], experiments: Sequence[str]) -> list[Hit]:
     """Up to ROWS + 1 of the experiments, runs and records of experiments whose
     title and text (the view texts) hold every word, ignoring case."""
-    where = " AND ".join(["contains(lower(title || chr(10) || text), ?)"] * len(words))
     found = con.execute("SELECT kind, id, experiment, title, text FROM texts"
-                        f" WHERE experiment IN (SELECT unnest(?::VARCHAR[])) AND {where}"
-                        f" ORDER BY kind, experiment, title LIMIT {ROWS + 1}", [experiments, *words]).fetchall()
+                        " WHERE experiment IN (SELECT unnest(?::VARCHAR[])) AND holds_words(title || chr(10) || text, ?)"
+                        f" ORDER BY kind, experiment, title LIMIT {ROWS + 1}", [experiments, " ".join(words)]).fetchall()
     return [Hit(kind=kind, id=i, experiment=experiment, title=title, snippet=snippet(text, words))
             for kind, i, experiment, title, text in found]
+
+
+def found_records(con: DuckDBPyConnection, rs: Listing, words: Sequence[str]) -> list[FoundRecord]:
+    """Up to ROWS + 1 of rs, the project's records, whose title and text hold every word, ignoring case."""
+    ids = {i for (i,) in con.execute("SELECT id FROM records WHERE holds_words(title || chr(10) || text, ?)",
+                                     [" ".join(words)]).fetchall()}
+    return [FoundRecord(r, snippet(r["text"], words)) for r in rs if r["id"] in ids][:ROWS + 1]
+
+
+def searched(find: str) -> list[str]:
+    """The words of a search box's text, in lower case."""
+    if len(find) > LONGEST_FIND:
+        raise HTTPException(400, f"the search is longer than {LONGEST_FIND} characters")
+    return find.lower().split()
 
 
 def kind_of(item: str) -> tuple[str, str]:
@@ -631,7 +663,7 @@ def same_origin(request: Request) -> bool:
             and request.headers.get("origin") == f"http://{host}")
 
 
-def found(hits: Sequence[Hit], where: str) -> str:
+def found(hits: Sequence[object], where: str) -> str:
     """The sentence above a search's results, of which the page shows ROWS."""
     return f"{'The first ' if len(hits) > ROWS else ''}{min(len(hits), ROWS)} found in {where}."
 
@@ -683,16 +715,15 @@ def create_app(data: Path) -> FastAPI:
         return PlainTextResponse("OK")
 
     @app.get("/lab/")
-    def index(request: Request, con: DuckDBPyConnection = Depends(cursor)) -> Response:
+    def index(request: Request, find: str = "", con: DuckDBPyConnection = Depends(cursor)) -> Response:
+        """The project's records, and those whose title and text hold every word of find, ignoring case."""
         project = request.state.project
+        words = searched(find)
         rs = all_records(con)
-        by: dict[str, Labeled] = {}
-        for r in rs:
-            by.setdefault(r["filed_in"], {}).setdefault(r["experiment"], []).append(r)
-        for labels in by.values():
-            for rows in labels.values():
-                rows.sort(key=lambda r: (records.KINDS.index(r["kind"]), r["time"]))
-        return page(request, "index", open=[r for r in rs if r["status"] == "open"],
+        hits = found_records(con, rs, words) if words else None
+        by = records_by_experiment(rs)
+        return page(request, "index", find=find, hits=hits and hits[:ROWS],
+                    found=None if hits is None else found(hits, project), open=[r for r in rs if r["status"] == "open"],
                     experiments=[experiment_records(e, by[e["name"]]) for e in tree(con) if e["name"] in by],
                     errors=request.app.state.views.errors(project), picker=True)
 
@@ -703,11 +734,9 @@ def create_app(data: Path) -> FastAPI:
         runs and records whose title and text (the view texts) hold every word
         of find, ignoring case: below node when below is given, else in the
         whole project."""
-        if len(find) > LONGEST_FIND:
-            raise HTTPException(400, f"the search is longer than {LONGEST_FIND} characters")
+        words = searched(find)
         nodes = tree(con)
         node = node if node in [e["name"] for e in nodes] else request.state.project
-        words = find.lower().split()
         hits = search(con, words, under(nodes, node, bool(below))) if words else None
         where = f"{node} and below it" if below else request.state.project
         return page(request, "experiments", nodes=nodes, node=node, find=find, below=bool(below) or not words,

@@ -5,7 +5,7 @@ several projects in one SQLite database, `lab.db`. A project's experiments form 
 below the experiment that led to it, with the project at the top. `q` answers questions about runs
 and records with one DuckDB SQL query; `rec` adds and changes projects, experiments and records;
 logging scripts write runs with the module `experiment_lab.lab`; pages at `/lab` show the records
-with their evidence, the experiment tree with a search of its texts, the experiments and their runs,
+with their evidence and a search of them, the experiment tree with a search of its texts, the experiments and their runs,
 the SQL views as tables, a read-only query box, the files under the projects' folders, every
 project with a button that deletes one (Projects), and the version, repository and author of
 experiment-lab (About, from `pyproject.toml`). The
@@ -220,11 +220,14 @@ title and text. An experiment's text is its description; a run's is its note, th
 tags as `key=value` lines; a record's is its text. The search box on the Experiments page lists
 those of the picked project whose title or text holds every word searched for, in any letter case;
 with "only below" checked, only those of the experiment selected in the tree and the experiments
-below it. A search holds at most 200 characters, and a query in the query box at most 5000. An
-agent searches the same view with q:
+below it. The search box on the Records page lists the picked project's records whose title or text
+holds every word. A search holds at most 200 characters, and a query in the query box at most 5000.
+Both pages search with the macro `holds_words(text, words)`, true when text holds every word of
+words; an agent searches the same way with q:
 
 ```sh
-q "SELECT kind, id, experiment, title FROM texts WHERE contains(lower(title || ' ' || text), 'sample rate')"
+q "SELECT kind, id, experiment, title FROM texts WHERE holds_words(title || ' ' || text, 'sample rate')"
+q "SELECT id, kind, status, title FROM records WHERE holds_words(title || ' ' || text, 'sample rate')"
 ```
 
 So that the search finds them, a new experiment needs a description (what it measures and why) and
@@ -236,7 +239,7 @@ a record a text; `rec`, `lab.py` and `records.py` refuse one without. A run's no
 |---|---|
 | `experiment_lab/` | the package; its `__init__.py` lists what each module holds |
 | `experiment_lab/schema.sql` | the tables of `lab.db` |
-| `experiment_lab/lab.sql` | the views `experiments`, `runs`, `files`, `records` and `texts`, which q and the pages query |
+| `experiment_lab/lab.sql` | the views `experiments`, `runs`, `files`, `records` and `texts`, which q and the pages query, and the macros `local_time` and `holds_words` |
 | `experiment_lab/lab.py` | logging projects, experiments and runs from Python, with the standard library only |
 | `bin/start.sh` | starts the pages' server, `lab-server`, in the background |
 | `checks/check_pages.py` | opens every page of a running server and checks it |

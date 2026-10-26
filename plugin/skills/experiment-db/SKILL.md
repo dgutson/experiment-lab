@@ -6,7 +6,8 @@ description: "Experiment data kept in the lab's database, lab.db: projects with 
 # Experiment database
 
 Answer from `q` before writing a new script. To find past experiments, runs or records about a
-subject, search the view `texts` first, then query the numbers of what it finds.
+subject, search the view `texts` (or `records`) with `holds_words` first, then query the numbers of
+what it finds.
 
 An experiment, in order:
 
@@ -98,7 +99,7 @@ An experiment, in order:
   an end earlier than now, and `rec run --start T` a start earlier than now. A run logged after the
   work without its times shows a duration of seconds, which the pages count as measured.
 - The owner reads the same records, experiments, runs and views at http://127.0.0.1:5000/lab, and
-  searches them on its Experiments page, which searches `texts` the same way. The pages link a `file:`
+  searches them on its Experiments and Records pages, which search with `holds_words` too. The pages link a `file:`
   item, and a `~/` or absolute path in any text, to the file when it is under a project's folder or
   files folder, with a player for audio and the image for an image; a relative path is not linked.
   Record texts, notes, descriptions and `.md` files there are Markdown; a ```` ```mermaid ```` block
@@ -116,12 +117,14 @@ An experiment, in order:
 
 `created`, `time`, `started` and `ended` are local time, to the minute (`2026-08-31 21:03`).
 `local_time(ms)` writes any time of the tables (milliseconds, as `lab.metrics.time`) the same way.
+`holds_words(text, words)` is true when text holds every word of words, in any letter case.
 
 The project's own view files are listed in its row of `lab.experiments`, column `views`; read
 those files for what each view holds.
 
 ```sql
-SELECT kind, id, experiment, title FROM texts WHERE contains(lower(title || ' ' || text), 'sample rate');
+SELECT kind, id, experiment, title FROM texts WHERE holds_words(title || ' ' || text, 'sample rate');
+SELECT id, kind, status, title FROM records WHERE holds_words(title || ' ' || text, 'sample rate');
 SELECT id, kind, status, title FROM records WHERE status = 'open' OR kind = 'decision' ORDER BY time;
 SELECT experiment, count(*) AS runs FROM runs GROUP BY ALL ORDER BY 2 DESC;
 SELECT key, step, value FROM lab.metrics WHERE run = '<run id>' ORDER BY key, step;

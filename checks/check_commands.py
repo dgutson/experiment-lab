@@ -72,6 +72,8 @@ git -C ~/mono worktree add -q ~/mono-b && mkdir ~/mono-b/sub && cd ~/mono-b/sub 
 EXPERIMENT_LAB_DATA=~/missing/lab-data rec open
 EXPERIMENT_LAB_DATA=/proc/lab-data rec open
 q "SELECT name, status FROM runs WHERE experiment = 'sample rate sweep' ORDER BY name"
+q "SELECT kind, id, experiment, title FROM texts WHERE holds_words(title || ' ' || text, 'RATE sweep') ORDER BY kind, id"
+q "SELECT id, kind, status, title FROM records WHERE holds_words(title || ' ' || text, 'gate  hold') ORDER BY id"
 q "SET TimeZone = 'UTC'; SELECT name, started, ended, minutes FROM runs WHERE experiment = 'sample rate sweep' ORDER BY name LIMIT 2"
 q .views
 q --project vision .views

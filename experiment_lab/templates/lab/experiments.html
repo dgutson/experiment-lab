@@ -11,7 +11,7 @@
 <label><input type="checkbox" name="below" value="1"{% if below %} checked{% endif %}> only below <strong id="node-name">{{ node }}</strong></label>
 <button type="submit">Search</button>
 </div>
-<p class="note">The search finds the experiments, runs and records whose title or text holds every word searched for, in any letter case. The text is an experiment's description, a run's note, params and tags, or a record's text. In SQL, this is the view texts.</p>
+<p class="note">The search finds the experiments, runs and records whose title or text holds every word searched for, in any letter case. The text is an experiment's description, a run's note, params and tags, or a record's text. In SQL, this is the view texts and the macro holds_words.</p>
 {% if found %}
 <h2>Found</h2>
 <p class="note">{{ found }}</p>
