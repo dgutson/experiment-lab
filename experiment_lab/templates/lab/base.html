@@ -36,6 +36,11 @@ tr.superseded td, span.superseded { color: var(--muted); text-decoration: line-t
 textarea { box-sizing: border-box; width: 100%; font: 13px ui-monospace, monospace; background: var(--bg); color: var(--fg); border: 1px solid var(--line); padding: 6px; }
 nav select, input[type="search"] { font: inherit; background: var(--bg); color: var(--fg); border: 1px solid var(--line); padding: 2px 8px; }
 nav select { font-weight: 600; }
+/* The project in the picker's place: a hidden picker of the same projects keeps its width. */
+.fixed { display: inline-grid; }
+.fixed > * { grid-area: 1 / 1; }
+.fixed .sizer { visibility: hidden; }
+.fixed .label { font-weight: 600; padding: 3px 9px; }
 .find { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 10px 0 4px; }
 .find input[type="search"] { width: 20em; max-width: 100%; }
 .path { color: var(--muted); font-size: 13px; margin: 0; }
@@ -59,7 +64,7 @@ dialog h2 { margin-top: 0; }
   <strong>Lab</strong>
   {% if picker and projects %}<select aria-label="Project" onchange="document.cookie = 'project=' + encodeURIComponent(this.value) + '; path=/; max-age=31536000; samesite=lax'; const u = new window.URL(location.href); u.searchParams.delete('project'); location.href = u">
     {% for p in projects %}<option{% if p == project %} selected{% endif %}>{{ p }}</option>{% endfor %}
-  </select>{% endif %}
+  </select>{% elif projects %}<span class="fixed"><select class="sizer" aria-hidden="true" tabindex="-1">{% for p in projects %}<option>{{ p }}</option>{% endfor %}</select>{% if label %}<span class="label">{{ label }}</span>{% endif %}</span>{% endif %}
   <a href="/lab/">Records</a>
   <a href="/lab/experiments">Experiments</a>
   <a href="/lab/query">Views and query</a>

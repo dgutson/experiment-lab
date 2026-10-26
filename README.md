@@ -10,7 +10,8 @@ the SQL views as tables, a read-only query box, the files under the projects' fo
 project with a button that deletes one (Projects), and the version, repository and author of
 experiment-lab (About, from `pyproject.toml`). The
 Records, Experiments, Views and query, and Files pages show the project picked at the top of them;
-the pages they link to show the same whatever is picked, and have no picker. A view's page shows the
+the pages they link to show the same whatever is picked, and show their project's name in the
+picker's place (the Projects and About pages leave it empty). A view's page shows the
 view of the project whose query page linked it, its rows sorted by every column from the first, which
 replaces an `ORDER BY` of the view; an experiment's page shows its runs latest first. A link to
 the query box from the page of an experiment, a run or a record opens it on that item's project. It is meant

@@ -85,11 +85,9 @@ def working_folders() -> list[Path]:
     return [here, trees[0] / here.relative_to(max(own, key=lambda tree: len(tree.parts)))] if own else [here]
 
 
-def holding(projects: Iterable[Project]) -> str | None:
-    """Of the projects, the one whose folder holds the current folder or the
-    folder at the same place in its repository's main worktree, the innermost
-    if several; None if none."""
-    folders = working_folders()
+def holding(projects: Iterable[Project], folders: Iterable[Path]) -> str | None:
+    """Of the projects, the one whose folder holds any of folders, the
+    innermost if several; None if none."""
     found = [(len(Path(folder).parts), name) for name, folder in projects
              if any(f.is_relative_to(folder) for f in folders)]
     return max(found)[1] if found else None
@@ -97,10 +95,11 @@ def holding(projects: Iterable[Project]) -> str | None:
 
 def working_project(projects: Sequence[Project], named: str | None) -> str | None:
     """named, which must be one of the projects, else the project of the
-    current folder (holding); None if neither."""
+    current folder or of the folder at the same place in its repository's main
+    worktree (holding); None if neither."""
     if named and named not in [p.name for p in projects]:
         raise ValueError(f"no project {named}")
-    return named or holding(projects)
+    return named or holding(projects, working_folders())
 
 
 def absolute(path: StrPath) -> str:
