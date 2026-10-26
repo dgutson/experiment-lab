@@ -42,6 +42,8 @@ rec set no-such-record status=closed
 rec set keep-48-khz color=red
 rec set keep-48-khz status=maybe
 git -c init.defaultBranch=main init -q ~/results && git -C ~/results -c user.name=x -c user.email=x commit -q --allow-empty -m x && git -C ~/results worktree add -q ~/results-b && touch ~/results-b/out.json
+rec add finding "From stdin" --in bitrate --text - <<< $'48 kHz kept "every" word; `rate=48000`, not $RATE.\\n\\n- one\\n' && q "SELECT text FROM records WHERE id = 'from-stdin'"
+rec add finding "Empty stdin" --in bitrate --text - < /dev/null
 rec add finding "From a worktree" --in bitrate --text "x" --evidence file:~/results-b/out.json file:~/results/out.json run:x
 rec set from-a-worktree "evidence=file:~/results-b/new/out.json; file:~/audio-codec/tone.wav"
 rec experiment "blur detector" --text "x"

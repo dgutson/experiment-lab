@@ -83,7 +83,9 @@ answers, and its evidence: items `run:<run id>`, `file:<path>`, `sql:<query over
 later checkout can change the file; such a file is logged in a run and cited as `run:<run id>`. A
 new question is open and any other record closed unless a status is given, and a record that answers
 an open question closes it. The view `records` has one row per record, with its project, and the
-label as its column `experiment`.
+label as its column `experiment`. `--text -` (of `rec add`, `rec experiment` and `rec project`)
+reads the text from stdin, without its last line breaks, so a quoted heredoc
+(`--text - <<'EOF'`) or a file (`--text - < notes.md`) needs no escaping.
 
 A record's page links each item of its evidence to its page or file, and shows the rows of a `sql:`
 item. An item of no kind, which rec refuses but `lab.db` may hold, is shown as a `file:` item when it
