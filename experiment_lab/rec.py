@@ -1,6 +1,6 @@
 """Adds or changes a project, an experiment or a record (a decision, finding,
-protocol rule or question) in the lab's database, or prints the experiment
-tree.
+protocol rule or question) in the lab's database, starts or ends a run, or
+prints the experiment tree.
 
 usage: rec project NAME --text DESCRIPTION [--folder F] [--files F] [--views FILE ...]
        rec experiment NAME --text DESCRIPTION [--in PARENT] [--dead-end | --no-dead-end]
@@ -9,6 +9,8 @@ usage: rec project NAME --text DESCRIPTION [--folder F] [--files F] [--views FIL
                             [--status S] [--answers ID] [--evidence ITEM ...] [--id ID] [--time T]
        rec set ID FIELD=VALUE ...
        rec open
+       rec run EXPERIMENT NAME [--note T] [--start T]
+       rec end RUN [--status FINISHED|FAILED|KILLED] [--at T]
 
 The experiments form a tree whose roots are the projects. rec works in the
 project whose folder holds the current folder (or its git repository's main
@@ -34,7 +36,12 @@ closes that question. Evidence items are run:<run id>, file:<path>, sql:<query
 over the views> or record:<id>; add and set warn about a file: item in a linked
 git worktree, where a later checkout can change the file. set changes kind, title, text, by, status,
 experiment, answers or evidence (items separated by ";"). add, set and open
-then print the project's open records. The database is lab.db in
+then print the project's open records.
+
+run starts a run, RUNNING, in an existing experiment, for work that runs
+outside the Python that logs it, and prints its id; end ends a RUNNING run,
+FINISHED unless --status says otherwise. --start, --at and add's --time are
+local times as 2026-09-10T12:00. The database is lab.db in
 $EXPERIMENT_LAB_DATA, else ~/lab-data.
 """
 import argparse
@@ -45,11 +52,16 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from experiment_lab import records
-from experiment_lab.lab import Lab
+from experiment_lab.lab import Lab, now
 
 # rec's field names for the columns of records that differ
 COLUMNS = {"by": "author", "experiment": "label"}
 SETTABLE = ("kind", "title", "text", "by", "status", "experiment", "answers", "evidence")
+
+
+def ms(t: datetime.datetime | None) -> int | None:
+    """t in milliseconds since 1970; None if None."""
+    return None if t is None else int(t.timestamp() * 1000)
 
 
 def show(r: records.Record) -> None:
@@ -103,7 +115,7 @@ def warn_overwritable(evidence: Iterable[str]) -> None:
 def run_add(lab: Lab, a: argparse.Namespace) -> None:
     for r in records.add(lab, a.container, a.kind, a.title, label=a.experiment, text=a.text, author=a.by,
                          status=a.status, answers=a.answers, evidence=a.evidence, rid=a.id,
-                         time=a.time and int(a.time.timestamp() * 1000)):
+                         time=ms(a.time)):
         show(r)
     warn_overwritable(a.evidence)
     show_open(lab)
@@ -120,6 +132,25 @@ def run_set(lab: Lab, a: argparse.Namespace) -> None:
     show(records.change(lab, a.id, **fields))
     warn_overwritable(fields.get("evidence", []))
     show_open(lab)
+
+
+def run_run(lab: Lab, a: argparse.Namespace) -> None:
+    print(lab.run(a.experiment, a.name, note=a.note, start=ms(a.start)).id)
+
+
+def run_end(lab: Lab, a: argparse.Namespace) -> None:
+    """Ends a RUNNING run, at --at or now, which may not be before its start."""
+    run = lab.run_by_id(a.id)
+    experiment, name, status, start = lab.db.execute("SELECT experiment, name, status, start_time FROM runs"
+                                                     " WHERE id = ?", (a.id,)).fetchone()
+    end = ms(a.at) or now()
+    if status != "RUNNING":
+        raise ValueError(f"run {name} in {experiment} has ended, {status}")
+    if end < start:
+        raise ValueError(f"run {name} in {experiment} started at {datetime.datetime.fromtimestamp(start / 1000)},"
+                         " after --at")
+    run.end(a.status, at=end)
+    print(f"run {name} in {experiment}: {a.status}, {(end - start) / 60000:.1f} min")
 
 
 def parser() -> argparse.ArgumentParser:
@@ -159,6 +190,17 @@ def parser() -> argparse.ArgumentParser:
     setp.add_argument("assignments", nargs="+", metavar="FIELD=VALUE")
     setp.set_defaults(run=run_set)
     sub.add_parser("open").set_defaults(run=lambda lab, _: show_open(lab))
+    run = sub.add_parser("run")
+    run.add_argument("experiment")
+    run.add_argument("name")
+    run.add_argument("--note", default="")
+    run.add_argument("--start", type=datetime.datetime.fromisoformat)
+    run.set_defaults(run=run_run)
+    end = sub.add_parser("end")
+    end.add_argument("id", metavar="RUN")
+    end.add_argument("--status", choices=("FINISHED", "FAILED", "KILLED"), default="FINISHED")
+    end.add_argument("--at", type=datetime.datetime.fromisoformat)
+    end.set_defaults(run=run_end)
     return p
 
 

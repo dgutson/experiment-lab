@@ -377,6 +377,49 @@ $ EXPERIMENT_LAB_DATA=~/absent/lab-data q "SELECT 1"
 error: no database FOLDER/home/absent/lab-data/lab.db; rec project or a logging script makes it
 exit 1
 
+$ id=$(rec run bitrate "background job" --note "Ran in a background job." --start 2026-09-10T12:00) && echo "$id" && rec end "$id" --at 2026-09-10T12:58 && q "SELECT name, status, started, ended, minutes, note FROM runs WHERE run = '$id'"
+RUN
+run background job in bitrate: FINISHED, 58.0 min
+name           | status   | started          | ended            | minutes | note
+---------------+----------+------------------+------------------+---------+-------------------------
+background job | FINISHED | 2026-09-10T12:00 | 2026-09-10T12:58 |      58 | Ran in a background job.
+(1 rows)
+exit 0
+
+$ rec run nowhere "a run"
+error: no experiment 'nowhere'; make it with rec experiment or Lab.experiment
+exit 1
+
+$ rec run "blur detector" "a run"
+error: 'blur detector' is in the project vision, not in audio-codec, whose folder this is
+exit 1
+
+$ rec end nosuch
+error: no run nosuch
+exit 1
+
+$ rec end "$(q --project vision "SELECT run FROM runs WHERE project = 'vision' ORDER BY name LIMIT 1")"
+error: 'blur detector' is in the project vision, not in audio-codec, whose folder this is
+exit 1
+
+$ rec end "$(q "SELECT run FROM runs WHERE name = 'background job'")"
+error: run background job in bitrate has ended, FINISHED
+exit 1
+
+$ id=$(rec run bitrate "late job" --start 2026-09-10T12:00) && rec end "$id" --at 2026-09-10T11:00
+error: run late job in bitrate started at 2026-09-10 12:00:00, after --at
+exit 1
+
+$ rec end x --status RUNNING
+usage: rec end [-h] [--status {FINISHED,FAILED,KILLED}] [--at AT] RUN
+rec end: error: argument --status: invalid choice: 'RUNNING' (choose from 'FINISHED', 'FAILED', 'KILLED')
+exit 2
+
+$ rec end x --at yesterday
+usage: rec end [-h] [--status {FINISHED,FAILED,KILLED}] [--at AT] RUN
+rec end: error: argument --at: invalid fromisoformat value: 'yesterday'
+exit 2
+
 $ EXPERIMENT_LAB_PORT=abc lab-server
 error: EXPERIMENT_LAB_PORT is 'abc', not a port number
 exit 1
