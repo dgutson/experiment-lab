@@ -17,21 +17,73 @@ the query box from the page of an experiment, a run or a record opens it on that
 for a coding agent and a person working on the same experiments: the agent reads and writes with
 `q` and `rec`, the person reads the pages.
 
-| Path | What it is |
-|---|---|
-| `experiment_lab/` | the package; its `__init__.py` lists what each module holds |
-| `experiment_lab/schema.sql` | the tables of `lab.db` |
-| `experiment_lab/lab.sql` | the views `experiments`, `runs`, `files`, `records` and `texts`, which q and the pages query |
-| `experiment_lab/lab.py` | logging projects, experiments and runs from Python, with the standard library only |
-| `bin/start.sh` | starts the pages' server, `lab-server`, in the background |
-| `checks/check_pages.py` | opens every page of a running server and checks it |
-| `checks/check_views.py`, `checks/sqlite_filter_bug.py` | checks to run before changing the DuckDB version |
-| `checks/check_commands.py` | runs the commands on a new lab and compares what they print with `checks/check_commands.txt` |
-| `checks/make_scratch.py` | makes a lab with data in it, for the checks and for trying changes |
-| `evals/` | the skill's eval cases, and `run.sh`, which runs them |
-| `plugin/` | a Claude Code plugin holding the skill `experiment-db`, which tells the agent how to use q, rec and `lab.py` |
+## Installation
 
-The commands, installed with the package: `q`, `rec` and `lab-server`.
+Each computer has a lab of its own: a database, the commands `q`, `rec` and `lab-server`, and the
+pages at http://127.0.0.1:5000/lab. Installing has two parts, and both are needed:
+
+- the package, which gives the commands and the pages' server, installed from a terminal;
+- the Claude Code plugin, which holds only the skill `experiment-lab:experiment-db`: the agent's
+  instructions for using the commands. It does not install them.
+
+It needs Linux (`start.sh` uses `setsid` and `ionice`), git,
+[uv](https://docs.astral.sh/uv/getting-started/installation/), and network access the first time q
+or the pages read the database, when DuckDB downloads its SQLite reader.
+
+1. In a terminal, install the commands and start the server:
+
+   ```sh
+   git clone https://github.com/dgutson/experiment-lab ~/experiment-lab
+   uv tool install --editable ~/experiment-lab
+   ~/experiment-lab/bin/start.sh
+   ```
+
+   uv puts the commands in `~/.local/bin`. If the shell does not find `rec`, `uv tool update-shell`
+   adds that folder to the PATH of the terminals opened after it. The server runs in the background
+   until the computer restarts; after a restart, run `~/experiment-lab/bin/start.sh` again.
+
+2. Install the plugin, in a terminal:
+
+   ```sh
+   claude plugin marketplace add dgutson/experiment-lab
+   claude plugin install experiment-lab@experiment-lab-marketplace
+   ```
+
+   or the same in Claude Code: `/plugin marketplace add dgutson/experiment-lab`, then
+   `/plugin install experiment-lab@experiment-lab-marketplace`. A Claude Code session that was
+   already running loads the plugin with `/reload-plugins`.
+
+3. Make a project, once, in the project's folder. The agent makes it when rec says that no project
+   holds the folder; to make it yourself, in a terminal:
+
+   ```sh
+   cd ~/src/my-project
+   rec project my-project --text "What the project is, in one line."
+   ```
+
+   Its folder is the main worktree of the git repository, else the current folder (see
+   [Projects and the experiment tree](#projects-and-the-experiment-tree)).
+
+The agent needs nothing in its prompt or settings: q and rec find the project from the folder it
+works in. Open http://127.0.0.1:5000/lab to read what it files.
+
+### Updating
+
+In a terminal:
+
+```sh
+git -C ~/experiment-lab pull
+claude plugin marketplace update experiment-lab-marketplace
+claude plugin update experiment-lab@experiment-lab-marketplace
+pkill -x lab-server; while pgrep -x lab-server > /dev/null; do sleep 1; done
+~/experiment-lab/bin/start.sh
+```
+
+The install is editable, so q and rec run the pulled code at once, and lab-server after the restart
+of the last two lines. The loop waits for the old server to end, since start.sh exits while one
+answers. When the pull changes `pyproject.toml`, also run
+`uv tool install --editable ~/experiment-lab --reinstall`. A Claude Code session that is running
+loads the new plugin with `/reload-plugins`.
 
 ## Projects and the experiment tree
 
@@ -112,6 +164,20 @@ a record a text; `rec`, `lab.py` and `records.py` refuse one without. A run's no
 
 ## Architecture
 
+| Path | What it is |
+|---|---|
+| `experiment_lab/` | the package; its `__init__.py` lists what each module holds |
+| `experiment_lab/schema.sql` | the tables of `lab.db` |
+| `experiment_lab/lab.sql` | the views `experiments`, `runs`, `files`, `records` and `texts`, which q and the pages query |
+| `experiment_lab/lab.py` | logging projects, experiments and runs from Python, with the standard library only |
+| `bin/start.sh` | starts the pages' server, `lab-server`, in the background |
+| `checks/check_pages.py` | opens every page of a running server and checks it |
+| `checks/check_views.py`, `checks/sqlite_filter_bug.py` | checks to run before changing the DuckDB version |
+| `checks/check_commands.py` | runs the commands on a new lab and compares what they print with `checks/check_commands.txt` |
+| `checks/make_scratch.py` | makes a lab with data in it, for the checks and for trying changes |
+| `evals/` | the skill's eval cases, and `run.sh`, which runs them |
+| `plugin/` | a Claude Code plugin holding the skill `experiment-db`, which tells the agent how to use q, rec and `lab.py` |
+
 ```mermaid
 flowchart LR
     subgraph browser["Owner's browser"]
@@ -178,39 +244,7 @@ see each other's locks (https://www.sqlite.org/howtocorrupt.html, section 2.2.1)
 opens `lab.db` with both: the writers use only Python's sqlite3, and q and the pages only DuckDB.
 That is why lab-server makes a missing `lab.db` in a child process.
 
-## Setting up a computer
-
-It needs Linux (start.sh uses `setsid` and `ionice`), [uv](https://docs.astral.sh/uv/), and network
-access the first time q or the pages read the database, when DuckDB downloads its SQLite reader.
-
-```sh
-git clone https://github.com/dgutson/experiment-lab ~/experiment-lab
-uv tool install --editable ~/experiment-lab
-~/experiment-lab/bin/start.sh
-cd ~/src/my-project
-rec project my-project --text "What the project is, in one line."
-rec experiment "rate test" --text "What it measures."
-rec add question "Which sample rate do we keep?" --in "rate test" --text "..."
-q "SELECT id, kind, status, title FROM records"
-```
-
-Then open http://127.0.0.1:5000/lab. `lab.db` and its tables are made by the first program that
-writes, and by lab-server when it starts.
-
-The install is editable, so a change to the clone's Python, templates or views needs no reinstall:
-q and rec read it at once, and lab-server after a restart (a change to `lab.sql` or a view file
-shows without one). After changing `pyproject.toml`, reinstall with
-`uv tool install --editable ~/experiment-lab --reinstall`.
-
-For a Claude Code agent, install the plugin `experiment-lab`:
-
-```sh
-claude plugin marketplace add dgutson/experiment-lab
-claude plugin install experiment-lab@experiment-lab-marketplace
-```
-
-Its skill, `experiment-lab:experiment-db`, runs `q` and `rec` from the PATH, which find the project
-from the current folder, so it needs no editing.
+## The skill's evals
 
 `evals/` holds eval cases for the skill, outside `plugin/` so that an installed plugin does not
 copy them. In each case, an agent given the plugin, and one without it, does a task in a small lab
@@ -255,7 +289,8 @@ does.
 The lab's files are in the data folder, `$EXPERIMENT_LAB_DATA` (default `~/lab-data`): `lab.db`,
 the runs' files in `files/`, and start.sh's `server.log`. start.sh serves the pages on port
 `$EXPERIMENT_LAB_PORT` (default 5000) and exits at once if a server already answers there. There is
-no stop command: kill the `lab-server` process, which outlives the shell that started it.
+no stop command: kill the `lab-server` process, which outlives the shell that started it. `lab.db` and its tables
+are made by the first program that writes, and by lab-server when it starts.
 
 A project's settings are in its row of `lab.experiments`, and `rec project NAME` changes those
 given:
