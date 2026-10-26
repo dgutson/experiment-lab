@@ -49,8 +49,7 @@ project, or below an earlier experiment with `--in PARENT`; given again, `--in` 
 experiments below it. `--dead-end` marks an idea that failed, which keeps its runs and records so
 the reason can be found (a finding says why); `--no-dead-end` clears the mark. `rec tree` prints
 the project's experiments, one indented line each, with `[dead end]` after those marked so;
-`rec tree EXPERIMENT`, only those below EXPERIMENT. Experiment names are unique across the lab, so
-a name such as `baseline` can be taken by another project; name an experiment after what it tests.
+`rec tree EXPERIMENT`, only those below EXPERIMENT. Experiment names are unique across the lab.
 
 The Experiments page shows the tree with, for each experiment, its records, when its first run
 started (with no runs, when it was made), its processing duration (the sum of its runs' durations)
