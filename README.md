@@ -12,7 +12,8 @@ experiment-lab (About, from `pyproject.toml`). The
 Records, Experiments, Views and query, and Files pages show the project picked at the top of them;
 the pages they link to show the same whatever is picked, and have no picker. A view's page shows the
 view of the project whose query page linked it, its rows sorted by every column from the first, which
-replaces an `ORDER BY` of the view; an experiment's page shows its runs latest first. It is meant
+replaces an `ORDER BY` of the view; an experiment's page shows its runs latest first. A link to
+the query box from the page of an experiment, a run or a record opens it on that item's project. It is meant
 for a coding agent and a person working on the same experiments: the agent reads and writes with
 `q` and `rec`, the person reads the pages.
 
@@ -38,11 +39,12 @@ A project is an experiment with no parent. `rec project NAME --text "what the pr
 once in the project's folder, makes it; its folder is the main worktree of the current git
 repository, else the current folder (`--folder` sets another). The project of the current folder is
 the one whose folder holds it, or holds the main worktree of its git repository, so that every
-worktree of a repository shares one project. rec, q and `lab.py` work in that project, and from a
-project's folder they refuse another project's experiments. A script works in the project of its
-working folder, not of the folder the script is in. From a folder no project holds, rec and `lab.py`
-reach every project's experiments by name, and a new experiment there needs `--in` (`parent=`)
-naming the experiment or project it goes below.
+worktree of a repository shares one project. rec, q and `lab.py` work in that project: q's views
+hold only its rows (`--project P` reads another project's, `--all` every project's), and from a
+project's folder rec and `lab.py` refuse another project's experiments. A script works in the project
+of its working folder, not of the folder the script is in. From a folder no project holds, q needs
+`--project` or `--all`; rec and `lab.py` reach every project's experiments by name, and a new
+experiment there needs `--in` (`parent=`) naming the experiment or project it goes below.
 
 `rec experiment NAME --text "what it measures and why"` makes an experiment directly below the
 project, or below an earlier experiment with `--in PARENT`; given again, `--in` moves it with the
@@ -96,7 +98,7 @@ below it. A search holds at most 200 characters, and a query in the query box at
 agent searches the same view with q:
 
 ```sh
-q "SELECT kind, id, experiment, title FROM texts WHERE project = 'my-project' AND contains(lower(title || ' ' || text), 'sample rate')"
+q "SELECT kind, id, experiment, title FROM texts WHERE contains(lower(title || ' ' || text), 'sample rate')"
 ```
 
 So that the search finds them, a new experiment needs a description (what it measures and why) and
@@ -157,8 +159,8 @@ it.
 | Database | Engine | Where | Written by | Read by | Lasts |
 |---|---|---|---|---|---|
 | `lab.db` | SQLite, WAL mode | data folder | `experiment_lab.lab` and `experiment_lab.records`, with Python's sqlite3: rec, the logging scripts, and lab-server's child process that deletes a project | q and the pages, through DuckDB | always |
-| the pages' databases, one per project | DuckDB, in memory | the lab-server process | the pages: `lab.db` attached read-only as the catalog `lab`, then the views of `lab.sql` and of the project's view files | the pages, a cursor per request, with file access off | until `lab.sql`, one of the project's view files or its list of them changes |
-| q's database | DuckDB, in memory | q's process | q: `lab.db` attached read-only as the catalog `lab`, then the views of `lab.sql` and of the project's view files | the SQL given to q | one q call |
+| the pages' databases, one per project, and one of every project for the pages of an experiment, a run or a record and the Projects page | DuckDB, in memory | the lab-server process | the pages: `lab.db` attached read-only as the catalog `lab`, then the views of `lab.sql` and of the project's view files | the pages, a cursor per request, with file access off | until `lab.sql`, one of the project's view files or its list of them changes |
+| q's database | DuckDB, in memory | q's process | q: `lab.db` attached read-only as the catalog `lab`, then the views of `lab.sql` and of the project's view files (with `--all`, lab.sql's alone, over every project) | the SQL given to q | one q call |
 
 Several processes may write at once and no server is needed for it: each write is one short
 transaction that starts with `BEGIN IMMEDIATE` and waits up to 60 s for another writer to finish.
@@ -265,8 +267,8 @@ list of views.
 
 A view file holds DuckDB `CREATE VIEW` statements over the views of `lab.sql` and the tables of
 `lab.db` in the catalog `lab` (`lab.experiments`, `lab.runs`, `lab.params`, `lab.tags`,
-`lab.metrics`, `lab.files`, `lab.records`). The views of `lab.sql` hold every project's rows; their column
-`project` tells them apart. The tables keep times as milliseconds since 1970; the views' `created`,
+`lab.metrics`, `lab.files`, `lab.records`). In a project's database the views of `lab.sql` hold only
+that project's rows, whose name `current_project()` returns, and the tables every project's. The tables keep times as milliseconds since 1970; the views' `created`,
 `time`, `started` and `ended` are local time, which `local_time(ms)` writes. For example:
 
 ```sql
