@@ -2,9 +2,10 @@
 with their evidence, its experiments as a tree with a search of their texts, its
 views with a query box, and its files folder. The pages they link to, of an
 experiment, a run, a record, a view or a file under the projects' folders and
-files folders, show the same whatever is picked, and have no picker, as do the
-Projects page, which lists every project with a button that deletes one, and
-the About page.
+files folders, show the same whatever is picked, and show their project's name
+in the picker's place, with the picker's width so that the links after it stay
+where they are. The Projects page, which lists every project with a button
+that deletes one, and the About page leave that place empty.
 lab-server serves them with uvicorn at http://127.0.0.1:$EXPERIMENT_LAB_PORT
 (default 5000).
 
@@ -46,6 +47,7 @@ from markdown.treeprocessors import Treeprocessor
 from markupsafe import Markup
 
 from experiment_lab import query, records
+from experiment_lab.lab import Project, holding
 from experiment_lab.settings import data_folder
 
 HERE = Path(__file__).parent
@@ -217,9 +219,14 @@ def every_project(request: Request) -> Iterator[DuckDBPyConnection]:
 
 
 def page(request: Request, template: str, status_code: int = 200, **context: object) -> Response:
-    """The template filled with context; picker=True shows the project picker."""
-    context = {"projects": getattr(request.state, "projects", []), "project": getattr(request.state, "project", None),
-               **context}
+    """The template filled with context; picker=True shows the project picker,
+    else label, a project's name, shows in its place, which keeps the picker's
+    width so that the links after it stay where they are."""
+    projects = getattr(request.state, "projects", None)
+    if projects is None:
+        with contextlib.suppress(duckdb.Error, OSError):  # an error page of a missing lab.db
+            projects = request.app.state.views.projects()
+    context = {"projects": projects or [], "project": getattr(request.state, "project", None), **context}
     return templates.TemplateResponse(request, f"lab/{template}.html", context, status_code=status_code)
 
 
@@ -291,6 +298,12 @@ def roots(con: DuckDBPyConnection) -> list[Path]:
     """The folders whose files /lab/file serves: each project's folder and files folder."""
     return [Path(f).resolve() for row in con.execute("SELECT folder, files FROM lab.experiments"
                                                      " WHERE parent IS NULL").fetchall() for f in row]
+
+
+def holder(con: DuckDBPyConnection, target: Path) -> str | None:
+    """The project whose folder or files folder holds target, the innermost if several."""
+    rows = con.execute("SELECT name, folder, files FROM lab.experiments WHERE parent IS NULL").fetchall()
+    return holding([Project(name, f) for name, *folders in rows for f in folders], [target])
 
 
 def served(path: str, roots: Iterable[Path]) -> Path | None:
@@ -516,7 +529,7 @@ def cited_item(kind: str, value: str, label: str | None, href: str, missing: str
     return Item(kind=kind, value=value, prefix=f"{kind.capitalize()}: ", label=label, href=href, media=media_kind)
 
 
-def folder(request: Request, target: Path, tops: Iterable[Path], picker: bool) -> Response:
+def folder(request: Request, target: Path, tops: Iterable[Path], picker: bool, label: str | None) -> Response:
     """The page of a folder that /lab/file serves: its folders, then its
     files, and a link to its parent unless it is the outermost of tops that
     holds it."""
@@ -527,7 +540,7 @@ def folder(request: Request, target: Path, tops: Iterable[Path], picker: bool) -
               "size": p.stat().st_size if p.is_file() else "", "media": p.is_file() and media(p)}
              for p in entries]
     return page(request, "folder", shown=shown, items=items,
-                parent=shown_path(target.parent) if target != top else None, picker=picker)
+                parent=shown_path(target.parent) if target != top else None, picker=picker, label=label)
 
 
 def run_values(r: Mapping[str, Any]) -> dict[str, RunValues]:
@@ -702,7 +715,7 @@ def create_app(data: Path) -> FastAPI:
                               "views": ", ".join(shown_path(Path(v)) for v in views.split("; ") if v) or "none"}
         return page(request, "experiment", name=name, description=md(description, roots(con)), dead_end=dead_end,
                     above=path[:-1], branches=branches, project_settings=project, t=t,
-                    query=query_url("SELECT * " + runs, path[0]), records=rs)
+                    query=query_url("SELECT * " + runs, path[0]), records=rs, label=path[0])
 
     @app.get("/lab/run/{rid}")
     def run_page(request: Request, rid: str, con: DuckDBPyConnection = Depends(every_project)) -> Response:
@@ -719,7 +732,7 @@ def create_app(data: Path) -> FastAPI:
         logged = query_url("SELECT key, step, time, value FROM lab.metrics"
                            f" WHERE run = {query.literal(rid)} ORDER BY key, step, time", r["project"])
         return page(request, "run", r=r, note=md(r["note"], roots(con)), files=files, cited_by=cited_by, logged=logged,
-                    run_values=run_values(r))
+                    run_values=run_values(r), label=r["project"])
 
     @app.get("/lab/run/{rid}/file/{path:path}")
     def run_file(rid: str, path: str) -> FileResponse:
@@ -741,7 +754,7 @@ def create_app(data: Path) -> FastAPI:
         answered_by = [x for x in rs.values() if x["answers"] == rid]
         cited_by = [x for x in rs.values() if f"record:{rid}" in x["evidence"]]
         return page(request, "record", r=r, text=md(r["text"], tops), evidence=evidence, answers=rs.get(r["answers"]),
-                    answered_by=answered_by, cited_by=cited_by, by=r["author"] or "?")
+                    answered_by=answered_by, cited_by=cited_by, by=r["author"] or "?", label=r["project"])
 
     @app.get("/lab/view/{name}")
     def view_page(request: Request, name: str, con: DuckDBPyConnection = Depends(cursor)) -> Response:
@@ -751,7 +764,7 @@ def create_app(data: Path) -> FastAPI:
             raise HTTPException(404, f"no view {name}")
         sql = f"SELECT * FROM {query.identifier(name)} ORDER BY ALL"
         return page(request, "view", name=name, query=query_url(sql, request.state.project),
-                    t=shown(con.execute(sql), ROWS, CUT, ordered=True))
+                    t=shown(con.execute(sql), ROWS, CUT, ordered=True), label=request.state.project)
 
     @app.get("/lab/query")
     def query_page(request: Request, sql: str = "", con: DuckDBPyConnection = Depends(cursor)) -> Response:
@@ -798,10 +811,10 @@ def create_app(data: Path) -> FastAPI:
         if target is None:
             raise HTTPException(404, f"no file {path} under a project's folder or files folder")
         if target.is_dir():
-            return folder(request, target, tops, picker)
+            return folder(request, target, tops, picker, holder(con, target))
         if target.suffix == ".md" and not raw:
             return page(request, "markdown", shown=shown_path(target),
-                        text=md(target.read_text(errors="replace"), tops))
+                        text=md(target.read_text(errors="replace"), tops), label=holder(con, target))
         return send(target)
 
     return app
