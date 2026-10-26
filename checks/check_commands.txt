@@ -229,6 +229,25 @@ $ cd ~/speech && rec project speech --text "Detects speech in recordings."
 project speech, folder ~/speech, files ~/speech, views FOLDER/home/speech/views.sql; FOLDER/home/speech/missing.sql
 exit 0
 
+$ git -c init.defaultBranch=main init -q ~/mono && git -C ~/mono -c user.name=x -c user.email=x commit -q --allow-empty -m x && mkdir ~/mono/sub && cd ~/mono && rec project mono --text "A repository with a project in a subfolder."
+project mono, folder ~/mono, files ~/mono, views none
+exit 0
+
+$ cd ~/mono/sub && rec project inner --text "The project of a subfolder."
+error: FOLDER/home/mono is the folder of the project mono; --folder F (folder=F) gives this project another folder, such as --folder . for the current one
+exit 1
+
+$ cd ~/mono/sub && rec project inner --text "The project of a subfolder." --folder . && rec experiment "subfolder test" --text "x"
+project inner, folder ~/mono/sub, files ~/mono/sub, views none
+experiment inner › subfolder test
+exit 0
+
+$ git -C ~/mono worktree add -q ~/mono-b && mkdir ~/mono-b/sub && cd ~/mono-b/sub && rec tree && cd .. && rec tree
+inner  (~/mono/sub)
+  subfolder test
+mono  (~/mono)
+exit 0
+
 $ EXPERIMENT_LAB_DATA=~/missing/lab-data rec open
 open (0):
 exit 0

@@ -8,12 +8,11 @@ library, as lab.py.
 """
 import re
 import sqlite3
-import subprocess
 from collections.abc import Collection, Iterable, Mapping
 from pathlib import Path
 from typing import Any, NamedTuple, TypedDict
 
-from experiment_lab.lab import BELOW, Lab, now
+from experiment_lab.lab import BELOW, Lab, now, worktrees
 
 KINDS = ("question", "decision", "protocol", "finding")  # in the order the pages show them
 STATUSES = ("open", "closed", "superseded")
@@ -91,15 +90,9 @@ def in_linked_worktree(items: Iterable[str]) -> list[str]:
 
 def linked(path: Path) -> bool:
     """Whether path, or the nearest folder above it that exists, is in a
-    linked git worktree: one whose git folder is not the repository's."""
-    folder = next(p for p in (path, *path.parents) if p.is_dir())
-    try:
-        git = subprocess.run(["git", "-C", str(folder), "rev-parse", "--path-format=absolute", "--git-dir",
-                              "--git-common-dir"], capture_output=True, text=True, check=True)
-    except (OSError, subprocess.CalledProcessError):
-        return False
-    own, common = git.stdout.splitlines()
-    return own != common
+    linked git worktree: one other than its repository's main worktree."""
+    folder = next(p for p in (path, *path.parents) if p.is_dir()).resolve()
+    return any(folder.is_relative_to(tree) for tree in worktrees(folder)[1:])
 
 
 def get(lab: Lab, rid: str) -> Record | None:

@@ -14,8 +14,8 @@ any Python 3.12 with PYTHONPATH=<clone of experiment-lab>.
 
 The experiments form a tree whose roots are the projects. A Lab works in the
 project it is given (Lab(project="my-project")), else in the project of the
-current folder: the one whose folder holds it, or holds the main worktree of
-its git repository. A new experiment goes directly below that project unless a
+current folder: the one whose folder holds it, or holds the folder at the same
+place in its git repository's main worktree. A new experiment goes directly below that project unless a
 parent is given, and only that project's experiments, runs and records are
 used; with no project, they are refused.
 
@@ -58,20 +58,37 @@ def now() -> int:
     return int(time.time() * 1000)
 
 
-def working_folders() -> list[Path]:
-    """The current folder, then, inside a git repository, its main worktree,
-    so that the other worktrees of a repository share its project."""
-    here = Path.cwd().resolve()
+def worktrees(folder: Path) -> list[Path]:
+    """The worktrees of the git repository that holds folder, its main worktree
+    first; none without git or outside a git repository."""
     try:
-        git = subprocess.run(["git", "worktree", "list", "--porcelain"], capture_output=True, text=True, check=True)
+        git = subprocess.run(["git", "-C", str(folder), "worktree", "list", "--porcelain"], capture_output=True,
+                             text=True, check=True)
     except (OSError, subprocess.CalledProcessError):
-        return [here]
-    return [here, Path(git.stdout.split("\n", 1)[0].removeprefix("worktree ")).resolve()]
+        return []
+    return [Path(line.removeprefix("worktree ")).resolve() for line in git.stdout.splitlines()
+            if line.startswith("worktree ")]
+
+
+def top_folder() -> Path:
+    """The main worktree of the current git repository, else the current folder."""
+    return (worktrees(Path.cwd()) or [Path.cwd().resolve()])[0]
+
+
+def working_folders() -> list[Path]:
+    """The current folder, then, inside a worktree of a git repository, the
+    folder at the same place in its main worktree, so that every worktree of a
+    repository works in the same projects."""
+    here = Path.cwd().resolve()
+    trees = worktrees(here)
+    own = [tree for tree in trees if here.is_relative_to(tree)]  # a linked worktree may be inside the main one
+    return [here, trees[0] / here.relative_to(max(own, key=lambda tree: len(tree.parts)))] if own else [here]
 
 
 def holding(projects: Iterable[Project]) -> str | None:
-    """Of the projects, the one whose folder holds the current folder or its
-    repository's main worktree, the innermost if several; None if none."""
+    """Of the projects, the one whose folder holds the current folder or the
+    folder at the same place in its repository's main worktree, the innermost
+    if several; None if none."""
     folders = working_folders()
     found = [(len(Path(folder).parts), name) for name, folder in projects
              if any(f.is_relative_to(folder) for f in folders)]
@@ -96,7 +113,7 @@ def defaults(name: str, changes: dict[str, str | None]) -> dict[str, str | None]
     current folder, and its files folder its folder."""
     if not changes["description"]:
         raise ValueError(f"a new project needs a description: {name}")
-    folder = changes["folder"] or str(working_folders()[-1])
+    folder = changes["folder"] or str(top_folder())
     return {**changes, "folder": folder, "files": changes["files"] or folder}
 
 
@@ -105,7 +122,8 @@ def check_folder(db: sqlite3.Connection, name: str, folder: str | None) -> None:
     taken = folder and db.execute("SELECT name FROM experiments WHERE folder = ? AND name <> ?",
                                   (folder, name)).fetchone()
     if taken:
-        raise ValueError(f"{folder} is the folder of the project {taken[0]}")
+        raise ValueError(f"{folder} is the folder of the project {taken[0]}; --folder F (folder=F) gives this"
+                         " project another folder, such as --folder . for the current one")
 
 
 def check_description(kind: str, name: str, where: str, own: str | None, given: str | None, replace: bool) -> None:
@@ -252,7 +270,7 @@ class Lab:
         """The project the lab works in; a ValueError naming the ways to give
         one if there is none."""
         if self.current is None:
-            folder = working_folders()[-1]
+            folder = top_folder()
             raise ValueError(f'no project holds {folder}: run in a project\'s folder, name one (rec --project P,'
                              f' Lab(project="P")), or make one: rec project {folder.name}'
                              ' --text "what the project is, in one line"')

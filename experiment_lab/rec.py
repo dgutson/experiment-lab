@@ -15,7 +15,8 @@ usage: rec project NAME --text DESCRIPTION [--folder F] [--files F] [--views FIL
 
 The experiments form a tree whose roots are the projects. rec works in the
 project --project names, else in the one whose folder holds the current folder
-(or its git repository's main worktree), and uses only that project's
+(or the folder at the same place in its git repository's main worktree), and
+uses only that project's
 experiments, runs and records; with no project, it refuses them, and open
 prints every project's open records.
 
