@@ -14,7 +14,6 @@ vision
 
 usage: python3 make_lab.py [PROJECT]
 """
-import os
 import sys
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -44,7 +43,7 @@ for frame in (256, 512, 1024):
 VIEWS = """-- The sharpness the blur detector measured for each image, sharpest first.
 CREATE OR REPLACE VIEW blur_scores AS
 SELECT params['image'] AS image, metrics['sharpness'] AS sharpness
-FROM runs WHERE project = 'vision' AND experiment = 'blur detector'
+FROM runs WHERE experiment = 'blur detector'
 ORDER BY sharpness DESC;
 """
 
@@ -68,9 +67,7 @@ def main(here: str | None = None) -> None:
     for folder, name, text in ((audio, "bench.py", BENCH), (vision, "views.sql", VIEWS)):
         folder.mkdir(exist_ok=True)
         (folder / name).write_text(text)
-    lab = Lab()
-    os.chdir(lab.data)  # held by no project, so that each project's experiments may be written
-
+    lab = Lab(project="audio-codec")
     lab.project("audio-codec", "A lossy audio codec for voice recordings.", folder=audio)
     lab.experiment("sample rate sweep", "Encodes the test set at four sample rates and measures how accurately "
                    "the decoded audio matches the original.", parent="audio-codec")
@@ -93,7 +90,9 @@ def main(here: str | None = None) -> None:
                    parent="audio-codec")
     runs(lab, "noise gate", 6, [("gate -50 dB", {"threshold_db": -50}, {"bits_saved": 0.12}, "FINISHED", "")])
     finding(lab, "noise gate", "The gate saves 12% of the bits", "The gate at -50 dB saved 12% of the bits.", 7)
+    lab.close()
 
+    lab = Lab(project="vision")
     lab.project("vision", "Image quality checks for the photo archive.", folder=vision, views=[vision / "views.sql"])
     lab.experiment("blur detector", "Scores how sharp each archive photo is.", parent="vision")
     runs(lab, "blur detector", 2, [(name, {"image": name}, {"sharpness": s}, "FINISHED", "")

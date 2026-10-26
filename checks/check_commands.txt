@@ -92,7 +92,7 @@ error: evidence 'ticket:123' is not one of run:..., file:..., sql:..., record:..
 exit 1
 
 $ rec add finding "Bad time" --in bitrate --text "x" --time yesterday
-usage: rec add [-h] --in EXPERIMENT [--experiment EXPERIMENT] --text TEXT [--by BY]
+usage: rec add [-h] [--project P] --in EXPERIMENT [--experiment EXPERIMENT] --text TEXT [--by BY]
                [--status STATUS] [--answers ANSWERS] [--evidence [EVIDENCE ...]] [--id ID]
                [--time TIME]
                kind title
@@ -444,14 +444,78 @@ error: run late job in bitrate started at 2026-09-10 12:00:00, after --at
 exit 1
 
 $ rec end x --status RUNNING
-usage: rec end [-h] [--status {FINISHED,FAILED,KILLED}] [--at AT] RUN
+usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT] RUN
 rec end: error: argument --status: invalid choice: 'RUNNING' (choose from 'FINISHED', 'FAILED', 'KILLED')
 exit 2
 
 $ rec end x --at yesterday
-usage: rec end [-h] [--status {FINISHED,FAILED,KILLED}] [--at AT] RUN
+usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT] RUN
 rec end: error: argument --at: invalid fromisoformat value: 'yesterday'
 exit 2
+
+$ cd ~ && rec add finding "From home" --in bitrate --text "x"
+error: no project holds FOLDER/home: run in a project's folder, name one (rec --project P, Lab(project="P")), or make one: rec project home --text "what the project is, in one line"
+exit 1
+
+$ cd ~ && rec experiment "home test" --in bitrate --text "x"
+error: no project holds FOLDER/home: run in a project's folder, name one (rec --project P, Lab(project="P")), or make one: rec project home --text "what the project is, in one line"
+exit 1
+
+$ cd ~ && rec experiment bitrate --dead-end
+error: no project holds FOLDER/home: run in a project's folder, name one (rec --project P, Lab(project="P")), or make one: rec project home --text "what the project is, in one line"
+exit 1
+
+$ cd ~ && rec set keep-48-khz status=closed
+error: no project holds FOLDER/home: run in a project's folder, name one (rec --project P, Lab(project="P")), or make one: rec project home --text "what the project is, in one line"
+exit 1
+
+$ cd ~ && rec run bitrate "from home"
+error: no project holds FOLDER/home: run in a project's folder, name one (rec --project P, Lab(project="P")), or make one: rec project home --text "what the project is, in one line"
+exit 1
+
+$ cd ~ && python -c "from experiment_lab.lab import Lab; Lab().run('bitrate', 'from a script')"
+Traceback: ValueError: no project holds FOLDER/home: run in a project's folder, name one (rec --project P, Lab(project="P")), or make one: rec project home --text "what the project is, in one line"
+exit 1
+
+$ cd ~ && rec add finding "From home, named" --in bitrate --text "x" --project audio-codec
+from-home-named: finding, closed: From home, named
+open in audio-codec (2):
+  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+  where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
+exit 0
+
+$ cd ~ && python -c "from experiment_lab.lab import Lab; print(Lab(project='audio-codec').run('bitrate', 'from a script').id)"
+RUN
+exit 0
+
+$ rec experiment sharpness --in "blur detector" --text "Scores sharpness by edges." --project vision
+experiment vision › blur detector › sharpness
+exit 0
+
+$ rec add question "Do edges score sharpness?" --in sharpness --text "Not measured yet." --project vision
+do-edges-score-sharpness: question, open: Do edges score sharpness?
+open in vision (1):
+  do-edges-score-sharpness [sharpness, question] Do edges score sharpness?
+exit 0
+
+$ rec open --project vision
+open in vision (1):
+  do-edges-score-sharpness [sharpness, question] Do edges score sharpness?
+exit 0
+
+$ rec tree --project vision
+vision  (~/vision)
+  blur detector
+    sharpness
+exit 0
+
+$ rec add finding "Named elsewhere" --in bitrate --text "x" --project vision
+error: 'bitrate' is in the project audio-codec, not in vision, the one named
+exit 1
+
+$ rec open --project nosuch
+error: no project nosuch
+exit 1
 
 $ EXPERIMENT_LAB_PORT=abc lab-server
 error: EXPERIMENT_LAB_PORT is 'abc', not a port number

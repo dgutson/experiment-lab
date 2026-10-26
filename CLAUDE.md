@@ -84,8 +84,8 @@ changes, not for evals, checks or CI. After the change is on `main`:
 ## Architecture
 
 - Projects are the rows of `lab.experiments` with no parent; only they have `folder`, `files` and
-  `views` (a CHECK in `schema.sql`). `lab.holding` finds the project of the current folder, for
-  `Lab.current` and q.
+  `views` (a CHECK in `schema.sql`). `lab.working_project` gives the project named (`--project`,
+  `Lab(project=)`), else the project of the current folder (`lab.holding`), for `Lab.current` and q.
 - Writers: `lab.py` (projects, experiments and runs) and `records.py` (records) use only the
   standard library and Python's sqlite3, so a logging script imports them with `PYTHONPATH` alone.
   Every write is one `Lab.write()` transaction (`BEGIN IMMEDIATE`). `settings.py` and `__init__.py`

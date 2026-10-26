@@ -12,11 +12,12 @@ any Python 3.12 with PYTHONPATH=<clone of experiment-lab>.
         run.set_tags({"outcome": "pass"})
         run.log_file("plot.png")                 # copied to files/<run id>/plot.png
 
-The experiments form a tree whose roots are the projects. The project of the
-current folder is the one whose folder holds it, or holds the main worktree of
-its git repository; a new experiment goes directly below that project unless a
-parent is given, and from a project's folder only that project's experiments
-are used.
+The experiments form a tree whose roots are the projects. A Lab works in the
+project it is given (Lab(project="my-project")), else in the project of the
+current folder: the one whose folder holds it, or holds the main worktree of
+its git repository. A new experiment goes directly below that project unless a
+parent is given, and only that project's experiments, runs and records are
+used; with no project, they are refused.
 
 A run ends FINISHED when its with block ends, FAILED on an exception, KILLED
 on Ctrl-C; without a with block, call end(). For work that runs elsewhere, a
@@ -77,6 +78,14 @@ def holding(projects: Iterable[Project]) -> str | None:
     return max(found)[1] if found else None
 
 
+def working_project(projects: Sequence[Project], named: str | None) -> str | None:
+    """named, which must be one of the projects, else the project of the
+    current folder (holding); None if neither."""
+    if named and named not in [p.name for p in projects]:
+        raise ValueError(f"no project {named}")
+    return named or holding(projects)
+
+
 def absolute(path: StrPath) -> str:
     return str(Path(path).expanduser().resolve())
 
@@ -107,9 +116,11 @@ def update(db: sqlite3.Connection, name: str, changes: Mapping[str, object]) -> 
 
 
 class Lab:
-    def __init__(self, data: StrPath | None = None) -> None:
+    def __init__(self, data: StrPath | None = None, project: str | None = None) -> None:
         """Opens the data folder's lab.db, making the folder and the tables if
-        missing; with the table files, the rows of the files already logged."""
+        missing; with the table files, the rows of the files already logged.
+        The lab works in project, else in the project of the current folder."""
+        self.named = project
         self.data = Path(data) if data else data_folder()
         self.data.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(database(self.data), timeout=60, isolation_level=None)
@@ -161,9 +172,9 @@ class Lab:
 
     @cached_property
     def current(self) -> str | None:
-        """The project of the current folder (holding); None if none."""
-        return holding(Project(*row) for row in self.db.execute("SELECT name, folder FROM experiments"
-                                                                 " WHERE parent IS NULL"))
+        """The project the lab works in (working_project); None if none."""
+        return working_project([Project(*row) for row in self.db.execute("SELECT name, folder FROM experiments"
+                                                                          " WHERE parent IS NULL")], self.named)
 
     def project(self, name: str, description: str | None = None, *, folder: StrPath | None = None,
                 files: StrPath | None = None, views: Sequence[StrPath] | None = None) -> None:
@@ -214,8 +225,8 @@ class Lab:
 
     def check_parent(self, name: str, parent: str, is_project: bool) -> None:
         """Refuses parent as the parent of the experiment name: it must exist in
-        the project of the current folder, name may not be a project, and parent
-        may not be name or below it."""
+        the project the lab works in, name may not be a project, and parent may
+        not be name or below it."""
         self.check_experiment(parent)
         if is_project:
             raise ValueError(f"{name} is a project, which has no parent")
@@ -223,11 +234,13 @@ class Lab:
             raise ValueError(f"{parent} is {name} or below it")
 
     def here(self) -> str:
-        """The project of the current folder; a ValueError if none holds it."""
+        """The project the lab works in; a ValueError naming the ways to give
+        one if there is none."""
         if self.current is None:
             folder = working_folders()[-1]
-            raise ValueError(f"no project holds {folder}; make it first:"
-                             f' rec project {folder.name} --text "what the project is, in one line"')
+            raise ValueError(f'no project holds {folder}: run in a project\'s folder, name one (rec --project P,'
+                             f' Lab(project="P")), or make one: rec project {folder.name}'
+                             ' --text "what the project is, in one line"')
         return self.current
 
     def path(self, name: str | None) -> list[str]:
@@ -242,11 +255,13 @@ class Lab:
         return names
 
     def check_experiment(self, name: str) -> None:
-        """Refuses an experiment that does not exist, or that is in another
-        project than the one of the current folder."""
+        """Refuses an experiment that does not exist or is not in the project
+        the lab works in, and any experiment when it works in none."""
+        current = self.here()
         project = self.path(name)[0]
-        if self.current and project != self.current:
-            raise ValueError(f"{name!r} is in the project {project}, not in {self.current}, whose folder this is")
+        if project != current:
+            whose = "the one named" if self.named else "whose folder this is"
+            raise ValueError(f"{name!r} is in the project {project}, not in {current}, {whose}")
 
     def run(self, experiment: str, name: str, *, note: str = "", params: Mapping[str, object] | None = None,
             tags: Mapping[str, object] | None = None, start: int | None = None) -> "Run":
@@ -264,7 +279,7 @@ class Lab:
 
     def run_by_id(self, rid: str) -> "Run":
         """The run of that id, for a process other than the one that started
-        it; it must be in the project of the current folder."""
+        it; it must be in the project the lab works in."""
         found = self.db.execute("SELECT experiment FROM runs WHERE id = ?", (rid,)).fetchone()
         if found is None:
             raise ValueError(f"no run {rid}")

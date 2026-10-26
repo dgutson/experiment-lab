@@ -146,9 +146,9 @@ def add(lab: Lab, experiment: str, kind: str, title: str, *, text: str, label: s
         rid: str | None = None, time: int | None = None) -> list[Record]:
     """Adds a record to an existing experiment; returns it, and the question
     it closed if any. text (Markdown) may not be empty."""
+    lab.check_experiment(experiment)
     rid = free_id(lab, rid, title)
     question = answered(lab, answers)
-    lab.check_experiment(experiment)
     r = Record(id=rid, experiment=experiment, label=label or experiment, kind=kind, title=title, text=text,
                author=author, status=status or ("open" if kind == "question" else "closed"), answers=answers,
                evidence=list(evidence), time=time or now())
@@ -164,11 +164,13 @@ def add(lab: Lab, experiment: str, kind: str, title: str, *, text: str, label: s
 
 
 def change(lab: Lab, rid: str, **fields: str | Evidence) -> Record:
-    """Sets fields of the record (columns of records; evidence a list) and
-    checks them, not the fields it keeps; returns it."""
+    """Sets fields of the record, which must be in the project the lab works
+    in (columns of records; evidence a list), and checks them, not the fields
+    it keeps; returns it."""
     r = get(lab, rid)
     if r is None:
         raise ValueError(f"no record {rid}")
+    lab.check_experiment(r["experiment"])
     r = as_record({**r, **fields})
     check(r, fields)
     with lab.write() as db:
