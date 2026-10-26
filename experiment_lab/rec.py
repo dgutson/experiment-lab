@@ -38,9 +38,10 @@ the label it is shown under (the --in experiment unless given). KIND is
 decision, finding, protocol or question. A new question is open and any other record closed, unless --status
 says otherwise (open, closed or superseded); a record added with --answers
 closes that question. Evidence items are run:<run id>, file:<path>, sql:<query
-over the views> or record:<id>; add and set warn about a file: item in a linked
-git worktree, where a later checkout can change the file. set changes kind, title, text, by, status,
-experiment, answers or evidence (items separated by ";"). add, set and open
+over the views> or record:<id>, the run or record existing; add and set warn
+about a file: item in a linked git worktree, where a later checkout can change
+the file. set changes kind, title, text, by, status, experiment, answers or
+evidence (items separated by ";"). add, set and open
 then print the project's open records. The --text of project, experiment and
 add may be -, which reads the text from stdin, without its last line breaks:
 a quoted heredoc (--text - <<'EOF') needs no escaping.

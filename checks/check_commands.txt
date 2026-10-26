@@ -13,7 +13,7 @@ exit 0
 
 $ rec open
 open in audio-codec (1):
-  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+  does-noise-shaping-lower-the-audible [noise shaping, question] Does noise shaping lower the audible noise?
 exit 0
 
 $ rec project audio-codec --text "A lossy audio codec for voice recordings, at 48 kHz." --replace
@@ -40,13 +40,13 @@ exit 0
 $ rec add finding "64 kbit/s keeps the accuracy" --in bitrate --text "Accuracy stayed at 0.93." --time 2026-09-10T12:00 --evidence record:48-khz-is-the-most-accurate-rate "sql:SELECT name FROM runs WHERE experiment = 'bitrate'"
 64-kbit-s-keeps-the-accuracy: finding, closed: 64 kbit/s keeps the accuracy
 open in audio-codec (1):
-  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+  does-noise-shaping-lower-the-audible [noise shaping, question] Does noise shaping lower the audible noise?
 exit 0
 
 $ rec add question "Where does accuracy drop?" --in bitrate --text "Not measured below 64 kbit/s."
 where-does-accuracy-drop: question, open: Where does accuracy drop?
 open in audio-codec (2):
-  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+  does-noise-shaping-lower-the-audible [noise shaping, question] Does noise shaping lower the audible noise?
   where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
 exit 0
 
@@ -54,20 +54,20 @@ $ rec add decision "Ship 64 kbit/s" --in bitrate --experiment "the bitrate" --by
 ship-64-kbit-s: decision, closed: Ship 64 kbit/s
 where-does-accuracy-drop: question, closed: Where does accuracy drop?
 open in audio-codec (1):
-  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+  does-noise-shaping-lower-the-audible [noise shaping, question] Does noise shaping lower the audible noise?
 exit 0
 
 $ rec set where-does-accuracy-drop status=open
 where-does-accuracy-drop: question, open: Where does accuracy drop?
 open in audio-codec (2):
-  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+  does-noise-shaping-lower-the-audible [noise shaping, question] Does noise shaping lower the audible noise?
   where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
 exit 0
 
 $ rec set 64-kbit-s-keeps-the-accuracy "evidence=record:48-khz-is-the-most-accurate-rate; file:$HOME/audio-codec/tone.wav" "text=Accuracy stayed at 0.93 at 64 kbit/s."
 64-kbit-s-keeps-the-accuracy: finding, closed: 64 kbit/s keeps the accuracy
 open in audio-codec (2):
-  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+  does-noise-shaping-lower-the-audible [noise shaping, question] Does noise shaping lower the audible noise?
   where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
 exit 0
 
@@ -125,7 +125,7 @@ exit 0
 $ rec add finding "From stdin" --in bitrate --text - <<< $'48 kHz kept "every" word; `rate=48000`, not $RATE.\n\n- one\n' && q "SELECT text FROM records WHERE id = 'from-stdin'"
 from-stdin: finding, closed: From stdin
 open in audio-codec (2):
-  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+  does-noise-shaping-lower-the-audible [noise shaping, question] Does noise shaping lower the audible noise?
   where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
 48 kHz kept "every" word; `rate=48000`, not $RATE.
 
@@ -136,11 +136,41 @@ $ rec add finding "Empty stdin" --in bitrate --text - < /dev/null
 error: a record needs a text: Empty stdin
 exit 1
 
-$ rec add finding "From a worktree" --in bitrate --text "x" --evidence file:~/results-b/out.json file:~/results/out.json run:x
+$ rec add finding "Dither noise is heard below 16 bits on headphones" --in "16-bit output" --text "x"
+dither-noise-is-heard-below-16-bits-on: finding, closed: Dither noise is heard below 16 bits on headphones
+open in audio-codec (2):
+  does-noise-shaping-lower-the-audible [noise shaping, question] Does noise shaping lower the audible noise?
+  where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
+exit 0
+
+$ rec add finding "Pneumonoultramicroscopicsilicovolcanoconiosis checked" --in bitrate --text "x"
+pneumonoultramicroscopicsilicovolcanocon: finding, closed: Pneumonoultramicroscopicsilicovolcanoconiosis checked
+open in audio-codec (2):
+  does-noise-shaping-lower-the-audible [noise shaping, question] Does noise shaping lower the audible noise?
+  where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
+exit 0
+
+$ rec add finding "Cites a run" --in bitrate --text "x" --evidence "run:$(q "SELECT run FROM runs WHERE name = 'rate 48000, listened to'")" record:keep-48-khz && q "SELECT evidence FROM records WHERE id = 'cites-a-run'"
+cites-a-run: finding, closed: Cites a run
+open in audio-codec (2):
+  does-noise-shaping-lower-the-audible [noise shaping, question] Does noise shaping lower the audible noise?
+  where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
+run:RUN; record:keep-48-khz
+exit 0
+
+$ rec add finding "Cites no run" --in bitrate --text "x" --evidence run:nosuch
+error: evidence 'run:nosuch': there is no run nosuch
+exit 1
+
+$ rec set cites-a-run "evidence=record:nosuch"
+error: evidence 'record:nosuch': there is no record nosuch
+exit 1
+
+$ rec add finding "From a worktree" --in bitrate --text "x" --evidence file:~/results-b/out.json file:~/results/out.json
 from-a-worktree: finding, closed: From a worktree
 warning: file:~/results-b/out.json is in a linked git worktree, where a later checkout can change it; log the file with run.log_file and cite run:<run id>
 open in audio-codec (2):
-  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+  does-noise-shaping-lower-the-audible [noise shaping, question] Does noise shaping lower the audible noise?
   where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
 exit 0
 
@@ -148,7 +178,7 @@ $ rec set from-a-worktree "evidence=file:~/results-b/new/out.json; file:~/audio-
 from-a-worktree: finding, closed: From a worktree
 warning: file:~/results-b/new/out.json is in a linked git worktree, where a later checkout can change it; log the file with run.log_file and cite run:<run id>
 open in audio-codec (2):
-  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+  does-noise-shaping-lower-the-audible [noise shaping, question] Does noise shaping lower the audible noise?
   where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
 exit 0
 
@@ -179,7 +209,7 @@ exit 0
 
 $ cd ~ && rec open
 open (2):
-  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+  does-noise-shaping-lower-the-audible [noise shaping, question] Does noise shaping lower the audible noise?
   where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
 exit 0
 
@@ -515,7 +545,7 @@ exit 1
 $ cd ~ && rec add finding "From home, named" --in bitrate --text "x" --project audio-codec
 from-home-named: finding, closed: From home, named
 open in audio-codec (2):
-  does-noise-shaping-lower-the-audible-noi [noise shaping, question] Does noise shaping lower the audible noise?
+  does-noise-shaping-lower-the-audible [noise shaping, question] Does noise shaping lower the audible noise?
   where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
 exit 0
 
