@@ -101,7 +101,7 @@ q "SELECT r.project FROM lab.records r"
 q --max 0 "SELECT 1 AS x"
 q --max -1 "SELECT 1 AS x"
 EXPERIMENT_LAB_DATA=~/absent/lab-data q "SELECT 1"
-id=$(rec run bitrate "background job" --note "Ran in a background job." --start 2026-09-10T12:00) && echo "$id" && rec end "$id" --at 2026-09-10T12:58 && q "SELECT name, status, started, ended, minutes, note FROM runs WHERE run = '$id'"
+id=$(rec run bitrate "background job" --note "Ran in a background job." --start "2026-09-10 12:00") && echo "$id" && rec end "$id" --at "2026-09-10 12:58" && q "SELECT name, status, started, ended, minutes, note FROM runs WHERE run = '$id'"
 rec run nowhere "a run"
 rec run "blur detector" "a run"
 rec end nosuch

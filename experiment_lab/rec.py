@@ -49,7 +49,7 @@ a quoted heredoc (--text - <<'EOF') needs no escaping.
 run starts a run, RUNNING, in an existing experiment, for work that runs
 outside the Python that logs it, and prints its id; end ends a RUNNING run,
 FINISHED unless --status says otherwise. --start, --at and add's --time are
-local times as 2026-09-10T12:00. The database is lab.db in
+local times as "2026-09-10 12:00" (or 2026-09-10T12:00). The database is lab.db in
 $EXPERIMENT_LAB_DATA, else ~/lab-data.
 """
 import argparse
@@ -167,8 +167,8 @@ def run_end(lab: Lab, a: argparse.Namespace) -> None:
     if status != "RUNNING":
         raise ValueError(f"run {name} in {experiment} has ended, {status}")
     if end < start:
-        raise ValueError(f"run {name} in {experiment} started at {datetime.datetime.fromtimestamp(start / 1000)},"
-                         " after --at")
+        raise ValueError(f"run {name} in {experiment} started at"
+                         f" {datetime.datetime.fromtimestamp(start / 1000):%Y-%m-%d %H:%M}, after --at")
     run.end(a.status, at=end)
     print(f"run {name} in {experiment}: {a.status}, {(end - start) / 60000:.1f} min")
 

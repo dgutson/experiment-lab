@@ -251,8 +251,8 @@ exit 0
 $ q "SET TimeZone = 'UTC'; SELECT name, started, ended, minutes FROM runs WHERE experiment = 'sample rate sweep' ORDER BY name LIMIT 2"
 name       | started          | ended            | minutes
 -----------+------------------+------------------+--------
-rate 16000 | 2026-09-01T00:00 | 2026-09-01T00:02 |       2
-rate 44100 | 2026-09-01T00:03 | 2026-09-01T00:05 |       2
+rate 16000 | 2026-09-01 00:00 | 2026-09-01 00:02 |       2
+rate 44100 | 2026-09-01 00:03 | 2026-09-01 00:05 |       2
 (2 rows)
 exit 0
 
@@ -468,12 +468,12 @@ $ EXPERIMENT_LAB_DATA=~/absent/lab-data q "SELECT 1"
 error: no database FOLDER/home/absent/lab-data/lab.db; rec project or a logging script makes it
 exit 1
 
-$ id=$(rec run bitrate "background job" --note "Ran in a background job." --start 2026-09-10T12:00) && echo "$id" && rec end "$id" --at 2026-09-10T12:58 && q "SELECT name, status, started, ended, minutes, note FROM runs WHERE run = '$id'"
+$ id=$(rec run bitrate "background job" --note "Ran in a background job." --start "2026-09-10 12:00") && echo "$id" && rec end "$id" --at "2026-09-10 12:58" && q "SELECT name, status, started, ended, minutes, note FROM runs WHERE run = '$id'"
 RUN
 run background job in bitrate: FINISHED, 58.0 min
 name           | status   | started          | ended            | minutes | note
 ---------------+----------+------------------+------------------+---------+-------------------------
-background job | FINISHED | 2026-09-10T12:00 | 2026-09-10T12:58 |      58 | Ran in a background job.
+background job | FINISHED | 2026-09-10 12:00 | 2026-09-10 12:58 |      58 | Ran in a background job.
 (1 rows)
 exit 0
 
@@ -498,7 +498,7 @@ error: run background job in bitrate has ended, FINISHED
 exit 1
 
 $ id=$(rec run bitrate "late job" --start 2026-09-10T12:00) && rec end "$id" --at 2026-09-10T11:00
-error: run late job in bitrate started at 2026-09-10 12:00:00, after --at
+error: run late job in bitrate started at 2026-09-10 12:00, after --at
 exit 1
 
 $ rec end x --status RUNNING

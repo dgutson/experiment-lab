@@ -276,7 +276,8 @@ A view file holds DuckDB `CREATE VIEW` statements over the views of `lab.sql` an
 that project's rows, whose name `current_project()` returns, and the tables every project's;
 `data_folder()` returns the data folder's absolute path, which the view `files` uses for each
 logged file's `path`. The tables keep times as milliseconds since 1970; the views' `created`,
-`time`, `started` and `ended` are local time, which `local_time(ms)` writes. For example:
+`time`, `started` and `ended` are local time to the minute, as `2026-08-31 21:03`, which
+`local_time(ms)` writes. For example:
 
 ```sql
 -- One row per finished run of "rate test", with its accuracy.
