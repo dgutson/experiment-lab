@@ -58,27 +58,31 @@ def now() -> int:
     return int(time.time() * 1000)
 
 
-def git(*args: str) -> list[str] | None:
-    """The lines git prints for args; None without git or outside a git repository."""
+def worktrees(folder: Path) -> list[Path]:
+    """The worktrees of the git repository that holds folder, its main worktree
+    first; none without git or outside a git repository."""
     try:
-        return subprocess.run(["git", *args], capture_output=True, text=True, check=True).stdout.splitlines()
+        git = subprocess.run(["git", "-C", str(folder), "worktree", "list", "--porcelain"], capture_output=True,
+                             text=True, check=True)
     except (OSError, subprocess.CalledProcessError):
-        return None
+        return []
+    return [Path(line.removeprefix("worktree ")).resolve() for line in git.stdout.splitlines()
+            if line.startswith("worktree ")]
 
 
 def top_folder() -> Path:
     """The main worktree of the current git repository, else the current folder."""
-    worktrees = git("worktree", "list", "--porcelain")
-    return Path(worktrees[0].removeprefix("worktree ") if worktrees else ".").resolve()
+    return (worktrees(Path.cwd()) or [Path.cwd().resolve()])[0]
 
 
 def working_folders() -> list[Path]:
-    """The current folder, then, inside a git repository, the folder at the
-    same place in its main worktree, so that every worktree of a repository
-    works in the same projects."""
+    """The current folder, then, inside a worktree of a git repository, the
+    folder at the same place in its main worktree, so that every worktree of a
+    repository works in the same projects."""
     here = Path.cwd().resolve()
-    prefix = git("rev-parse", "--show-prefix")
-    return [here, top_folder() / prefix[0]] if prefix else [here]
+    trees = worktrees(here)
+    own = [tree for tree in trees if here.is_relative_to(tree)]  # a linked worktree may be inside the main one
+    return [here, trees[0] / here.relative_to(max(own, key=lambda tree: len(tree.parts)))] if own else [here]
 
 
 def holding(projects: Iterable[Project]) -> str | None:
