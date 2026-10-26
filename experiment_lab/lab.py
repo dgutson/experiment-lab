@@ -108,6 +108,14 @@ def check_folder(db: sqlite3.Connection, name: str, folder: str | None) -> None:
         raise ValueError(f"{folder} is the folder of the project {taken[0]}")
 
 
+def check_description(kind: str, name: str, where: str, own: str | None, given: str | None, replace: bool) -> None:
+    """Refuses given as the description of the existing experiment or project
+    (kind) name, unless it is its own or replace; where tells which it is."""
+    if given and given != own and not replace:
+        raise ValueError(f"{kind} {name} exists ({where}); a new {kind} needs another name;"
+                         " --replace (replace=True) changes its description")
+
+
 def update(db: sqlite3.Connection, name: str, changes: Mapping[str, object]) -> None:
     """Sets those columns of the experiment's row that changes gives as not None."""
     for column, value in changes.items():
@@ -177,22 +185,26 @@ class Lab:
                                                                           " WHERE parent IS NULL")], self.named)
 
     def project(self, name: str, description: str | None = None, *, folder: StrPath | None = None,
-                files: StrPath | None = None, views: Sequence[StrPath] | None = None) -> None:
+                files: StrPath | None = None, views: Sequence[StrPath] | None = None, replace: bool = False) -> None:
         """Makes the project, an experiment with no parent, if there is none of
-        that name, or changes what is given. A new project needs a description
-        (one line: what the project is). Its folder is by default the main
-        worktree of the current git repository, else the current folder; files,
-        the folder its files page shows, is by default its folder; views lists
-        its view files."""
+        that name, or changes what is given; a description other than its own
+        only with replace. A new project needs a description (one line: what
+        the project is). Its folder is by default the main worktree of the
+        current git repository, else the current folder; files, the folder its
+        files page shows, is by default its folder; views lists its view
+        files."""
         changes = {"description": description or None, "folder": absolute(folder) if folder else None,
                    "files": absolute(files) if files else None,
                    "views": None if views is None else "; ".join(map(absolute, views))}
         with self.write() as db:
-            found = db.execute("SELECT parent FROM experiments WHERE name = ?", (name,)).fetchone()
+            found = db.execute("SELECT parent, folder, description FROM experiments WHERE name = ?",
+                               (name,)).fetchone()
             if found is None:
                 changes = defaults(name, changes)
             elif found[0] is not None:
                 raise ValueError(f"{name} is an experiment below {found[0]}, not a project")
+            else:
+                check_description("project", name, f"folder {found[1]}", found[2], description, replace)
             check_folder(db, name, changes["folder"])
             if found is None:
                 db.execute("INSERT INTO experiments (name, created, folder, files) VALUES (?, ?, ?, ?)",
@@ -201,21 +213,24 @@ class Lab:
         self.__dict__.pop("current", None)
 
     def experiment(self, name: str, description: str | None = None, *, parent: str | None = None,
-                   dead_end: bool | None = None) -> list[str]:
+                   dead_end: bool | None = None, replace: bool = False) -> list[str]:
         """Makes the experiment if there is none of that name, below parent (by
         default the project of the current folder), or changes what is given:
         its description (Markdown: what it measures and why, which a new
-        experiment needs and a search finds), its parent (moving it with the
-        experiments below it), whether it is a dead end (an idea that failed).
-        Returns the names from its project down to it."""
+        experiment needs and a search finds), other than its own only with
+        replace; its parent (moving it with the experiments below it); whether
+        it is a dead end (an idea that failed). Returns the names from its
+        project down to it."""
         with self.write() as db:
-            found = db.execute("SELECT parent FROM experiments WHERE name = ?", (name,)).fetchone()
+            found = db.execute("SELECT parent, description FROM experiments WHERE name = ?", (name,)).fetchone()
             if found is None:
                 if not description:
                     raise ValueError(f"a new experiment needs a description: {name}")
                 parent = parent or self.here()
             else:
-                self.check_experiment(name)
+                self.check_experiment(name, "; experiment names are unique across the lab, so a new experiment"
+                                            " needs another name")
+                check_description("experiment", name, " › ".join(self.path(name)), found[1], description, replace)
             if parent is not None:
                 self.check_parent(name, parent, is_project=found is not None and found[0] is None)
             if found is None:
@@ -254,14 +269,15 @@ class Lab:
             name = found[0]
         return names
 
-    def check_experiment(self, name: str) -> None:
+    def check_experiment(self, name: str, hint: str = "") -> None:
         """Refuses an experiment that does not exist or is not in the project
-        the lab works in, and any experiment when it works in none."""
+        the lab works in, the latter with hint at the end, and any experiment
+        when it works in none."""
         current = self.here()
         project = self.path(name)[0]
         if project != current:
             whose = "the one named" if self.named else "whose folder this is"
-            raise ValueError(f"{name!r} is in the project {project}, not in {current}, {whose}")
+            raise ValueError(f"{name!r} is in the project {project}, not in {current}, {whose}{hint}")
 
     def run(self, experiment: str, name: str, *, note: str = "", params: Mapping[str, object] | None = None,
             tags: Mapping[str, object] | None = None, start: int | None = None) -> "Run":

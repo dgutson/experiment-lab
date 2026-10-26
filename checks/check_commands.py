@@ -21,7 +21,7 @@ COMMANDS = """
 rec tree
 rec tree "16-bit output"
 rec open
-rec project audio-codec --text "A lossy audio codec for voice recordings, at 48 kHz."
+rec project audio-codec --text "A lossy audio codec for voice recordings, at 48 kHz." --replace
 rec experiment bitrate --in "sample rate sweep" --text "Lowers the bitrate at 48 kHz until accuracy drops."
 rec experiment "noise gate" --dead-end
 rec tree
@@ -45,6 +45,10 @@ git -c init.defaultBranch=main init -q ~/results && git -C ~/results -c user.nam
 rec add finding "From a worktree" --in bitrate --text "x" --evidence file:~/results-b/out.json file:~/results/out.json run:x
 rec set from-a-worktree "evidence=file:~/results-b/new/out.json; file:~/audio-codec/tone.wav"
 rec experiment "blur detector" --text "x"
+rec experiment "noise shaping" --text "A new idea."
+rec experiment bitrate --in "sample rate sweep" --text "Lowers the bitrate at 48 kHz until accuracy drops."
+rec experiment bitrate --text "Lowers the bitrate until accuracy drops." --replace && q "SELECT description FROM experiments WHERE name = 'bitrate'"
+rec project audio-codec --text "A new project."
 rec tree "blur detector"
 cd ~ && rec open
 rec project audio-codec --files ~/nowhere
@@ -53,6 +57,7 @@ cd ~/speech && rec project speech --text "Detects speech in recordings."
 cd ~/speech && rec experiment vad --text "Voice activity detection." && rec tree
 echo "CREATE VIEW broken AS SELECT nosuch FROM runs;" > ~/speech/views.sql
 cd ~/speech && rec project speech --views views.sql missing.sql && q .views
+cd ~/speech && rec project speech --text "Detects speech in recordings."
 EXPERIMENT_LAB_DATA=~/missing/lab-data rec open
 EXPERIMENT_LAB_DATA=/proc/lab-data rec open
 q "SELECT name, status FROM runs WHERE experiment = 'sample rate sweep' ORDER BY name"

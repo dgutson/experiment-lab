@@ -2,8 +2,8 @@
 protocol rule or question) in the lab's database, starts or ends a run, or
 prints the experiment tree.
 
-usage: rec project NAME --text DESCRIPTION [--folder F] [--files F] [--views FILE ...]
-       rec experiment NAME --text DESCRIPTION [--in PARENT] [--dead-end | --no-dead-end]
+usage: rec project NAME --text DESCRIPTION [--folder F] [--files F] [--views FILE ...] [--replace]
+       rec experiment NAME --text DESCRIPTION [--in PARENT] [--dead-end | --no-dead-end] [--replace]
        rec tree [EXPERIMENT]
        rec add KIND "TITLE" --in EXPERIMENT --text T [--experiment LABEL] [--by WHO]
                             [--status S] [--answers ID] [--evidence ITEM ...] [--id ID] [--time T]
@@ -25,8 +25,10 @@ description; given again, it changes what is given. --files is the folder its
 files page shows (its folder unless given), --views its view files, run after
 lab.sql. experiment makes an experiment directly below the project, or below
 --in PARENT, with a description (Markdown: what it measures and why); given
-again, it changes the description, moves it below --in, or marks it as a dead
-end (an idea that failed; a finding says why) or not. tree prints the
+again, it moves it below --in, or marks it as a dead end (an idea that failed;
+a finding says why) or not. A description other than an existing project's or
+experiment's own is refused unless --replace, since a new one needs a name
+that no experiment of the lab has. tree prints the
 project's experiments, or those below EXPERIMENT, one per line, indented, with
 [dead end] after those marked so.
 
@@ -84,14 +86,15 @@ def show_open(lab: Lab) -> None:
 
 
 def run_project(lab: Lab, a: argparse.Namespace) -> None:
-    lab.project(a.name, a.text, folder=a.folder, files=a.files, views=a.views)
+    lab.project(a.name, a.text, folder=a.folder, files=a.files, views=a.views, replace=a.replace)
     folder, files, views = lab.db.execute("SELECT folder, files, views FROM experiments WHERE name = ?",
                                           (a.name,)).fetchone()
     print(f"project {a.name}, folder {shown(folder)}, files {shown(files)}, views {views or 'none'}")
 
 
 def run_experiment(lab: Lab, a: argparse.Namespace) -> None:
-    print("experiment " + " › ".join(lab.experiment(a.name, a.text, parent=a.parent, dead_end=a.dead_end)))
+    print("experiment " + " › ".join(lab.experiment(a.name, a.text, parent=a.parent, dead_end=a.dead_end,
+                                                    replace=a.replace)))
 
 
 def run_tree(lab: Lab, a: argparse.Namespace) -> None:
@@ -161,15 +164,17 @@ def parser() -> argparse.ArgumentParser:
     p.set_defaults(project=None)
     named = argparse.ArgumentParser(add_help=False)  # the options of every command but project
     named.add_argument("--project", metavar="P")
+    replace = argparse.ArgumentParser(add_help=False)  # the options of project and experiment
+    replace.add_argument("--replace", action="store_true")
     sub = p.add_subparsers(dest="command", required=True)
-    project = sub.add_parser("project")
+    project = sub.add_parser("project", parents=[replace])
     project.add_argument("name")
     project.add_argument("--text")
     project.add_argument("--folder")
     project.add_argument("--files")
     project.add_argument("--views", nargs="*")
     project.set_defaults(run=run_project)
-    exp = sub.add_parser("experiment", parents=[named])
+    exp = sub.add_parser("experiment", parents=[named, replace])
     exp.add_argument("name")
     exp.add_argument("--text")
     exp.add_argument("--in", dest="parent", metavar="PARENT")
