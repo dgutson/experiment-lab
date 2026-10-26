@@ -14,7 +14,9 @@ usage: rec project NAME --text DESCRIPTION [--folder F] [--files F] [--views FIL
 
 The experiments form a tree whose roots are the projects. rec works in the
 project whose folder holds the current folder (or its git repository's main
-worktree), and uses only that project's experiments.
+worktree), and uses only that project's experiments; from a folder no project
+holds, it reaches every project's experiments by name, which are unique across
+the lab, and a new experiment needs --in.
 
 project makes a project, once, from its folder (by default the current git
 repository's main worktree, else the current folder), with a one-line
@@ -28,9 +30,9 @@ project's experiments, or those below EXPERIMENT, one per line, indented, with
 [dead end] after those marked so.
 
 add files a record, whose text (Markdown) may not be empty, in the experiment
-named by --in, which must exist; --experiment gives the label it is shown under
-(the --in experiment unless given). KIND is decision, finding, protocol or
-question. A new question is open and any other record closed, unless --status
+named by --in, which must exist, or in the project itself; --experiment gives
+the label it is shown under (the --in experiment unless given). KIND is
+decision, finding, protocol or question. A new question is open and any other record closed, unless --status
 says otherwise (open, closed or superseded); a record added with --answers
 closes that question. Evidence items are run:<run id>, file:<path>, sql:<query
 over the views> or record:<id>; add and set warn about a file: item in a linked
