@@ -2,9 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-`README.md` is the user documentation: projects and the experiment tree, the record format, the
-architecture diagram, the table of databases, setup, logging from Python, a project's settings,
-and the steps for changing the Mermaid or DuckDB version. Read it before changing behavior. This
+`README.md` is the user documentation: installation and updating, projects and the experiment tree,
+the record format, the architecture diagram, the table of databases, logging from Python, a
+project's settings, and the steps for changing the Mermaid or DuckDB version. Read it before changing behavior. This
 file holds what a developer needs beyond it.
 
 ## Commands
