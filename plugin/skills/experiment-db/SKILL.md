@@ -26,6 +26,9 @@ An experiment, in order:
 - The lab holds several projects. q, rec and `lab.py` work in the project of the current folder
   (the one whose folder holds it or its git repository's main worktree). If rec says no project
   holds the folder, make it once there: `rec project NAME --text "what the project is, in one line"`.
+  A script works in the project of its working folder, not of the folder the script is in; from a
+  folder no project holds, rec and `lab.py` reach every project's experiments by name, and a new
+  experiment there needs `--in` (`parent=`) naming its parent or the project.
 - `q "SQL"` runs DuckDB SQL over the views (those of `experiment_lab/lab.sql`, then the project's
   view files; `--project P` for another project's) on `lab.db`, attached read-only as the catalog
   `lab`, and prints at most 40 rows (`--max N`, `--full` for long cells) of the last statement,
@@ -40,12 +43,17 @@ An experiment, in order:
 - `rec experiment NAME --text DESCRIPTION [--in PARENT] [--dead-end | --no-dead-end]` makes an
   experiment, or changes it when it exists. A new experiment needs a description, in Markdown: what
   it measures and why, in the words a later search would use.
-  `rec add KIND "TITLE" --in EXPERIMENT --text T [--experiment LABEL] [--by WHO]
-  [--answers ID] [--evidence ITEM ...]` records a decision, finding, protocol rule or question in an
-  existing experiment; its text may not be empty, and `--answers` closes that question. `rec set ID FIELD=VALUE` (`status=closed`,
-  `title=...`, `evidence=a;b`); `rec open`. Evidence items: `run:<run id>`, `file:<~ or absolute
-  path>`, `sql:<query over the views>`, `record:<id>`. rec writes `lab.db` itself; no server is
-  needed, and a text has no length limit.
+  `rec add KIND "TITLE" --in EXPERIMENT --text T [--experiment LABEL] [--by WHO] [--status S]
+  [--answers ID] [--evidence ITEM ...] [--id ID] [--time T]` records a decision, finding, protocol
+  rule or question, KIND `decision`, `finding`, `protocol` or `question`, in an existing experiment,
+  or with `--in PROJECT` in the project itself when no experiment fits. Its text may not be empty,
+  and `--answers` closes that question. A new question is open and any other record closed;
+  `--status open|closed|superseded` sets another. `--id` gives a short id (lower-case letters,
+  digits and dashes), else rec makes one from the title and prints it; `--time` a local time as
+  `2026-09-10T12:00`. `rec set ID FIELD=VALUE` (`status=closed`, `title=...`, `evidence=a;b`);
+  `rec open`. Evidence items: `run:<run id>`, `file:<~ or absolute path>`, `sql:<query over the
+  views>`, `record:<id>`. rec writes `lab.db` itself; no server is needed, and a text has no length
+  limit.
 - Evidence must show later what it showed when the record was written. Log a file that a later run
   or checkout can overwrite, and numbers, in a run (`run.log_file`, below) and cite `run:<run id>`;
   `file:` is for a file that stays as it is, such as one committed to git. rec warns about a

@@ -39,15 +39,17 @@ once in the project's folder, makes it; its folder is the main worktree of the c
 repository, else the current folder (`--folder` sets another). The project of the current folder is
 the one whose folder holds it, or holds the main worktree of its git repository, so that every
 worktree of a repository shares one project. rec, q and `lab.py` work in that project, and from a
-project's folder they refuse another project's experiments.
+project's folder they refuse another project's experiments. A script works in the project of its
+working folder, not of the folder the script is in. From a folder no project holds, rec and `lab.py`
+reach every project's experiments by name, and a new experiment there needs `--in` (`parent=`)
+naming the experiment or project it goes below.
 
 `rec experiment NAME --text "what it measures and why"` makes an experiment directly below the
 project, or below an earlier experiment with `--in PARENT`; given again, `--in` moves it with the
 experiments below it. `--dead-end` marks an idea that failed, which keeps its runs and records so
 the reason can be found (a finding says why); `--no-dead-end` clears the mark. `rec tree` prints
 the project's experiments, one indented line each, with `[dead end]` after those marked so;
-`rec tree EXPERIMENT`, only those below EXPERIMENT.
-Experiment names are unique across the lab.
+`rec tree EXPERIMENT`, only those below EXPERIMENT. Experiment names are unique across the lab.
 
 The Experiments page shows the tree with, for each experiment, its records, when its first run
 started (with no runs, when it was made), its processing duration (the sum of its runs' durations)
@@ -69,8 +71,8 @@ address, since a page of any website can post a form to `127.0.0.1`.
 
 ## Records
 
-A record is a row of the table `records`: an id, the experiment it is filed in, the label it is
-shown under (the experiment's name unless given), a kind (decision, finding, protocol or question),
+A record is a row of the table `records`: an id, the experiment it is filed in (the project itself
+for a record that no experiment fits, with `rec add --in PROJECT`), the label it is shown under (the experiment's name unless given), a kind (decision, finding, protocol or question),
 a title, a text in Markdown, an author, a status (open, closed or superseded), the question it
 answers, and its evidence: items `run:<run id>`, `file:<path>`, `sql:<query over the views>` or
 `record:<id>`, joined by `; `. rec warns about a `file:` item in a linked git worktree, where a
