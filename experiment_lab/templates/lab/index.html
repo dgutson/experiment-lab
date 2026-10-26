@@ -1,5 +1,5 @@
 {% extends "lab/base.html" %}
-{% from "lab/macros.html" import dead_end_label, view_errors, no_project %}
+{% from "lab/macros.html" import answered, dead_end_label, view_errors, no_project %}
 {% block title %}Records{% endblock %}
 {% block main %}
 <h1>Records</h1>
@@ -11,7 +11,7 @@
 <table class="sortable">
 <thead><tr><th>Title</th><th>Kind</th><th>Experiment</th><th>By</th><th>Time</th></tr></thead>
 <tbody>
-{% for r in open %}<tr><td><a href="{{ url('record', r.id) }}">{{ r.title }}</a></td><td>{{ r.kind }}</td><td>{{ r.experiment }}</td><td>{{ r.author }}</td><td>{{ r.time }}</td></tr>
+{% for r in open %}<tr><td><a href="{{ url('record', r.id) }}">{{ r.title }}</a>{{ answered(r) }}</td><td>{{ r.kind }}</td><td>{{ r.experiment }}</td><td>{{ r.author }}</td><td>{{ r.time }}</td></tr>
 {% endfor %}
 </tbody>
 </table>
@@ -25,7 +25,7 @@
 <table class="sortable">
 <thead><tr><th>Kind</th><th>Status</th><th>Title</th><th>By</th><th>Time</th></tr></thead>
 <tbody>
-{% for r in rows %}<tr class="{{ r.status }}"><td>{{ r.kind }}</td><td>{{ r.status }}</td><td><a href="{{ url('record', r.id) }}">{{ r.title }}</a></td><td>{{ r.author }}</td><td>{{ r.time }}</td></tr>
+{% for r in rows %}<tr class="{{ r.status }}"><td>{{ r.kind }}</td><td>{{ r.status }}</td><td><a href="{{ url('record', r.id) }}">{{ r.title }}</a>{{ answered(r) }}</td><td>{{ r.author }}</td><td>{{ r.time }}</td></tr>
 {% endfor %}
 </tbody>
 </table>

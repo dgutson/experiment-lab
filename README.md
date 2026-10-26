@@ -208,7 +208,8 @@ label as its column `experiment`. `--text -` (of `rec add`, `rec experiment` and
 reads the text from stdin, without its last line breaks, so a quoted heredoc
 (`--text - <<'EOF'`) or a file (`--text - < notes.md`) needs no escaping.
 
-A record's page links each item of its evidence to its page or file, and shows the rows of a `sql:`
+The Records page shows, under a question's title, the records that answer it, or that it was
+closed without an answer; a question's page shows each answer's text. A record's page links each item of its evidence to its page or file, and shows the rows of a `sql:`
 item. An item of no kind, which rec refuses but `lab.db` may hold, is shown as a `file:` item when it
 is a `~/` or absolute path, as a link when it is an `http(s)` URL, and as text otherwise.
 

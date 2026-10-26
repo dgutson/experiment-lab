@@ -6,8 +6,14 @@
 <p class="meta">{{ r.kind }} · <span class="{{ r.status }}">{{ r.status }}</span> · by {{ by }} · {{ r.time }} · {{ r.experiment }} ·
   in <a href="{{ url('experiment', r.filed_in) }}">{{ r.filed_in }}</a> · id {{ r.id }}</p>
 {% if answers %}<p>Answers <a href="{{ url('record', answers.id) }}">{{ answers.title }}</a> ({{ answers.kind }}, {{ answers.status }}).</p>{% endif %}
-{% for x in answered_by %}<p>Answered by <a href="{{ url('record', x.id) }}">{{ x.title }}</a> ({{ x.kind }}, {{ x.time }}).</p>{% endfor %}
+{% if r.unanswered %}<p>Closed without an answer.</p>{% endif %}
 {{ text }}
+{% for x, answer in answered_by %}<div class="answer">
+<h2>Answered by <a href="{{ url('record', x.id) }}">{{ x.title }}</a></h2>
+<p class="meta">{{ x.kind }} · by {{ x.author }} · {{ x.time }}</p>
+{{ answer }}
+</div>
+{% endfor %}
 <h2>Evidence</h2>
 {% if not evidence %}<p>None listed.</p>{% endif %}
 {% for e in evidence %}
