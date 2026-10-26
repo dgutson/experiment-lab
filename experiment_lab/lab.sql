@@ -44,8 +44,10 @@ FROM lab.runs r JOIN experiments x ON x.name = r.experiment
 LEFT JOIN t ON t.run = r.id LEFT JOIN p ON p.run = r.id LEFT JOIN m ON m.run = r.id;
 
 -- One row per file logged for a run: run, experiment, project, name (which may
--- hold folders) and bytes. The copy is files/<run>/<name> in the data folder.
-CREATE VIEW files AS SELECT f.run, r.experiment, x.project, f.name, f.bytes
+-- hold folders), bytes and path, the absolute path of the copy, files/<run>/<name>
+-- in the data folder (the macro data_folder(), which query.attach makes).
+CREATE VIEW files AS SELECT f.run, r.experiment, x.project, f.name, f.bytes,
+    data_folder() || '/files/' || f.run || '/' || f.name AS path
 FROM lab.files f JOIN lab.runs r ON r.id = f.run JOIN experiments x ON x.name = r.experiment;
 
 -- Decisions, findings, protocol rules and questions. experiment is the label a

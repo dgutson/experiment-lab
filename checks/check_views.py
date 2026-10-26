@@ -44,6 +44,7 @@ def read(copy: bool, project: str | None) -> dict[str, Sum]:
                                     " WHERE table_catalog = 'source'").fetchall():
             con.execute(f"CREATE TABLE lab.{table} AS FROM source.{table}")
         con.execute("DETACH source")
+        con.execute(f"CREATE MACRO data_folder() AS {query.literal(str(data.resolve()))}")  # as query.attach
         sources = query.make_views(con, project)
     else:
         con, sources = query.connect(data, project)

@@ -273,7 +273,9 @@ list of views.
 A view file holds DuckDB `CREATE VIEW` statements over the views of `lab.sql` and the tables of
 `lab.db` in the catalog `lab` (`lab.experiments`, `lab.runs`, `lab.params`, `lab.tags`,
 `lab.metrics`, `lab.files`, `lab.records`). In a project's database the views of `lab.sql` hold only
-that project's rows, whose name `current_project()` returns, and the tables every project's. The tables keep times as milliseconds since 1970; the views' `created`,
+that project's rows, whose name `current_project()` returns, and the tables every project's;
+`data_folder()` returns the data folder's absolute path, which the view `files` uses for each
+logged file's `path`. The tables keep times as milliseconds since 1970; the views' `created`,
 `time`, `started` and `ended` are local time, which `local_time(ms)` writes. For example:
 
 ```sql

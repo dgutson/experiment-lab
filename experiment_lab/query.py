@@ -87,12 +87,14 @@ def identifier(name: str) -> str:
 
 
 def attach(data: Path) -> DuckDBPyConnection:
-    """A new in-memory DuckDB database with lab.db attached as the catalog lab."""
+    """A new in-memory DuckDB database with lab.db attached as the catalog lab,
+    and the macro data_folder(), the data folder's absolute path."""
     path = database(data)
     if not path.exists():
         raise FileNotFoundError(f"no database {path}; rec project or a logging script makes it")
     con = duckdb.connect()
     con.execute(f"ATTACH {literal(str(path))} AS lab (TYPE sqlite, READ_ONLY)")
+    con.execute(f"CREATE MACRO data_folder() AS {literal(str(data.resolve()))}")
     return con
 
 

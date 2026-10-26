@@ -85,7 +85,11 @@ An experiment, in order:
 
   Open the run before the work starts, with the work inside the `with` block; the owner's pages add
   up an experiment's run durations. A run ends FINISHED
-  when the `with` block ends and FAILED on an exception.
+  when the `with` block ends and FAILED on an exception. A result that is not one number, such as
+  each judge's choice on each criterion, goes in a JSON file logged with `run.log_file`, not in
+  many metric keys; q reads it through its path in the view `files` (a table function takes no
+  column): `q "SET VARIABLE f = (SELECT path FROM files WHERE run = '<run id>' AND name = 'x.json');
+  FROM read_json(getvariable('f'))"`.
 - Work that runs outside the Python that logs it: `rec run EXPERIMENT NAME [--note T]` before it
   starts prints the run's id. When it ends, log its results and end the run from a script,
   `run = lab.run_by_id("<run id>")`, then `run.log_metrics(...)`, `run.log_file(...)`, `run.end()`;
@@ -105,7 +109,7 @@ An experiment, in order:
 |---|---|---|
 | `experiments` | experiment | name, project, parent, depth (0 for a project), path (`a › b › c`, from the project down to the experiment itself), dead_end, description, created |
 | `runs` | run | run, experiment, project, name, status (RUNNING, FINISHED, FAILED or KILLED), start_time (ms), tags, params, metrics (maps: `metrics['accuracy']` is the latest value, a double; `params['lr']` and tags are text, so `params['lr']::DOUBLE` for a number), end_time (ms), started, ended, minutes (NULL until the run ends), note |
-| `files` | file logged for a run | run, experiment, project, name, bytes; the copy is `files/<run id>/<name>` in the data folder |
+| `files` | file logged for a run | run, experiment, project, name, bytes, path (the copy's absolute path, `files/<run id>/<name>` in the data folder) |
 | `records` | record | id, time, project, experiment (the label it is shown under), kind, title, text, author, status, answers, evidence (items joined by `; `) |
 | `texts` | experiment, run and record | kind (`experiment`, `run` or `record`), id, project, experiment, title, text: an experiment's description; a run's note, then its params and tags as `key=value` lines; a record's text |
 
