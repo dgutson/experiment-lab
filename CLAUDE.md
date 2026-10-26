@@ -64,8 +64,9 @@ q "SELECT id, kind, status, title FROM records"    # pages at http://127.0.0.1:5
 For a lab with data already in it, make one with `checks/make_scratch.py` and set
 `EXPERIMENT_LAB_DATA=FOLDER/lab-data` instead.
 
-lab-server reads Python and templates when it starts, so restart it after changing them; a change
-to `lab.sql`, a view file or a project's list of view files shows without a restart. start.sh exits at once if a server
+lab-server reads Python and templates when it starts, so restart it after changing them
+(`bin/restart.sh`, which restarts the one on `$EXPERIMENT_LAB_PORT`); a change to `lab.sql`, a view
+file or a project's list of view files shows without a restart. start.sh exits at once if a server
 already answers on the port. To stop a server, kill the process listening on its port
 (`ss -ltnp 'sport = :5001'`).
 

@@ -33,7 +33,7 @@ computers share nothing. There are two parts, and Claude Code needs both:
 
 Requirements:
 
-- Linux with `curl`, `setsid` and `ionice`, which `bin/start.sh` uses.
+- Linux with `curl`, `setsid`, `ionice` and `ss`, which `bin/start.sh` and `bin/restart.sh` use.
 - git, [uv](https://docs.astral.sh/uv/getting-started/installation/) and Claude Code.
 - Network access during the install, and the first time `q` or the pages read the database, when
   DuckDB downloads its SQLite extension into `~/.duckdb/extensions/`.
@@ -144,13 +144,11 @@ In a terminal, in this order:
 3. Restart the server, which still runs the old code:
 
    ```sh
-   pkill -x lab-server; while pgrep -x lab-server > /dev/null; do sleep 1; done
-   ~/experiment-lab/bin/start.sh
+   ~/experiment-lab/bin/restart.sh
    ```
 
-   The loop waits for the old server to stop, since start.sh starts nothing while a server answers
-   on the port. start.sh must print `running at …`; `already running at …` means the old server
-   did not stop.
+   It stops the server on port `$EXPERIMENT_LAB_PORT` (default 5000), waits for it to end, and
+   runs `start.sh`, which prints `running at …`.
 
 ## Projects and the experiment tree
 
@@ -242,6 +240,7 @@ a record a text; `rec`, `lab.py` and `records.py` refuse one without. A run's no
 | `experiment_lab/lab.sql` | the views `experiments`, `runs`, `files`, `records` and `experiments_runs_records`, which q and the pages query, and the macros `local_time` and `holds_words` |
 | `experiment_lab/lab.py` | logging projects, experiments and runs from Python, with the standard library only |
 | `bin/start.sh` | starts the pages' server, `lab-server`, in the background |
+| `bin/restart.sh` | stops the `lab-server` on the port, waits for it to end, and runs `start.sh` |
 | `checks/check_pages.py` | opens every page of a running server and checks it |
 | `checks/check_views.py`, `checks/sqlite_filter_bug.py` | checks to run before changing the DuckDB version |
 | `checks/check_commands.py` | runs the commands on a new lab and compares what they print with `checks/check_commands.txt` |
@@ -359,9 +358,10 @@ does.
 
 The lab's files are in the data folder, `$EXPERIMENT_LAB_DATA` (default `~/lab-data`): `lab.db`,
 the runs' files in `files/`, and start.sh's `server.log`. start.sh serves the pages on port
-`$EXPERIMENT_LAB_PORT` (default 5000) and exits at once if a server already answers there. There is
-no stop command: kill the `lab-server` process, which outlives the shell that started it. `lab.db` and its tables
-are made by the first program that writes, and by lab-server when it starts.
+`$EXPERIMENT_LAB_PORT` (default 5000) and exits at once if a server already answers there;
+restart.sh restarts the server on that port. There is no stop command: kill the `lab-server`
+process, which outlives the shell that started it. `lab.db` and its tables are made by the first
+program that writes, and by lab-server when it starts.
 
 A project's settings are in its row of `lab.experiments`, and `rec project NAME` changes those
 given:
