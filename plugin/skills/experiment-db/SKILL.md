@@ -53,11 +53,12 @@ An experiment, in order:
   `--status open|closed|superseded` sets another. `--id` gives a short id (lower-case letters,
   digits and dashes), else rec makes one from the title's first words and prints it; `--time` a
   local time as `2026-09-10T12:00`. `rec set ID FIELD=VALUE` (`status=closed`, `title=...`,
-  `evidence=a;b`); `rec open`. Evidence items: `run:<run id>`, `file:<~ or absolute path>`,
-  `sql:<query over the views>`, `record:<id>`; rec refuses a run or record id that does not exist.
-  rec writes `lab.db` itself; no server is needed, and a text has no length limit. `--text -`
-  reads the text from stdin (for `rec experiment` and `rec project` too), so a text with line
-  breaks, quotes or backticks goes in a quoted heredoc, which needs no escaping:
+  `evidence=a;b`); add and set print how many records are open, and `rec open` lists them.
+  Evidence items: `run:<run id>`, `file:<~ or absolute path>`, `sql:<query over the views>`,
+  `record:<id>`; rec refuses a run or record id that does not exist. rec writes `lab.db` itself;
+  no server is needed, and a text has no length limit. `--text -` reads the text from stdin (for
+  `rec experiment` and `rec project` too), so a text with line breaks, quotes or backticks goes in
+  a quoted heredoc, which needs no escaping:
 
   ```sh
   rec add finding "TITLE" --in NAME --evidence run:<run id> --text - <<'EOF'

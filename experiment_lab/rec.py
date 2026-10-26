@@ -41,8 +41,8 @@ closes that question. Evidence items are run:<run id>, file:<path>, sql:<query
 over the views> or record:<id>, the run or record existing; add and set warn
 about a file: item in a linked git worktree, where a later checkout can change
 the file. set changes kind, title, text, by, status, experiment, answers or
-evidence (items separated by ";"). add, set and open
-then print the project's open records. The --text of project, experiment and
+evidence (items separated by ";"). add and set then print how many of the
+project's records are open, and open lists them. The --text of project, experiment and
 add may be -, which reads the text from stdin, without its last line breaks:
 a quoted heredoc (--text - <<'EOF') needs no escaping.
 
@@ -93,6 +93,12 @@ def show_open(lab: Lab) -> None:
         print(f"  {rid} [{label}, {kind}] {title}")
 
 
+def show_open_count(lab: Lab) -> None:
+    """How many of the project's records are open, and the command that lists them."""
+    named = f" --project {lab.named}" if lab.named else ""
+    print(f"{len(records.open_records(lab, lab.current))} open in {lab.current}; rec open{named} lists them")
+
+
 def run_project(lab: Lab, a: argparse.Namespace) -> None:
     lab.project(a.name, a.text, folder=a.folder, files=a.files, views=a.views, replace=a.replace)
     folder, files, views = lab.db.execute("SELECT folder, files, views FROM experiments WHERE name = ?",
@@ -132,7 +138,7 @@ def run_add(lab: Lab, a: argparse.Namespace) -> None:
                          time=ms(a.time)):
         show(r)
     warn_overwritable(a.evidence)
-    show_open(lab)
+    show_open_count(lab)
 
 
 def run_set(lab: Lab, a: argparse.Namespace) -> None:
@@ -145,7 +151,7 @@ def run_set(lab: Lab, a: argparse.Namespace) -> None:
                                              if field == "evidence" else value)
     show(records.change(lab, a.id, **fields))
     warn_overwritable(fields.get("evidence", []))
-    show_open(lab)
+    show_open_count(lab)
 
 
 def run_run(lab: Lab, a: argparse.Namespace) -> None:
