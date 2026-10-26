@@ -355,12 +355,13 @@ table   | key            | runs
 tags    | outcome        |    1
 params  | dither         |    2
 params  | rate           |    5
+params  | script         |    1
 params  | threshold_db   |    1
 metrics | accuracy       |    4
 metrics | bits_saved     |    1
 metrics | distortion_db  |    2
 metrics | noise_floor_db |    2
-(8 rows)
+(9 rows)
 exit 0
 
 $ q --project vision .keys
