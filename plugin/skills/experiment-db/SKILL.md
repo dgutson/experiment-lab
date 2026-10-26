@@ -5,9 +5,9 @@ description: "Experiment data kept in the lab's database, lab.db: projects with 
 
 # Experiment database
 
-Answer from `q` before writing a new script. To find past experiments, runs or records about a
-subject, search the view `texts` (or `records`) with `holds_words` first, then query the numbers of
-what it finds.
+Answer from `q` before writing a new script. To find past experiments or records about a subject,
+search the views `experiments` and `records` with `holds_words` (below) first, then query the
+numbers of what it finds.
 
 An experiment, in order:
 
@@ -99,9 +99,10 @@ An experiment, in order:
   an end earlier than now, and `rec run --start T` a start earlier than now. A run logged after the
   work without its times shows a duration of seconds, which the pages count as measured.
 - The owner reads the same records, experiments, runs and views at http://127.0.0.1:5000/lab, and
-  searches them on its Experiments and Records pages, which search with `holds_words` too. The pages link a `file:`
-  item, and a `~/` or absolute path in any text, to the file when it is under a project's folder or
-  files folder, with a player for audio and the image for an image; a relative path is not linked.
+  searches experiments and records on its Experiments and Records pages, with `holds_words` too.
+  The pages link a `file:` item, and a `~/` or absolute path in any text, to the file when it is
+  under a project's folder or files folder, with a player for audio and the image for an image; a
+  relative path is not linked.
   Record texts, notes, descriptions and `.md` files there are Markdown; a ```` ```mermaid ```` block
   is drawn as a diagram by mermaid 11.17.2, the version mmdc uses, so check a diagram with
   `mmdc -i x.mmd -o x.svg` before recording it.
@@ -113,7 +114,6 @@ An experiment, in order:
 | `runs` | run | run, experiment, project, name, status (RUNNING, FINISHED, FAILED or KILLED), start_time (ms), tags, params, metrics (maps: `metrics['accuracy']` is the latest value, a double; `params['lr']` and tags are text, so `params['lr']::DOUBLE` for a number), end_time (ms), started, ended, minutes (NULL until the run ends), note |
 | `files` | file logged for a run | run, experiment, project, name, bytes, path (the copy's absolute path, `files/<run id>/<name>` in the data folder) |
 | `records` | record | id, time, project, experiment (the label it is shown under), kind, title, text, author, status, answers, evidence (items joined by `; `) |
-| `texts` | experiment, run and record | kind (`experiment`, `run` or `record`), id, project, experiment, title, text: an experiment's description; a run's note, then its params and tags as `key=value` lines; a record's text |
 
 `created`, `time`, `started` and `ended` are local time, to the minute (`2026-08-31 21:03`).
 `local_time(ms)` writes any time of the tables (milliseconds, as `lab.metrics.time`) the same way.
@@ -123,7 +123,7 @@ The project's own view files are listed in its row of `lab.experiments`, column 
 those files for what each view holds.
 
 ```sql
-SELECT kind, id, experiment, title FROM texts WHERE holds_words(title || ' ' || text, 'sample rate');
+SELECT name, description FROM experiments WHERE holds_words(name || ' ' || description, 'sample rate');
 SELECT id, kind, status, title FROM records WHERE holds_words(title || ' ' || text, 'sample rate');
 SELECT id, kind, status, title FROM records WHERE status = 'open' OR kind = 'decision' ORDER BY time;
 SELECT experiment, count(*) AS runs FROM runs GROUP BY ALL ORDER BY 2 DESC;

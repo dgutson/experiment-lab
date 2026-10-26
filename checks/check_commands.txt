@@ -222,7 +222,6 @@ experiments: name, project, parent, depth, path, dead_end, description, created
 files: run, experiment, project, name, bytes, path
 records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
 runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, started, ended, minutes, note
-texts: kind, id, project, experiment, title, text
 exit 0
 
 $ cd ~/speech && rec project speech --text "Detects speech in recordings."
@@ -267,12 +266,11 @@ rate 96000              | FAILED
 (5 rows)
 exit 0
 
-$ q "SELECT kind, id, experiment, title FROM texts WHERE holds_words(title || ' ' || text, 'RATE sweep') ORDER BY kind, id"
-kind       | id                    | experiment        | title
------------+-----------------------+-------------------+-----------------------
-experiment | sample rate sweep     | sample rate sweep | sample rate sweep
-record     | which-rate-do-we-keep | sample rate sweep | Which rate do we keep?
-(2 rows)
+$ q "SELECT name, description FROM experiments WHERE holds_words(name || ' ' || description, 'RATE sweep') ORDER BY name"
+name              | description
+------------------+---------------------------------------------------------------------------------
+sample rate sweep | Encodes the test set at four sample rates and measures how accurately the decod…
+(1 rows)
 exit 0
 
 $ q "SELECT id, kind, status, title FROM records WHERE holds_words(title || ' ' || text, 'gate  hold') ORDER BY id"
@@ -295,7 +293,6 @@ experiments: name, project, parent, depth, path, dead_end, description, created
 files: run, experiment, project, name, bytes, path
 records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
 runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, started, ended, minutes, note
-texts: kind, id, project, experiment, title, text
 exit 0
 
 $ q --project vision .views
@@ -304,7 +301,6 @@ experiments: name, project, parent, depth, path, dead_end, description, created
 files: run, experiment, project, name, bytes, path
 records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
 runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, started, ended, minutes, note
-texts: kind, id, project, experiment, title, text
 exit 0
 
 $ q --project vision "FROM blur_scores"
@@ -337,7 +333,6 @@ experiments: name, project, parent, depth, path, dead_end, description, created
 files: run, experiment, project, name, bytes, path
 records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
 runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, started, ended, minutes, note
-texts: kind, id, project, experiment, title, text
 exit 0
 
 $ q --all --project vision .views
@@ -485,7 +480,7 @@ Candidate bindings: : "text"
 
 LINE 1: SELECT r.project FROM lab.records r
                ^
-column project is in the views experiments, files, records, runs, texts
+column project is in the views experiments, files, records, runs
 exit 1
 
 $ q --max 0 "SELECT 1 AS x"
