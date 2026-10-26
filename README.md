@@ -53,8 +53,10 @@ or the pages read the database, when DuckDB downloads its SQLite reader.
    `/plugin install experiment-lab@experiment-lab-marketplace`. A Claude Code session that was
    already running loads the plugin with `/reload-plugins`.
 
-3. Make a project, once, in the project's folder. The agent makes it when rec says that no project
-   holds the folder; to make it yourself, in a terminal:
+3. Make the project: optional. The first time the agent records something in a folder that no
+   project holds, it makes the project there, with the name rec's message suggests (the folder's)
+   and a description it writes. Make it yourself to choose the name, which cannot be changed later
+   (the description can, with `--replace`). In a terminal, in the project's folder:
 
    ```sh
    cd ~/src/my-project
