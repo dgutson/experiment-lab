@@ -90,8 +90,8 @@ changes, not for evals, checks or CI. After the change is on `main`:
   standard library and Python's sqlite3, so a logging script imports them with `PYTHONPATH` alone.
   Every write is one `Lab.write()` transaction (`BEGIN IMMEDIATE`). `settings.py` and `__init__.py`
   must stay importable without the package's dependencies too.
-- Readers: `query.py` attaches `lab.db` read-only to an in-memory DuckDB, makes the macro
-  `current_project()` and runs `lab.sql`, whose views keep that project's rows, then the project's
+- Readers: `query.py` attaches `lab.db` read-only to an in-memory DuckDB with the macro
+  `data_folder()`, makes the macro `current_project()` and runs `lab.sql`, whose views keep that project's rows, then the project's
   view files, so that each project's views are in a database of their own and may reuse names. With
   no project, `lab.sql`'s views hold every project's rows. q, the pages and `checks/check_views.py`
   all read through it.

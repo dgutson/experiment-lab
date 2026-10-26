@@ -219,7 +219,7 @@ project speech, folder ~/speech, files ~/speech, views FOLDER/home/speech/views.
 views.sql: Binder Error: Referenced column "nosuch" not found in FROM clause!
 missing.sql: [Errno 2] No such file or directory: 'FOLDER/home/speech/missing.sql'
 experiments: name, project, parent, depth, path, dead_end, description, created
-files: run, experiment, project, name, bytes
+files: run, experiment, project, name, bytes, path
 records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
 runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, started, ended, minutes, note
 texts: kind, id, project, experiment, title, text
@@ -258,7 +258,7 @@ exit 0
 
 $ q .views
 experiments: name, project, parent, depth, path, dead_end, description, created
-files: run, experiment, project, name, bytes
+files: run, experiment, project, name, bytes, path
 records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
 runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, started, ended, minutes, note
 texts: kind, id, project, experiment, title, text
@@ -267,7 +267,7 @@ exit 0
 $ q --project vision .views
 blur_scores: image, sharpness
 experiments: name, project, parent, depth, path, dead_end, description, created
-files: run, experiment, project, name, bytes
+files: run, experiment, project, name, bytes, path
 records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
 runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, started, ended, minutes, note
 texts: kind, id, project, experiment, title, text
@@ -300,7 +300,7 @@ exit 0
 
 $ q --all .views
 experiments: name, project, parent, depth, path, dead_end, description, created
-files: run, experiment, project, name, bytes
+files: run, experiment, project, name, bytes, path
 records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
 runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, started, ended, minutes, note
 texts: kind, id, project, experiment, title, text
@@ -388,6 +388,19 @@ experiment        | name     | bytes
 ------------------+----------+------
 sample rate sweep | plot.png |   291
 sample rate sweep | tone.wav | 16044
+(2 rows)
+exit 0
+
+$ q "SELECT string_agg(path, chr(10) ORDER BY name) FROM files" | while read -r p; do test -f "$p" && echo "exists $p" || echo "missing $p"; done
+exists FOLDER/lab-data/files/RUN/plot.png
+exists FOLDER/lab-data/files/RUN/tone.wav
+exit 0
+
+$ echo '[{"judge": "a", "preferred": "run 7"}, {"judge": "b", "preferred": "run 6"}]' > ~/tally.json && python -c "from experiment_lab.lab import Lab; r = Lab().run('bitrate', 'judged'); r.log_file('$HOME/tally.json'); r.end()" && q "SET VARIABLE f = (SELECT path FROM files WHERE name = 'tally.json'); FROM read_json(getvariable('f'))"
+judge | preferred
+------+----------
+a     | run 7
+b     | run 6
 (2 rows)
 exit 0
 

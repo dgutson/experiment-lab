@@ -88,6 +88,8 @@ q --full "SELECT text FROM records WHERE id = '48-khz-is-the-most-accurate-rate'
 q "SELECT text FROM records WHERE id = 'keep-48-khz'"
 echo "SELECT count(*) AS runs FROM runs" | q
 q "SELECT experiment, name, bytes FROM files ORDER BY name"
+q "SELECT string_agg(path, chr(10) ORDER BY name) FROM files" | while read -r p; do test -f "$p" && echo "exists $p" || echo "missing $p"; done
+echo '[{"judge": "a", "preferred": "run 7"}, {"judge": "b", "preferred": "run 6"}]' > ~/tally.json && python -c "from experiment_lab.lab import Lab; r = Lab().run('bitrate', 'judged'); r.log_file('$HOME/tally.json'); r.end()" && q "SET VARIABLE f = (SELECT path FROM files WHERE name = 'tally.json'); FROM read_json(getvariable('f'))"
 q "SELECT 1 AS x; SET threads = 1; FROM runs LIMIT 1; SELECT 2 AS y"
 q "CREATE TABLE t AS SELECT 1 AS x; SELECT x FROM t"
 q "CREATE TABLE t (x INT)"
