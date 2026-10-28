@@ -152,6 +152,8 @@ with tempfile.TemporaryDirectory() as folder:
     text = "\n".join(out).replace(str(Path(folder).resolve()), "FOLDER").replace(folder, "FOLDER")
 text = re.sub(r"Traceback \(most recent call last\):\n(?:[ \t].*\n)*", "Traceback: ", text)
 text = re.sub(r"\b[0-9a-f]{32}\b", "RUN", text)
+# argparse quotes the choices it lists in some Python versions and not in others
+text = re.sub(r"\(choose from .*\)", lambda m: m[0].replace("'", ""), text)
 
 if sys.argv[1:] == ["--update"]:
     SAVED.write_text(text)
