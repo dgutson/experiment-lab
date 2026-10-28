@@ -88,10 +88,14 @@ An experiment, in order:
 
   Open the run before the work starts, with the work inside the `with` block; the owner's pages add
   up an experiment's run durations. A run ends FINISHED
-  when the `with` block ends and FAILED on an exception. A result that is not one number, such as
-  each judge's choice on each criterion, goes in a JSON file logged with `run.log_file`, not in
-  many metric keys; q reads it through its path in the view `files` (a table function takes no
-  column): `q "SET VARIABLE f = (SELECT path FROM files WHERE run = '<run id>' AND name = 'x.json');
+  when the `with` block ends and FAILED on an exception. N measurements of one number in a run (one
+  per session or repetition) go under one key with `step=` set to each, and their mean or count
+  under a key of its own: `runs.metrics` holds a key's value of the highest step, `lab.metrics`
+  every step. Run `q .keys` before naming a new key, and reuse the project's spelling. A result
+  that is not one number, such as each judge's choice on each criterion, goes in a JSON file
+  logged with `run.log_file`, not in many metric keys; q reads it through its path in the view
+  `files` (a table function takes no column):
+  `q "SET VARIABLE f = (SELECT path FROM files WHERE run = '<run id>' AND name = 'x.json');
   FROM read_json(getvariable('f'))"`.
 - Work that runs outside the Python that logs it: `rec run EXPERIMENT NAME [--note T]` before it
   starts prints the run's id. When it ends, log its results and end the run from a script,
