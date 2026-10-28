@@ -237,7 +237,7 @@ a record a text; `rec`, `lab.py` and `records.py` refuse one without. A run's no
 |---|---|
 | `experiment_lab/` | the package; its `__init__.py` lists what each module holds |
 | `experiment_lab/schema.sql` | the tables of `lab.db` |
-| `experiment_lab/lab.sql` | the views `experiments`, `runs`, `files`, `records` and `experiments_runs_records`, which q and the pages query, and the macros `local_time` and `holds_words` |
+| `experiment_lab/lab.sql` | the views `experiments`, `runs`, `files`, `records` and `experiments_runs_records`, which q and the pages query, and the macros `local_time`, `holds_words` and `latest_runs` |
 | `experiment_lab/lab.py` | logging projects, experiments and runs from Python, with the standard library only |
 | `bin/start.sh` | starts the pages' server, `lab-server`, in the background |
 | `bin/restart.sh` | stops the `lab-server` on the port, waits for it to end, and runs `start.sh` |
@@ -351,6 +351,17 @@ params, metrics and files through `lab.run_by_id(run_id)`, which refuses an id t
 lab's project, and calls `run.end()`; or `rec end RUN [--status FINISHED|FAILED|KILLED]
 [--at T]` ends it. `run.end(at=ms)` and `--at` give an end earlier than now; `rec end` refuses a run
 that has ended and an end before the run's start.
+
+The macro `latest_runs(experiment_name, keys)` gives an experiment's latest FINISHED run, by start
+time, for each combination of the values of the params named in the list keys, as rows of the view
+`runs`:
+
+```sh
+q "SELECT name, params, metrics FROM latest_runs('rate test', ['rate'])"
+```
+
+A later run changes what it returns, so a record's evidence cites the runs it returned
+(`run:<run id>`), not the query.
 
 To record a decision or finding from a script, `experiment_lab.records.add` does what `rec add`
 does.

@@ -23,6 +23,8 @@ jobs:
         run: uv run ruff check experiment_lab checks
       - name: No annotation nests too deep (pylint-complex-struct)
         run: uv run pylint experiment_lab checks
+      - name: lab.sql passes sqlfluff
+        run: uv run sqlfluff lint experiment_lab/lab.sql
       - name: DuckDB reads attached SQLite tables correctly
         run: uv run --script checks/sqlite_filter_bug.py
       - name: Commands print what checks/check_commands.txt holds
