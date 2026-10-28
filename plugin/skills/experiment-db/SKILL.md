@@ -83,6 +83,7 @@ An experiment, in order:
       run.set_tags({"outcome": "pass"})
       run.log_file("table.html")                 # copied to the data folder's files/<run id>/
       run.log_file("out/a.json", name="case-1/a.json")  # name: its path there, which may hold folders
+      run.log_json("result.json", {"passed": [1, 3]})  # an object or text in memory: log_json, log_text
       print(run.id)                              # what evidence cites as run:<run id>
   ```
 
@@ -95,7 +96,7 @@ An experiment, in order:
   under a key of its own: `runs.metrics` holds a key's value of the highest step, `lab.metrics`
   every step. Run `q .keys` before naming a new key, and reuse the project's spelling. A result
   that is not one number, such as each judge's choice on each criterion, goes in a JSON file
-  logged with `run.log_file`, not in many metric keys; q reads it through its path in the view
+  logged with `run.log_json`, not in many metric keys; q reads it through its path in the view
   `files` (a table function takes no column):
   `q "SET VARIABLE f = (SELECT path FROM files WHERE run = '<run id>' AND name = 'x.json');
   FROM read_json(getvariable('f'))"`.

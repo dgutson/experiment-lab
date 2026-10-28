@@ -340,6 +340,8 @@ with lab.run("rate test", "run 1", params={"rate": 48000}, note="Markdown") as r
     run.set_tags({"outcome": "pass"})
     run.log_file("plot.png")                      # copied to files/<run id>/plot.png
     run.log_file("out/a.json", name="case-1/a.json")  # to files/<run id>/case-1/a.json
+    run.log_json("result.json", {"passed": [1, 3]})   # written to files/<run id>/result.json
+    run.log_text("summary.md", "# Rate test")         # the same for text
 ```
 
 A run ends FINISHED when its `with` block ends, FAILED on an exception and KILLED on Ctrl-C; without

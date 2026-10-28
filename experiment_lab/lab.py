@@ -13,6 +13,7 @@ PYTHONPATH=<clone of experiment-lab>.
         run.set_tags({"outcome": "pass"})
         run.log_file("plot.png")                 # copied to files/<run id>/plot.png
         run.log_file("out/a.json", name="case-1/a.json")   # to files/<run id>/case-1/a.json
+        run.log_json("result.json", {"passed": [1, 3]})    # written there; log_text for text
     for run in lab.runs("rate test", tags={"outcome": "pass"}, latest_by="rate"):
         print(run.params["rate"], run.metrics["accuracy"], lab.json(run.id, "case-1/a.json"))
 
@@ -44,7 +45,7 @@ import subprocess
 import sys
 import time
 import uuid
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from functools import cached_property
 from pathlib import Path
 from typing import Any, NamedTuple, Self
@@ -437,10 +438,24 @@ class Run:
         the file's own; it may hold folders, as plots/a.png), adds it to the
         table files and returns the copy's path. Logging a name again replaces
         the file."""
+        return self.store(name or Path(path).name, lambda target: shutil.copy2(path, target))
+
+    def log_text(self, name: str, text: str) -> Path:
+        """Writes text to files/<run id>/<name>, as log_file copies a file."""
+        return self.store(name, lambda target: target.write_text(text, encoding="utf-8"))
+
+    def log_json(self, name: str, value: object) -> Path:
+        """Writes value as JSON to files/<run id>/<name>, as log_file copies a
+        file; lab.json reads it back."""
+        return self.log_text(name, json.dumps(value, indent=2))
+
+    def store(self, name: str, write: Callable[[Path], object]) -> Path:
+        """Makes files/<run id>/<name> with write, adds it to the table files
+        and returns its path."""
         folder = self.lab.data / "files" / self.id
-        target = folder / (name or Path(path).name)
+        target = folder / name
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(path, target)
+        write(target)
         with self.lab.write() as db:
             db.execute("INSERT INTO files (run, name, bytes) VALUES (?, ?, ?)"
                        " ON CONFLICT (run, name) DO UPDATE SET bytes = excluded.bytes",

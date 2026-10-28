@@ -1,14 +1,13 @@
 """Compares what Lab.runs and Lab.file read with what q's views give, on a new
 lab of make_scratch.py with one more run, whose metrics were logged at two
 steps, the lower one later, and twice at the same step and time, once as NaN,
-and whose JSON file Lab.json reads back. For each experiment: every run with the
-view runs; the latest runs for each param, for all of them and for none with the
-macro latest_runs; the filters of Lab.runs with a WHERE; the runs' files with
-the view files.
+and whose JSON file, logged by log_json, Lab.json reads back. For each
+experiment: every run with the view runs; the latest runs for each param, for
+all of them and for none with the macro latest_runs; the filters of Lab.runs
+with a WHERE; the runs' files with the view files.
 
 usage: uv run python checks/check_reader.py
 """
-import json
 import subprocess
 import sys
 import tempfile
@@ -41,15 +40,13 @@ class Read(NamedTuple):
     files: list[str]  # each file's run, name and path
 
 
-def add_run(lab: Lab, folder: Path) -> str:
-    result = folder / "result.json"
-    result.write_text(json.dumps(RESULT))
+def add_run(lab: Lab) -> str:
     at = now()
     with lab.run(SWEEP, "rate 22050", params={"rate": 22050}) as run:
         run.log_metrics({"accuracy": 0.95, "loss": float("nan")}, step=2, at=at)
         run.log_metrics({"loss": 0.2}, step=2, at=at)
         run.log_metrics({"accuracy": 0.5, "loss": 0.1}, step=1, at=at + 1000)
-        run.log_file(result)
+        run.log_json("result.json", RESULT)
     return run.id
 
 
@@ -114,7 +111,7 @@ def main() -> None:
     for project in ("audio-codec", "vision"):
         lab = Lab(data, project=project)
         if project == "audio-codec":
-            same &= lab.json(add_run(lab, folder), "result.json") == RESULT
+            same &= lab.json(add_run(lab), "result.json") == RESULT
         names = [n for (n,) in lab.db.execute(f"{BELOW} SELECT name FROM below", (project,))]
         plans = [p for n in names for p in latest_of(n, lab.runs(n, status=None))]
         mine = read_lab(lab, names, plans)
