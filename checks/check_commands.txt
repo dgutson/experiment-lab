@@ -25,8 +25,10 @@ uses only that project's experiments, runs and records; with no project, it
 refuses them, and open prints every project's open records. A --text of -
 reads the text from stdin, without its last line breaks: a quoted heredoc
 (--text - <<'EOF') needs no escaping. add's --time, run's --start and end's
---at are local times as "2026-09-10 12:00" (or 2026-09-10T12:00). The database
-is lab.db in $EXPERIMENT_LAB_DATA, else ~/lab-data.
+--at are ISO 8601 times, as "2026-09-10 12:00" or 2026-09-10T12:00, local
+unless they end in Z or an offset (2026-09-10T10:00Z, 2026-09-10T12:00+02:00),
+as lab.py takes them too. The database is lab.db in $EXPERIMENT_LAB_DATA,
+else ~/lab-data.
 
 project NAME makes a project, once, from its folder, --folder (by default the
 current git repository's main worktree, else the current folder), with --text,
@@ -115,8 +117,10 @@ uses only that project's experiments, runs and records; with no project, it
 refuses them, and open prints every project's open records. A --text of -
 reads the text from stdin, without its last line breaks: a quoted heredoc
 (--text - <<'EOF') needs no escaping. add's --time, run's --start and end's
---at are local times as "2026-09-10 12:00" (or 2026-09-10T12:00). The database
-is lab.db in $EXPERIMENT_LAB_DATA, else ~/lab-data.
+--at are ISO 8601 times, as "2026-09-10 12:00" or 2026-09-10T12:00, local
+unless they end in Z or an offset (2026-09-10T10:00Z, 2026-09-10T12:00+02:00),
+as lab.py takes them too. The database is lab.db in $EXPERIMENT_LAB_DATA,
+else ~/lab-data.
 
 positional arguments:
   kind
@@ -152,8 +156,10 @@ uses only that project's experiments, runs and records; with no project, it
 refuses them, and open prints every project's open records. A --text of -
 reads the text from stdin, without its last line breaks: a quoted heredoc
 (--text - <<'EOF') needs no escaping. add's --time, run's --start and end's
---at are local times as "2026-09-10 12:00" (or 2026-09-10T12:00). The database
-is lab.db in $EXPERIMENT_LAB_DATA, else ~/lab-data.
+--at are ISO 8601 times, as "2026-09-10 12:00" or 2026-09-10T12:00, local
+unless they end in Z or an offset (2026-09-10T10:00Z, 2026-09-10T12:00+02:00),
+as lab.py takes them too. The database is lab.db in $EXPERIMENT_LAB_DATA,
+else ~/lab-data.
 
 positional arguments:
   id
@@ -802,6 +808,20 @@ usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT]
                RUN
 rec end: error: argument --at: invalid fromisoformat value: 'yesterday'
 exit 2
+
+$ id=$(rec run bitrate "utc job" --start 2026-09-10T10:00Z) && rec end "$id" --at 2026-09-10T12:30+02:00 && q "SET TimeZone = 'UTC'; SELECT started, ended FROM runs WHERE run = '$id'"
+run utc job in bitrate: FINISHED, 30.0 min
+started: 2026-09-10 10:00
+ended: 2026-09-10 10:30
+(1 rows)
+exit 0
+
+$ python -c "import datetime; from experiment_lab.lab import Lab; r = Lab().run('bitrate', 'python times', start='2026-09-10T10:00Z'); r.log_metrics({'x': 1}, at='2026-09-10 10:10+00:00'); r.end(at=datetime.datetime(2026, 9, 10, 10, 30, tzinfo=datetime.UTC))" && q "SET TimeZone = 'UTC'; SELECT r.started, r.ended, local_time(m.time) AS measured FROM runs r JOIN lab.metrics m ON m.run = r.run WHERE r.name = 'python times'"
+started: 2026-09-10 10:00
+ended: 2026-09-10 10:30
+measured: 2026-09-10 10:10
+(1 rows)
+exit 0
 
 $ echo a > ~/out.txt && id=$(rec run bitrate "shell job" --start "2026-09-10 12:00") && { rec end "$id" --metric accuracy=0.93 --file ~/out.txt ~/missing.txt; q "SELECT status, metrics FROM runs WHERE run = '$id'"; }
 usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT]

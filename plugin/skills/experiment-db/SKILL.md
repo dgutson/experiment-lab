@@ -53,9 +53,11 @@ An experiment, in order:
   or with `--in PROJECT` in the project itself when no experiment fits. Its text may not be empty,
   and `--answers` closes that question. A new question is open and any other record closed;
   `--status open|closed|superseded` sets another. `--id` gives a short id (lower-case letters,
-  digits and dashes), else rec makes one from the title's first words and prints it; `--time` a
-  local time as `"2026-09-10 12:00"`. `rec set ID FIELD=VALUE` (`status=closed`, `title=...`,
-  `evidence=a;b`); add and set print how many records are open, and `rec open` lists them.
+  digits and dashes), else rec makes one from the title's first words and prints it; `--time` its
+  time. A time, in rec and in `lab.py` alike, is ISO 8601 text, local unless it ends in `Z` or an
+  offset: `"2026-09-10 12:00"`, or `2026-09-10T10:00Z` as it is, with no conversion by hand.
+  `rec set ID FIELD=VALUE` (`status=closed`, `title=...`, `evidence=a;b`); add and set print how
+  many records are open, and `rec open` lists them.
   Evidence items: `run:<run id>`, `file:<~ or absolute path>`, `sql:<query over the views>`,
   `record:<id>`; rec refuses a run or record id that does not exist. rec writes `lab.db` itself;
   no server is needed, and a text has no length limit. `--text -` reads the text from stdin (for
@@ -119,9 +121,10 @@ An experiment, in order:
   [--file PATH[=NAME] ...] [--status FAILED|KILLED]` logs its results and ends the run (metrics at
   step 0; NAME, the file's path in the run, its own name unless given). A result that needs
   computing goes through a script instead: `run = lab.run_by_id("<run id>")`, then
-  `run.log_metrics(...)`, `run.log_file(...)`, `run.end()`. `--at "2026-09-10 12:58"` (`run.end(at=ms)`) gives
-  an end earlier than now, and `rec run --start T` a start earlier than now. A run logged after the
-  work without its times shows a duration of seconds, which the pages count as measured.
+  `run.log_metrics(...)`, `run.log_file(...)`, `run.end()`. `--at "2026-09-10 12:58"`
+  (`run.end(at=...)`) gives an end earlier than now, and `rec run --start T` (`lab.run(start=...)`)
+  a start earlier than now; in Python a time may be a `datetime` too. A run logged after the work
+  without its times shows a duration of seconds, which the pages count as measured.
 - The owner reads the same records, experiments, runs and views at http://127.0.0.1:5000/lab, and
   searches them on its Experiments and Records pages, which search with `holds_words` too. The
   pages link a `file:` item, a `~/` or absolute path in any text, and a table cell, such as a run's

@@ -22,8 +22,10 @@ uses only that project's experiments, runs and records; with no project, it
 refuses them, and open prints every project's open records. A --text of -
 reads the text from stdin, without its last line breaks: a quoted heredoc
 (--text - <<'EOF') needs no escaping. add's --time, run's --start and end's
---at are local times as "2026-09-10 12:00" (or 2026-09-10T12:00). The database
-is lab.db in $EXPERIMENT_LAB_DATA, else ~/lab-data.
+--at are ISO 8601 times, as "2026-09-10 12:00" or 2026-09-10T12:00, local
+unless they end in Z or an offset (2026-09-10T10:00Z, 2026-09-10T12:00+02:00),
+as lab.py takes them too. The database is lab.db in $EXPERIMENT_LAB_DATA,
+else ~/lab-data.
 
 project NAME makes a project, once, from its folder, --folder (by default the
 current git repository's main worktree, else the current folder), with --text,
@@ -86,17 +88,12 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from experiment_lab import records
-from experiment_lab.lab import Lab, now
+from experiment_lab.lab import Lab, ms, now
 
 # rec's field names for the columns of records that differ
 COLUMNS = {"by": "author", "experiment": "label"}
 SETTABLE = ("kind", "title", "text", "by", "status", "experiment", "answers", "evidence")
 type Commands = argparse._SubParsersAction[argparse.ArgumentParser]  # what add_subparsers returns
-
-
-def ms(t: datetime.datetime | None) -> int | None:
-    """t in milliseconds since 1970; None if None."""
-    return None if t is None else int(t.timestamp() * 1000)
 
 
 def given_text(value: str) -> str:

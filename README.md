@@ -356,8 +356,13 @@ logs its metrics (at step 0), tags and files (copied as NAME, the file's own nam
 then ends it. It refuses a wrong item before it writes anything, a run that has ended and an end
 before the run's start. A result that needs computing, a param or a metric of several steps is
 logged by a script through `lab.run_by_id(run_id)`, which refuses an id that is no run of the lab's
-project, and the script calls `run.end()`. `run.end(at=ms)` and `--at` give an end earlier than
+project, and the script calls `run.end()`. `run.end(at=...)` and `--at` give an end earlier than
 now.
+
+A time, in rec (`rec add --time`, `rec run --start`, `rec end --at`) and in `lab.py` (`lab.run(start=)`,
+`run.log_metrics(at=)`, `run.end(at=)`), is ISO 8601 text, as `"2026-09-10 12:00"` or
+`2026-09-10T12:00`, local unless it ends in `Z` or an offset (`2026-09-10T10:00Z`,
+`2026-09-10T12:00+02:00`). `lab.py` also takes a `datetime`, or milliseconds since 1970.
 
 The macro `latest_runs(experiment_name, keys)` gives an experiment's latest FINISHED run, by start
 time, for each combination of the values of the params named in the list keys, as rows of the view
