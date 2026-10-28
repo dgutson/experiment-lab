@@ -237,8 +237,9 @@ a record a text; `rec`, `lab.py` and `records.py` refuse one without. A run's no
 |---|---|
 | `experiment_lab/` | the package; its `__init__.py` lists what each module holds |
 | `experiment_lab/schema.sql` | the tables of `lab.db` |
+| `experiment_lab/read.sql` | the SQLite SQL with which `lab.py` reads runs back |
 | `experiment_lab/lab.sql` | the views `experiments`, `runs`, `files`, `records` and `experiments_runs_records`, which q and the pages query, and the macros `local_time`, `holds_words` and `latest_runs` |
-| `experiment_lab/lab.py` | logging projects, experiments and runs from Python, with the standard library only |
+| `experiment_lab/lab.py` | logging projects, experiments and runs from Python, and reading runs back, with the standard library only |
 | `bin/start.sh` | starts the pages' server, `lab-server`, in the background |
 | `bin/restart.sh` | stops the `lab-server` on the port, waits for it to end, and runs `start.sh` |
 | `checks/check_pages.py` | opens every page of a running server and checks it |
@@ -323,9 +324,9 @@ it answered. `evals/run.sh` runs them with this clone's code through `claude plu
 takes the options given (for example `--case dead-end --runs 1 --model sonnet`), and puts the
 results in `evals/results/`. `evals/baseline.md` has the last full run's scores and costs.
 
-## Logging runs from Python
+## Logging and reading runs from Python
 
-`experiment_lab/lab.py` uses only Python's standard library, so a logging script imports it from
+`experiment_lab/lab.py` uses only Python's standard library, so a logging or report script imports it from
 any Python 3.12 without installing anything: `PYTHONPATH=~/experiment-lab python3 script.py`.
 
 ```python
@@ -362,6 +363,20 @@ q "SELECT name, params, metrics FROM latest_runs('rate test', ['rate'])"
 
 A later run changes what it returns, so a record's evidence cites the runs it returned
 (`run:<run id>`), not the query.
+
+A report script reads runs back through `lab.py` too, with no DuckDB. `lab.runs(experiment)` gives
+the experiment's FINISHED runs, oldest first, each with `id`, `name`, `status`, `start_time`,
+`end_time`, `params`, `tags`, `metrics` and `note`: params and tags as text, and each metric's
+latest value, as the view `runs` has them. Its keywords, all optional, narrow them: `status=None`
+for any status; `params=` and `tags=`, for each key a value or a tuple of the values allowed;
+`has_metric=`, a metric the run logged; and `latest_by=`, a param or a list of them, which keeps
+the latest run for each combination of their values, as `latest_runs` does. `lab.file(run_id,
+name)` is the path of a file the run logged, and `lab.json(run_id, name)` its JSON, parsed:
+
+```python
+for run in lab.runs("rate test", tags={"outcome": "pass"}, latest_by="rate"):
+    print(run.params["rate"], run.metrics["accuracy"], lab.json(run.id, "case-1/a.json"))
+```
 
 To record a decision or finding from a script, `experiment_lab.records.add` does what `rec add`
 does.

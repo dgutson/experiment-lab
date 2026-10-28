@@ -3,9 +3,15 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 `README.md` is the user documentation: installation and updating, projects and the experiment tree,
-the record format, the architecture diagram, the table of databases, logging from Python, a
+the record format, the architecture diagram, the table of databases, logging and reading runs from Python, a
 project's settings, and the steps for changing the Mermaid or DuckDB version. Read it before changing behavior. This
 file holds what a developer needs beyond it.
+
+## Design
+
+The lab's users are agents, who pay for it in tokens and thought. A command or an API takes the
+work an agent would otherwise write itself (a filter, a path, parsing a file) as a parameter, with a
+default for what the agent may not care about, even when that costs more code here.
 
 ## Commands
 
@@ -31,6 +37,8 @@ kind, a diagram, an audio file and an image. The checks:
 - `uv run sqlfluff lint experiment_lab/lab.sql`: lab.sql as DuckDB SQL, with the rules of
   `[tool.sqlfluff.core]` in `pyproject.toml`, which leaves out those of layout and of the file's own
   style (`lab.runs r` without `AS`, `JOIN`, `USING`, the schema's column names that are keywords).
+  `uv run sqlfluff lint --dialect sqlite experiment_lab/read.sql experiment_lab/schema.sql`: those
+  two as SQLite SQL, with the same rules.
 - `uv run --script checks/check_views.py` and `uv run --script checks/sqlite_filter_bug.py`: the views
   read the same with `lab.db` attached as with its tables copied. They read the data folder's
   `lab.db`; run them while nothing is logged to it.
@@ -39,6 +47,8 @@ kind, a diagram, an audio file and an image. The checks:
   and compares what they print and their exit statuses with `checks/check_commands.txt`. When a change
   to what they print is meant, `--update` rewrites the file, and its diff shows the change. It
   passes under Python 3.12 and 3.14: where their argparse messages differ, it evens them out.
+- `uv run python checks/check_reader.py`: on a new lab of `make_scratch.py`, `Lab.runs` and
+  `Lab.file` read what the views `runs` and `files` and the macro `latest_runs` give.
 - `uv run --script checks/check_pages.py [URL]`: every page of a running server, and its diagrams,
   audio players and images in Chrome, light and dark.
 - `evals/run.sh [--case NAME] [--model sonnet]`: the skill's eval cases, run by agents with and
@@ -92,6 +102,7 @@ changes, not for evals, checks or CI. After the change is on `main`:
   `Lab(project=)`), else the project of the current folder (`lab.holding`), for `Lab.current` and q.
 - Writers: `lab.py` (projects, experiments and runs) and `records.py` (records) use only the
   standard library and Python's sqlite3, so a logging script imports them with `PYTHONPATH` alone.
+  `lab.py` reads runs back the same way (`Lab.runs`, `Lab.file`, `Lab.json`), for a report script.
   Every write is one `Lab.write()` transaction (`BEGIN IMMEDIATE`). `settings.py` and `__init__.py`
   must stay importable without the package's dependencies too.
 - Readers: `query.py` attaches `lab.db` read-only to an in-memory DuckDB with the macro
@@ -131,6 +142,9 @@ Change these together:
 - What rec prints after `rec project` (`project NAME, folder ...`) and `rec experiment`
   (`experiment PROJECT › ... › NAME`): `rec.py` and the graders in `evals/*/case.yaml`,
   which match it.
+- A metric's latest value (of the highest step, then time) and the latest run for each combination
+  of params: the view `runs` and the macro `latest_runs` in `lab.sql`; the metrics query of
+  `read.sql`, and `latest` in `lab.py`. `checks/check_reader.py` compares them.
 - The order of experiments below the same parent (`created, name`): `rec.tree`, `pages.tree` and
   the Branches list of `pages.experiment`.
 - The DuckDB version: `pyproject.toml`, `checks/check_views.py`, `checks/sqlite_filter_bug.py`.

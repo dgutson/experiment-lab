@@ -1,7 +1,8 @@
 """Writing to the lab's database, lab.db in the data folder: projects, the
-experiments below them, and runs with their params, metrics, tags and files.
-It uses only Python's standard library, so a logging script can import it from
-any Python 3.12 with PYTHONPATH=<clone of experiment-lab>.
+experiments below them, and runs with their params, metrics, tags and files;
+and reading runs back. It uses only Python's standard library, so a logging or
+report script can import it from any Python 3.12 with
+PYTHONPATH=<clone of experiment-lab>.
 
     from experiment_lab.lab import Lab
     lab = Lab()                                  # $EXPERIMENT_LAB_DATA, else ~/lab-data
@@ -12,6 +13,8 @@ any Python 3.12 with PYTHONPATH=<clone of experiment-lab>.
         run.set_tags({"outcome": "pass"})
         run.log_file("plot.png")                 # copied to files/<run id>/plot.png
         run.log_file("out/a.json", name="case-1/a.json")   # to files/<run id>/case-1/a.json
+    for run in lab.runs("rate test", tags={"outcome": "pass"}, latest_by="rate"):
+        print(run.params["rate"], run.metrics["accuracy"], lab.json(run.id, "case-1/a.json"))
 
 The experiments form a tree whose roots are the projects. A Lab works in the
 project it is given (Lab(project="my-project")), else in the project of the
@@ -27,8 +30,14 @@ process: lab.run_by_id(run_id).end(), end(at=ms) for an earlier end, or rec
 end. Several processes may write at once without a server: the database is in
 WAL mode, every write is one short transaction, and a writer waits up to a
 minute for another's to end.
+
+lab.runs reads an experiment's FINISHED runs back, oldest first; its keywords
+keep those with the params, tags or metric given, and the latest for each
+combination of the values of the params latest_by names, as q's latest_runs.
+lab.file and lab.json read a file that a run logged.
 """
 import contextlib
+import json
 import shutil
 import sqlite3
 import subprocess
@@ -38,7 +47,7 @@ import uuid
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from functools import cached_property
 from pathlib import Path
-from typing import NamedTuple, Self
+from typing import Any, NamedTuple, Self
 
 from experiment_lab.settings import data_folder, database
 
@@ -47,12 +56,31 @@ SCHEMA = Path(__file__).with_name("schema.sql")
 BELOW = ("WITH RECURSIVE below(name) AS (SELECT ? UNION ALL"
          " SELECT e.name FROM experiments e JOIN below ON e.parent = below.name)")
 
+RUNS, *READ = Path(__file__).with_name("read.sql").read_text().split(";")[:4]  # the runs; their params, tags, metrics
+
 type StrPath = str | Path
+type Values = dict[str, Any]  # a run's params, tags or metrics, by key
+type Names = Sequence[str]
+type Keys = str | Names  # a param's name, or a list of them
 
 
 class Project(NamedTuple):
     name: str
     folder: str
+
+
+class RunRow(NamedTuple):
+    """A run as Lab.runs reads it: params and tags as text, and the latest
+    value of each metric, None for NaN."""
+    id: str
+    name: str
+    status: str
+    start_time: int
+    end_time: int | None
+    params: dict[str, str]
+    tags: dict[str, str]
+    metrics: dict[str, float | None]
+    note: str
 
 
 def now() -> int:
@@ -105,6 +133,21 @@ def working_project(projects: Sequence[Project], named: str | None) -> str | Non
 
 def absolute(path: StrPath) -> str:
     return str(Path(path).expanduser().resolve())
+
+
+def matches(values: Mapping[str, str], wanted: Mapping[str, object] | None) -> bool:
+    """Whether values has each key of wanted with its value, or one of them if
+    it is a tuple, list or set, compared as the text it is logged as."""
+    return all(values.get(k) in ({str(x) for x in v} if isinstance(v, tuple | list | set | frozenset) else {str(v)})
+               for k, v in (wanted or {}).items())
+
+
+def latest(rows: list[RunRow], keys: Keys) -> list[RunRow]:
+    """The last of rows, which are oldest first, for each combination of the
+    values of the params named by keys; a param that a run lacks counts as None."""
+    names = [keys] if isinstance(keys, str) else keys
+    last = set({tuple(r.params.get(k) for k in names): r.id for r in rows}.values())
+    return [r for r in rows if r.id in last]
 
 
 def defaults(name: str, changes: dict[str, str | None]) -> dict[str, str | None]:
@@ -319,6 +362,43 @@ class Lab:
             raise ValueError(f"no run {rid}")
         self.check_experiment(found[0])
         return Run(self, rid)
+
+    def runs(self, experiment: str, *, status: str | None = "FINISHED", params: Mapping[str, object] | None = None,
+             tags: Mapping[str, object] | None = None, has_metric: str | None = None,
+             latest_by: Keys | None = None) -> list[RunRow]:
+        """The runs of the experiment, oldest first, with status (None: any),
+        the params and tags given (a value, or a tuple or list of those
+        allowed) and the metric has_metric. latest_by, a param or a list of
+        them, keeps the latest of those runs by start time for each combination
+        of the params' values, as latest_runs of lab.sql."""
+        self.check_experiment(experiment)
+        rows = [r for r in self.every_run(experiment) if (status is None or r.status == status)
+                and matches(r.params, params) and matches(r.tags, tags) and (has_metric is None or has_metric in r.metrics)]
+        return rows if latest_by is None else latest(rows, latest_by)
+
+    def every_run(self, experiment: str) -> list[RunRow]:
+        """Every run of the experiment, by start time, then id."""
+        runs = self.db.execute(RUNS, (experiment,)).fetchall()
+        # read after the runs, so that a run read as ended has all it logged before its end
+        params, tags, metrics = (self.by_run(sql, experiment) for sql in READ)
+        return [RunRow(rid, name, status, start, end, params.get(rid, {}), tags.get(rid, {}), metrics.get(rid, {}), note)
+                for rid, name, status, start, end, note in runs]
+
+    def by_run(self, sql: str, experiment: str) -> dict[str, Values]:
+        """The keys and values that sql selects for the experiment, by run."""
+        found: dict[str, Values] = {}
+        for rid, key, value in self.db.execute(sql, (experiment,)):
+            found.setdefault(rid, {})[key] = value
+        return found
+
+    def file(self, rid: str, name: str) -> Path:
+        """The copy of the file that the run logged as name: files/<run id>/<name>
+        in the data folder."""
+        return self.data / "files" / rid / name
+
+    def json(self, rid: str, name: str) -> Any:  # noqa: ANN401, a JSON value as json.loads gives it
+        """The value of the JSON file that the run logged as name."""
+        return json.loads(self.file(rid, name).read_text())
 
 
 class Run:
