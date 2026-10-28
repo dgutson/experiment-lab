@@ -61,7 +61,7 @@ def show(t: query.Table, cut: int | None, ordered: bool) -> None:
 
 
 def arguments() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     which = p.add_mutually_exclusive_group()
     which.add_argument("--project")
     which.add_argument("--all", action="store_true")

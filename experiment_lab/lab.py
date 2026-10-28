@@ -11,6 +11,7 @@ any Python 3.12 with PYTHONPATH=<clone of experiment-lab>.
         run.log_metrics({"accuracy": 0.91}, step=3)
         run.set_tags({"outcome": "pass"})
         run.log_file("plot.png")                 # copied to files/<run id>/plot.png
+        run.log_file("out/a.json", name="case-1/a.json")   # to files/<run id>/case-1/a.json
 
 The experiments form a tree whose roots are the projects. A Lab works in the
 project it is given (Lab(project="my-project")), else in the project of the

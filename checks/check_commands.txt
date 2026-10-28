@@ -1,3 +1,201 @@
+$ rec --help
+usage: rec [-h] {project,experiment,tree,add,set,open,run,end} ...
+
+Adds or changes a project, an experiment or a record (a decision, finding,
+protocol rule or question) in the lab's database, starts or ends a run, or
+prints the experiment tree. rec COMMAND --help prints COMMAND's paragraph
+below, and the one that applies to every command.
+
+usage: rec project NAME --text DESCRIPTION [--folder F] [--files F] [--views FILE ...] [--replace]
+       rec experiment NAME --text DESCRIPTION [--in PARENT] [--dead-end | --no-dead-end] [--replace]
+       rec tree [EXPERIMENT]
+       rec add KIND "TITLE" --in EXPERIMENT --text T [--experiment LABEL] [--by WHO]
+                            [--status S] [--answers ID] [--evidence ITEM ...] [--id ID] [--time T]
+       rec set ID FIELD=VALUE ...
+       rec open
+       rec run EXPERIMENT NAME [--note T] [--start T]
+       rec end RUN [--status FINISHED|FAILED|KILLED] [--at T]
+       (each but project takes --project P)
+
+The experiments form a tree whose roots are the projects. rec works in the
+project --project names, else in the one whose folder holds the current folder
+(or the folder at the same place in its git repository's main worktree), and
+uses only that project's experiments, runs and records; with no project, it
+refuses them, and open prints every project's open records. A --text of -
+reads the text from stdin, without its last line breaks: a quoted heredoc
+(--text - <<'EOF') needs no escaping. add's --time, run's --start and end's
+--at are local times as "2026-09-10 12:00" (or 2026-09-10T12:00). The database
+is lab.db in $EXPERIMENT_LAB_DATA, else ~/lab-data.
+
+project NAME makes a project, once, from its folder, --folder (by default the
+current git repository's main worktree, else the current folder), with --text,
+a one-line description; given again, it changes what is given. --files is the
+folder its files page shows (its folder unless given), --views its view files,
+run after lab.sql in that order (--views alone clears them). A description
+other than the project's own is refused unless --replace.
+
+experiment NAME makes an experiment directly below the project, or below --in
+PARENT, with --text, its description (Markdown: what it measures and why);
+given again, it moves it below --in, or marks it as a dead end with --dead-end
+(an idea that failed; a finding says why) or not with --no-dead-end. A
+description other than an existing experiment's own is refused unless
+--replace, since a new experiment needs a name that no experiment of the lab
+has.
+
+tree prints the project's experiments, or those below EXPERIMENT, one per line,
+each indented below the one it came from, with [dead end] after those marked
+so.
+
+add KIND TITLE files a record in the experiment that --in names, which must
+exist, or with --in PROJECT in the project itself. KIND is decision, finding,
+protocol or question; TITLE is its title, not its id. --text, its text
+(Markdown), may not be empty. --experiment gives the label it is shown under
+(the --in experiment unless given), --by its author (agent unless given). A new
+question is open and any other record closed, unless --status says otherwise
+(open, closed or superseded); --answers ID closes the question ID. --evidence
+items are run:<run id>, file:<path>, sql:<query over the views> or
+record:<id>, the run or record existing; a file: item in a linked git worktree,
+where a later checkout can change the file, is warned about. --id gives the
+record's id (lower-case letters, digits and dashes), else rec makes one from
+the title's first words; --time its time, now unless given. add prints the
+records it adds or closes, then how many of the project's records are open.
+
+set ID FIELD=VALUE ... changes the record ID's FIELD: kind, title, text, by,
+status, experiment, answers or evidence (items separated by ";"). It warns
+about a file: item as add does, and prints the record, then how many of the
+project's records are open.
+
+open lists the project's open records.
+
+run EXPERIMENT NAME starts a run, RUNNING, in an existing experiment, for work
+that runs outside the Python that logs it, and prints its id. --note is the
+run's note, and --start its start, now unless given.
+
+end RUN ends a RUNNING run, FINISHED unless --status says FAILED or KILLED, at
+--at, now unless given, which may not be before the run's start.
+
+positional arguments:
+  {project,experiment,tree,add,set,open,run,end}
+
+options:
+  -h, --help            show this help message and exit
+exit 0
+
+$ rec add --help
+usage: rec add [-h] [--project P] --in EXPERIMENT [--experiment EXPERIMENT] --text TEXT [--by BY]
+               [--status STATUS] [--answers ANSWERS] [--evidence [EVIDENCE ...]] [--id ID]
+               [--time TIME]
+               kind title
+
+add KIND TITLE files a record in the experiment that --in names, which must
+exist, or with --in PROJECT in the project itself. KIND is decision, finding,
+protocol or question; TITLE is its title, not its id. --text, its text
+(Markdown), may not be empty. --experiment gives the label it is shown under
+(the --in experiment unless given), --by its author (agent unless given). A new
+question is open and any other record closed, unless --status says otherwise
+(open, closed or superseded); --answers ID closes the question ID. --evidence
+items are run:<run id>, file:<path>, sql:<query over the views> or
+record:<id>, the run or record existing; a file: item in a linked git worktree,
+where a later checkout can change the file, is warned about. --id gives the
+record's id (lower-case letters, digits and dashes), else rec makes one from
+the title's first words; --time its time, now unless given. add prints the
+records it adds or closes, then how many of the project's records are open.
+
+The experiments form a tree whose roots are the projects. rec works in the
+project --project names, else in the one whose folder holds the current folder
+(or the folder at the same place in its git repository's main worktree), and
+uses only that project's experiments, runs and records; with no project, it
+refuses them, and open prints every project's open records. A --text of -
+reads the text from stdin, without its last line breaks: a quoted heredoc
+(--text - <<'EOF') needs no escaping. add's --time, run's --start and end's
+--at are local times as "2026-09-10 12:00" (or 2026-09-10T12:00). The database
+is lab.db in $EXPERIMENT_LAB_DATA, else ~/lab-data.
+
+positional arguments:
+  kind
+  title
+
+options:
+  -h, --help            show this help message and exit
+  --project P
+  --in EXPERIMENT
+  --experiment EXPERIMENT
+  --text TEXT
+  --by BY
+  --status STATUS
+  --answers ANSWERS
+  --evidence [EVIDENCE ...]
+  --id ID
+  --time TIME
+exit 0
+
+$ rec set --help
+usage: rec set [-h] [--project P] id FIELD=VALUE [FIELD=VALUE ...]
+
+set ID FIELD=VALUE ... changes the record ID's FIELD: kind, title, text, by,
+status, experiment, answers or evidence (items separated by ";"). It warns
+about a file: item as add does, and prints the record, then how many of the
+project's records are open.
+
+The experiments form a tree whose roots are the projects. rec works in the
+project --project names, else in the one whose folder holds the current folder
+(or the folder at the same place in its git repository's main worktree), and
+uses only that project's experiments, runs and records; with no project, it
+refuses them, and open prints every project's open records. A --text of -
+reads the text from stdin, without its last line breaks: a quoted heredoc
+(--text - <<'EOF') needs no escaping. add's --time, run's --start and end's
+--at are local times as "2026-09-10 12:00" (or 2026-09-10T12:00). The database
+is lab.db in $EXPERIMENT_LAB_DATA, else ~/lab-data.
+
+positional arguments:
+  id
+  FIELD=VALUE
+
+options:
+  -h, --help   show this help message and exit
+  --project P
+exit 0
+
+$ q --help
+usage: q [-h] [--project PROJECT | --all] [--max MAX] [--full] [sql]
+
+Runs SQL over the views of the lab's database and prints the result as a
+compact table.
+
+usage: q [--project P | --all] [--max N] [--full] "SQL"   (SQL from stdin when omitted)
+       q [--project P | --all] .views                     (each view and its columns)
+       q [--project P | --all] [--max N] .keys            (the keys of the runs)
+
+The database is lab.db in the data folder ($EXPERIMENT_LAB_DATA, else
+~/lab-data), attached read-only as the catalog lab with the tables
+lab.experiments, lab.runs, lab.params, lab.tags, lab.metrics (every value
+logged), lab.files (the files logged for runs) and lab.records. The views are those of experiment_lab/lab.sql, then
+those of the view files of the project of the current folder (the one whose
+folder holds it or the folder at the same place in its git repository's main
+worktree), or of --project; a
+statement of a view file that fails is printed on stderr and skipped. lab.sql's
+views hold that project's rows only; with --all, they hold every project's and
+no view file runs. From a folder no project holds, q needs --project or --all.
+Several statements may be given; the last one's rows are printed, at most
+--max of them (40), with cells cut at 80 characters unless --full. A result of
+one row and one column prints that cell alone, whole and with its line breaks,
+as in q "SELECT text FROM records WHERE id = '...'". An error about a column
+that is not found names the views that have it, and earlier statements of
+type SELECT, whose rows are not printed, are named on stderr. .keys lists each key of the
+tags, params and metrics of the runs in the view runs, with the number of runs
+that have it.
+
+positional arguments:
+  sql
+
+options:
+  -h, --help         show this help message and exit
+  --project PROJECT
+  --all
+  --max MAX
+  --full
+exit 0
+
 $ rec tree
 audio-codec  (~/audio-codec)
   sample rate sweep
