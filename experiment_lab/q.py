@@ -1,5 +1,5 @@
-"""Runs SQL over the views of the lab's database and prints the result as a
-compact table.
+"""Runs SQL over the views of the lab's database and prints the result: a line
+of column names, then a line per row, cells joined by " | " and not padded.
 
 usage: q [--project P | --all] [--max N] [--full] "SQL"   (SQL from stdin when omitted)
        q [--project P | --all] .views                     (each view and its columns)
@@ -17,9 +17,12 @@ views hold that project's rows only; with --all, they hold every project's and
 no view file runs. From a folder no project holds, q needs --project or --all.
 Several statements may be given; the last one's rows are printed, at most
 --max of them (40), with cells cut at 80 characters unless --full. A result of
-one row and one column prints that cell alone, whole and with its line breaks,
-as in q "SELECT text FROM records WHERE id = '...'". An error about a column
-that is not found names the views that have it, and earlier statements of
+one row prints a line "column: value" per column, and one of one row and one
+column that cell alone, whole and with its line breaks, as in
+q "SELECT text FROM records WHERE id = '...'". An error about a column
+that is not found names the views that have it; one about the table params,
+tags or metrics, the map column of runs; one about text in params or tags, a
+cast; a list of candidate functions is cut to three. Earlier statements of
 type SELECT, whose rows are not printed, are named on stderr. .keys lists each key of the
 tags, params and metrics of the runs in the view runs, with the number of runs
 that have it.
@@ -46,16 +49,12 @@ def show(t: query.Table, cut: int | None, ordered: bool) -> None:
     """The table with its cells cut at cut characters (None: whole), each on one
     line; ordered: the query's ORDER BY gives every row its place."""
     rows = [[v.replace("\n", " ") for v in query.shorten(r, cut)] for r in t["rows"]]
-    widths = [max([len(n)] + [len(r[i]) for r in rows]) for i, n in enumerate(t["columns"])]
-
-    def fmt(values: list[str]) -> str:
-        return " | ".join(v.rjust(w) if num else v.ljust(w)
-                          for v, w, num in zip(values, widths, t["numeric"])).rstrip()
-
-    print(fmt(t["columns"]))
-    print("-+-".join("-" * w for w in widths))
-    for r in rows:
-        print(fmt(r))
+    if len(rows) == 1 and not t["more"]:
+        lines = [f"{c}: {v}" for c, v in zip(t["columns"], rows[0])]
+    else:
+        lines = [" | ".join(r) for r in [t["columns"], *rows]]
+    for line in lines:
+        print(line.rstrip())
     unordered = "" if ordered else "; without ORDER BY, other rows may come first"
     print(f"({len(rows)} rows{f', more not shown (--max N shows more{unordered})' if t['more'] else ''})")
 
@@ -85,7 +84,7 @@ def project_of(con: DuckDBPyConnection, a: argparse.Namespace) -> str | None:
     return project
 
 
-def views_with(con: DuckDBPyConnection, error: duckdb.BinderException) -> str:
+def views_with(con: DuckDBPyConnection, error: duckdb.Error) -> str:
     """For an error about a column that is not found, a line naming the views
     that have that column; '' if none has it."""
     found = re.search(r'(?:Referenced column|column named) "([^"]+)"', str(error))
@@ -97,13 +96,27 @@ def views_with(con: DuckDBPyConnection, error: duckdb.BinderException) -> str:
     return f"\ncolumn {found[1]} is in the view{'s' if len(names) > 1 else ''} {', '.join(names)}"
 
 
+def explained(con: DuckDBPyConnection, sql: str, error: duckdb.Error) -> str:
+    """The error with its list of candidate functions cut to three, and a line
+    naming the fix where one is known: the views that have a column not found,
+    the map columns of runs for the tables params, tags and metrics, and a cast
+    for params and tags, which are text."""
+    text = re.sub(r"(Candidate functions:\n(?:\t.*\n){3})(?:\t.*\n)+", "\\1\t…\n", str(error))
+    table = re.search(r"Table with name (params|tags|metrics) does not exist", text)
+    if table:
+        text += f"\n{table[1]} is a map column of the view runs: SELECT {table[1]}['key'] FROM runs"
+    if "VARCHAR" in text and re.search(r"\b(params|tags)\[", sql):
+        text += "\nparams and tags are text: cast one for a number, as params['rate']::INT or ::DOUBLE"
+    return text + views_with(con, error)
+
+
 def sql_result(con: DuckDBPyConnection, sql: str) -> DuckDBPyConnection | None:
     """The result of sql's last statement, None if it returns no rows; prints
     on stderr which earlier statements' rows are left out."""
     try:
         last = query.run(con, sql)
-    except duckdb.BinderException as e:
-        raise ValueError(f"{e}{views_with(con, e)}") from e
+    except (duckdb.BinderException, duckdb.CatalogException) as e:
+        raise ValueError(explained(con, sql, e)) from e
     if last.hidden_note:
         print(last.hidden_note, file=sys.stderr)
     return last.result

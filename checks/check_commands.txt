@@ -159,8 +159,8 @@ exit 0
 $ q --help
 usage: q [-h] [--project PROJECT | --all] [--max MAX] [--full] [sql]
 
-Runs SQL over the views of the lab's database and prints the result as a
-compact table.
+Runs SQL over the views of the lab's database and prints the result: a line
+of column names, then a line per row, cells joined by " | " and not padded.
 
 usage: q [--project P | --all] [--max N] [--full] "SQL"   (SQL from stdin when omitted)
        q [--project P | --all] .views                     (each view and its columns)
@@ -178,9 +178,12 @@ views hold that project's rows only; with --all, they hold every project's and
 no view file runs. From a folder no project holds, q needs --project or --all.
 Several statements may be given; the last one's rows are printed, at most
 --max of them (40), with cells cut at 80 characters unless --full. A result of
-one row and one column prints that cell alone, whole and with its line breaks,
-as in q "SELECT text FROM records WHERE id = '...'". An error about a column
-that is not found names the views that have it, and earlier statements of
+one row prints a line "column: value" per column, and one of one row and one
+column that cell alone, whole and with its line breaks, as in
+q "SELECT text FROM records WHERE id = '...'". An error about a column
+that is not found names the views that have it; one about the table params,
+tags or metrics, the map column of runs; one about text in params or tags, a
+cast; a list of candidate functions is cut to three. Earlier statements of
 type SELECT, whose rows are not printed, are named on stderr. .keys lists each key of the
 tags, params and metrics of the runs in the view runs, with the number of runs
 that have it.
@@ -455,44 +458,41 @@ error: [Errno 2] No such file or directory: '/proc/lab-data'
 exit 1
 
 $ q "SELECT name, status FROM runs WHERE experiment = 'sample rate sweep' ORDER BY name"
-name                    | status
-------------------------+---------
-rate 16000              | FINISHED
-rate 44100              | FINISHED
-rate 48000              | FINISHED
+name | status
+rate 16000 | FINISHED
+rate 44100 | FINISHED
+rate 48000 | FINISHED
 rate 48000, listened to | FINISHED
-rate 96000              | FAILED
+rate 96000 | FAILED
 (5 rows)
 exit 0
 
 $ q "SELECT kind, id, experiment, title FROM experiments_runs_records WHERE holds_words(title || ' ' || text, 'RATE sweep') ORDER BY kind, id"
-kind       | id                    | experiment        | title
------------+-----------------------+-------------------+-----------------------
-experiment | sample rate sweep     | sample rate sweep | sample rate sweep
-record     | which-rate-do-we-keep | sample rate sweep | Which rate do we keep?
+kind | id | experiment | title
+experiment | sample rate sweep | sample rate sweep | sample rate sweep
+record | which-rate-do-we-keep | sample rate sweep | Which rate do we keep?
 (2 rows)
 exit 0
 
 $ q "SELECT id, kind, status, title FROM records WHERE holds_words(title || ' ' || text, 'gate  hold') ORDER BY id"
-id                             | kind     | status | title
--------------------------------+----------+--------+--------------------------------
-does-the-gate-need-a-hold-time | question | closed | Does the gate need a hold time?
+id: does-the-gate-need-a-hold-time
+kind: question
+status: closed
+title: Does the gate need a hold time?
 (1 rows)
 exit 0
 
 $ q "SET TimeZone = 'UTC'; SELECT name, started, ended, minutes FROM runs WHERE experiment = 'sample rate sweep' ORDER BY name LIMIT 2"
-name       | started          | ended            | minutes
------------+------------------+------------------+--------
-rate 16000 | 2026-09-01 00:00 | 2026-09-01 00:02 |       2
-rate 44100 | 2026-09-01 00:03 | 2026-09-01 00:05 |       2
+name | started | ended | minutes
+rate 16000 | 2026-09-01 00:00 | 2026-09-01 00:02 | 2
+rate 44100 | 2026-09-01 00:03 | 2026-09-01 00:05 | 2
 (2 rows)
 exit 0
 
 $ q "SELECT name, params['rate'] AS rate FROM latest_runs('sample rate sweep', ['rate']) ORDER BY name"
-name                    | rate
-------------------------+------
-rate 16000              | 16000
-rate 44100              | 44100
+name | rate
+rate 16000 | 16000
+rate 44100 | 44100
 rate 48000, listened to | 48000
 (3 rows)
 exit 0
@@ -515,11 +515,10 @@ runs: run, experiment, project, name, status, start_time, tags, params, metrics,
 exit 0
 
 $ q --project vision "FROM blur_scores"
-image       | sharpness
-------------+----------
-market.jpg  |      0.87
-tower.jpg   |      0.63
-harbour.jpg |      0.41
+image | sharpness
+market.jpg | 0.87
+tower.jpg | 0.63
+harbour.jpg | 0.41
 (3 rows)
 exit 0
 
@@ -533,7 +532,6 @@ exit 0
 
 $ q --all "SELECT DISTINCT project FROM runs ORDER BY project"
 project
------------
 audio-codec
 vision
 (2 rows)
@@ -557,33 +555,30 @@ error: no project holds this folder; --project P names one, --all reads every pr
 exit 1
 
 $ q .keys
-table   | key            | runs
---------+----------------+-----
-tags    | outcome        |    1
-params  | dither         |    2
-params  | rate           |    5
-params  | script         |    1
-params  | threshold_db   |    1
-metrics | accuracy       |    4
-metrics | bits_saved     |    1
-metrics | distortion_db  |    2
-metrics | noise_floor_db |    2
+table | key | runs
+tags | outcome | 1
+params | dither | 2
+params | rate | 5
+params | script | 1
+params | threshold_db | 1
+metrics | accuracy | 4
+metrics | bits_saved | 1
+metrics | distortion_db | 2
+metrics | noise_floor_db | 2
 (9 rows)
 exit 0
 
 $ q --project vision .keys
-table   | key       | runs
---------+-----------+-----
-params  | image     |    3
-metrics | sharpness |    3
+table | key | runs
+params | image | 3
+metrics | sharpness | 3
 (2 rows)
 exit 0
 
 $ q --max 2 .keys
-table  | key     | runs
--------+---------+-----
-tags   | outcome |    1
-params | dither  |    2
+table | key | runs
+tags | outcome | 1
+params | dither | 2
 (2 rows, more not shown (--max N shows more))
 exit 0
 
@@ -593,16 +588,14 @@ exit 1
 
 $ q --max 2 "SELECT name FROM runs ORDER BY name"
 name
------------
 dither none
 dither tpdf
 (2 rows, more not shown (--max N shows more; without ORDER BY, other rows may come first))
 exit 0
 
 $ q "SELECT id, text FROM records WHERE id = '48-khz-is-the-most-accurate-rate'"
-id                               | text
----------------------------------+---------------------------------------------------------------------------------
-48-khz-is-the-most-accurate-rate | 48 kHz reached an accuracy of 0.93, against 0.88 at 44.1 kHz; the 96 kHz run ra…
+id: 48-khz-is-the-most-accurate-rate
+text: 48 kHz reached an accuracy of 0.93, against 0.88 at 44.1 kHz; the 96 kHz run ra…
 (1 rows)
 exit 0
 
@@ -626,9 +619,8 @@ $ echo "SELECT count(*) AS runs FROM runs" | q
 exit 0
 
 $ q "SELECT experiment, name, bytes FROM files ORDER BY name"
-experiment        | name     | bytes
-------------------+----------+------
-sample rate sweep | plot.png |   291
+experiment | name | bytes
+sample rate sweep | plot.png | 291
 sample rate sweep | tone.wav | 16044
 (2 rows)
 exit 0
@@ -640,9 +632,8 @@ exit 0
 
 $ echo '[{"judge": "a", "preferred": "run 7"}, {"judge": "b", "preferred": "run 6"}]' > ~/tally.json && python -c "from experiment_lab.lab import Lab; r = Lab().run('bitrate', 'judged'); r.log_file('$HOME/tally.json'); r.end()" && q "SET VARIABLE f = (SELECT path FROM files WHERE name = 'tally.json'); FROM read_json(getvariable('f'))"
 judge | preferred
-------+----------
-a     | run 7
-b     | run 6
+a | run 7
+b | run 6
 (2 rows)
 exit 0
 
@@ -657,7 +648,6 @@ exit 0
 
 $ q "CREATE TABLE t (x INT)"
 Count
------
 (0 rows)
 exit 0
 
@@ -675,6 +665,37 @@ Candidate bindings: "note", "status", "minutes", "project", "run"
 
 LINE 1: SELECT nosuch FROM runs
                ^
+exit 1
+
+$ q "FROM params"
+error: Catalog Error: Table with name params does not exist!
+Did you mean "lab.params"?
+
+LINE 1: FROM params
+             ^
+params is a map column of the view runs: SELECT params['key'] FROM runs
+exit 1
+
+$ q "SELECT params['rate'] + 1 FROM runs"
+error: Binder Error: No function matches the given name and argument types '+(VARCHAR, INTEGER_LITERAL)'. You might need to add explicit type casts.
+	Candidate functions:
+	+(TINYINT) -> TINYINT
+	+(TINYINT, TINYINT) -> TINYINT
+	+(SMALLINT) -> SMALLINT
+	…
+
+
+LINE 1: SELECT params['rate'] + 1 FROM runs
+                              ^
+params and tags are text: cast one for a number, as params['rate']::INT or ::DOUBLE
+exit 1
+
+$ q "SELECT name FROM runs WHERE params['rate'] > 20000"
+error: Binder Error: Cannot compare values of type VARCHAR and type INTEGER_LITERAL - an explicit cast is required
+
+LINE 1: SELECT name FROM runs WHERE params['rate'] > 20000
+                                                   ^
+params and tags are text: cast one for a number, as params['rate']::INT or ::DOUBLE
 exit 1
 
 $ q "SELECT name FROM lab.experiments WHERE depth = 0"
@@ -713,9 +734,12 @@ exit 1
 $ id=$(rec run bitrate "background job" --note "Ran in a background job." --start "2026-09-10 12:00") && echo "$id" && rec end "$id" --at "2026-09-10 12:58" && q "SELECT name, status, started, ended, minutes, note FROM runs WHERE run = '$id'"
 RUN
 run background job in bitrate: FINISHED, 58.0 min
-name           | status   | started          | ended            | minutes | note
----------------+----------+------------------+------------------+---------+-------------------------
-background job | FINISHED | 2026-09-10 12:00 | 2026-09-10 12:58 |      58 | Ran in a background job.
+name: background job
+status: FINISHED
+started: 2026-09-10 12:00
+ended: 2026-09-10 12:58
+minutes: 58
+note: Ran in a background job.
 (1 rows)
 exit 0
 
