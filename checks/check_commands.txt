@@ -736,7 +736,7 @@ exit 1
 
 $ rec end x --status RUNNING
 usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT] RUN
-rec end: error: argument --status: invalid choice: 'RUNNING' (choose from 'FINISHED', 'FAILED', 'KILLED')
+rec end: error: argument --status: invalid choice: 'RUNNING' (choose from FINISHED, FAILED, KILLED)
 exit 2
 
 $ rec end x --at yesterday

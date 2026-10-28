@@ -34,8 +34,8 @@ kind, a diagram, an audio file and an image. The checks:
 - `uv run python checks/check_commands.py`: runs a fixed list of rec, q and lab-server
   commands, wrong input among them, in order on a new lab of `make_scratch.py`,
   and compares what they print and their exit statuses with `checks/check_commands.txt`. When a change
-  to what they print is meant, `--update` rewrites the file, and its diff shows the change. The
-  output depends on the Python version, which `.python-version` pins.
+  to what they print is meant, `--update` rewrites the file, and its diff shows the change. It
+  passes under Python 3.12 and 3.14: where their argparse messages differ, it evens them out.
 - `uv run --script checks/check_pages.py [URL]`: every page of a running server, and its diagrams,
   audio players and images in Chrome, light and dark.
 - `evals/run.sh [--case NAME] [--model sonnet]`: the skill's eval cases, run by agents with and
