@@ -37,8 +37,8 @@ kind, a diagram, an audio file and an image. The checks:
 - `uv run sqlfluff lint experiment_lab/lab.sql`: lab.sql as DuckDB SQL, with the rules of
   `[tool.sqlfluff.core]` in `pyproject.toml`, which leaves out those of layout and of the file's own
   style (`lab.runs r` without `AS`, `JOIN`, `USING`, the schema's column names that are keywords).
-  `uv run sqlfluff lint --dialect sqlite experiment_lab/read.sql`: read.sql as SQLite SQL, with the
-  same rules.
+  `uv run sqlfluff lint --dialect sqlite experiment_lab/read.sql experiment_lab/schema.sql`: those
+  two as SQLite SQL, with the same rules.
 - `uv run --script checks/check_views.py` and `uv run --script checks/sqlite_filter_bug.py`: the views
   read the same with `lab.db` attached as with its tables copied. They read the data folder's
   `lab.db`; run them while nothing is logged to it.
