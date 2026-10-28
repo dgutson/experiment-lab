@@ -7,6 +7,12 @@ the record format, the architecture diagram, the table of databases, logging fro
 project's settings, and the steps for changing the Mermaid or DuckDB version. Read it before changing behavior. This
 file holds what a developer needs beyond it.
 
+## Design
+
+The lab's users are agents, who pay for it in tokens and thought. A command or an API takes the
+work an agent would otherwise write itself (a filter, a path, parsing a file) as a parameter, with a
+default for what the agent may not care about, even when that costs more code here.
+
 ## Commands
 
 There is no test suite or build step. `.github/workflows/checks.yml` runs the checks below, except
