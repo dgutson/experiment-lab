@@ -18,6 +18,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SAVED = ROOT / "checks" / "check_commands.txt"
 COMMANDS = """
+rec --help
+rec add --help
+rec set --help
+q --help
 rec tree
 rec tree "16-bit output"
 rec open
