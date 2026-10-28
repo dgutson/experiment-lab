@@ -11,7 +11,8 @@ usage: rec project NAME --text DESCRIPTION [--folder F] [--files F] [--views FIL
        rec tree [EXPERIMENT]
        rec add KIND "TITLE" --in EXPERIMENT --text T [--experiment LABEL] [--by WHO]
                             [--status S] [--answers ID] [--evidence ITEM ...] [--id ID] [--time T]
-       rec set ID FIELD=VALUE ...
+                            [--quiet]
+       rec set ID FIELD=VALUE ... [--quiet]
        rec open
        rec run EXPERIMENT NAME [--note T] [--start T]
        rec end RUN [--status FINISHED|FAILED|KILLED] [--at T] [--metric K=V ...] [--tag K=V ...]
@@ -61,13 +62,15 @@ record:<id>, the run or record existing; a file: item in a linked git worktree,
 where a later checkout can change the file, is warned about. --id gives the
 record's id (lower-case letters, digits and dashes), else rec makes one from
 the title's first words; --time its time, now unless given. add prints the
-records it adds or closes, then how many of the project's records are open.
+records it adds or closes, then, if it changed how many of the project's
+records are open, how many are; with --quiet, only the id of the record it
+adds.
 
 set ID FIELD=VALUE ... changes the record ID's FIELD: kind, title, text, by,
 status, experiment, answers or evidence (items separated by ";"). FIELD=-
 reads VALUE from stdin, as --text - does, for one FIELD per call. It warns
 about a file: item as add does, and prints the record, then how many of the
-project's records are open.
+project's records are open, as add does; with --quiet, only its id.
 
 open lists the project's open records.
 
@@ -91,9 +94,9 @@ options:
 exit 0
 
 $ rec add --help
-usage: rec add [-h] [--project P] --in EXPERIMENT [--experiment EXPERIMENT] --text TEXT [--by BY]
-               [--status STATUS] [--answers ANSWERS] [--evidence [EVIDENCE ...]] [--id ID]
-               [--time TIME]
+usage: rec add [-h] [--project P] [--quiet] --in EXPERIMENT [--experiment EXPERIMENT] --text TEXT
+               [--by BY] [--status STATUS] [--answers ANSWERS] [--evidence [EVIDENCE ...]]
+               [--id ID] [--time TIME]
                kind title
 
 add KIND TITLE files a record in the experiment that --in names, which must
@@ -108,7 +111,9 @@ record:<id>, the run or record existing; a file: item in a linked git worktree,
 where a later checkout can change the file, is warned about. --id gives the
 record's id (lower-case letters, digits and dashes), else rec makes one from
 the title's first words; --time its time, now unless given. add prints the
-records it adds or closes, then how many of the project's records are open.
+records it adds or closes, then, if it changed how many of the project's
+records are open, how many are; with --quiet, only the id of the record it
+adds.
 
 The experiments form a tree whose roots are the projects. rec works in the
 project --project names, else in the one whose folder holds the current folder
@@ -129,6 +134,7 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   --project P
+  --quiet
   --in EXPERIMENT
   --experiment EXPERIMENT
   --text TEXT
@@ -141,13 +147,13 @@ options:
 exit 0
 
 $ rec set --help
-usage: rec set [-h] [--project P] id FIELD=VALUE [FIELD=VALUE ...]
+usage: rec set [-h] [--project P] [--quiet] id FIELD=VALUE [FIELD=VALUE ...]
 
 set ID FIELD=VALUE ... changes the record ID's FIELD: kind, title, text, by,
 status, experiment, answers or evidence (items separated by ";"). FIELD=-
 reads VALUE from stdin, as --text - does, for one FIELD per call. It warns
 about a file: item as add does, and prints the record, then how many of the
-project's records are open.
+project's records are open, as add does; with --quiet, only its id.
 
 The experiments form a tree whose roots are the projects. rec works in the
 project --project names, else in the one whose folder holds the current folder
@@ -168,6 +174,7 @@ positional arguments:
 options:
   -h, --help   show this help message and exit
   --project P
+  --quiet
 exit 0
 
 $ q --help
@@ -254,7 +261,6 @@ exit 0
 
 $ rec add finding "64 kbit/s keeps the accuracy" --in bitrate --text "Accuracy stayed at 0.93." --time 2026-09-10T12:00 --evidence record:48-khz-is-the-most-accurate-rate "sql:SELECT name FROM runs WHERE experiment = 'bitrate'"
 64-kbit-s-keeps-the-accuracy: finding, closed: 64 kbit/s keeps the accuracy
-1 open in audio-codec; rec open lists them
 exit 0
 
 $ rec add question "Where does accuracy drop?" --in bitrate --text "Not measured below 64 kbit/s."
@@ -273,9 +279,20 @@ where-does-accuracy-drop: question, open: Where does accuracy drop?
 2 open in audio-codec; rec open lists them
 exit 0
 
+$ rec add finding "Quietly" --in bitrate --text "x" --quiet
+quietly
+exit 0
+
+$ rec add question "Quiet question" --in bitrate --text "x" --quiet && rec set quiet-question status=closed --quiet && rec open
+quiet-question
+quiet-question
+open in audio-codec (2):
+  does-noise-shaping-lower-the-audible [noise shaping, question] Does noise shaping lower the audible noise?
+  where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
+exit 0
+
 $ rec set 64-kbit-s-keeps-the-accuracy "evidence=record:48-khz-is-the-most-accurate-rate; file:$HOME/audio-codec/tone.wav" "text=Accuracy stayed at 0.93 at 64 kbit/s."
 64-kbit-s-keeps-the-accuracy: finding, closed: 64 kbit/s keeps the accuracy
-2 open in audio-codec; rec open lists them
 exit 0
 
 $ rec add idea "An idea" --in bitrate --text "x"
@@ -299,9 +316,9 @@ error: evidence 'ticket:123' is not one of run:..., file:..., sql:..., record:..
 exit 1
 
 $ rec add finding "Bad time" --in bitrate --text "x" --time yesterday
-usage: rec add [-h] [--project P] --in EXPERIMENT [--experiment EXPERIMENT] --text TEXT [--by BY]
-               [--status STATUS] [--answers ANSWERS] [--evidence [EVIDENCE ...]] [--id ID]
-               [--time TIME]
+usage: rec add [-h] [--project P] [--quiet] --in EXPERIMENT [--experiment EXPERIMENT] --text TEXT
+               [--by BY] [--status STATUS] [--answers ANSWERS] [--evidence [EVIDENCE ...]]
+               [--id ID] [--time TIME]
                kind title
 rec add: error: argument --time: invalid fromisoformat value: 'yesterday'
 exit 2
@@ -331,7 +348,6 @@ exit 0
 
 $ rec add finding "From stdin" --in bitrate --text - <<< $'48 kHz kept "every" word; `rate=48000`, not $RATE.\n\n- one\n' && q "SELECT text FROM records WHERE id = 'from-stdin'"
 from-stdin: finding, closed: From stdin
-2 open in audio-codec; rec open lists them
 48 kHz kept "every" word; `rate=48000`, not $RATE.
 
 - one
@@ -343,7 +359,6 @@ exit 1
 
 $ rec set from-stdin "title=Set from stdin" text=- <<< $'Kept "every" word; `rate=48000`, not $RATE.\n' && q "SELECT title, text FROM records WHERE id = 'from-stdin'"
 from-stdin: finding, closed: Set from stdin
-2 open in audio-codec; rec open lists them
 title: Set from stdin
 text: Kept "every" word; `rate=48000`, not $RATE.
 (1 rows)
@@ -355,17 +370,14 @@ exit 1
 
 $ rec add finding "Dither noise is heard below 16 bits on headphones" --in "16-bit output" --text "x"
 dither-noise-is-heard-below-16-bits-on: finding, closed: Dither noise is heard below 16 bits on headphones
-2 open in audio-codec; rec open lists them
 exit 0
 
 $ rec add finding "Pneumonoultramicroscopicsilicovolcanoconiosis checked" --in bitrate --text "x"
 pneumonoultramicroscopicsilicovolcanocon: finding, closed: Pneumonoultramicroscopicsilicovolcanoconiosis checked
-2 open in audio-codec; rec open lists them
 exit 0
 
 $ rec add finding "Cites a run" --in bitrate --text "x" --evidence "run:$(q "SELECT run FROM runs WHERE name = 'rate 48000, listened to'")" record:keep-48-khz && q "SELECT evidence FROM records WHERE id = 'cites-a-run'"
 cites-a-run: finding, closed: Cites a run
-2 open in audio-codec; rec open lists them
 run:RUN; record:keep-48-khz
 exit 0
 
@@ -378,15 +390,13 @@ error: evidence 'record:nosuch': there is no record nosuch
 exit 1
 
 $ rec add finding "From a worktree" --in bitrate --text "x" --evidence file:~/results-b/out.json file:~/results/out.json
-from-a-worktree: finding, closed: From a worktree
 warning: file:~/results-b/out.json is in a linked git worktree, where a later checkout can change it; log the file with run.log_file and cite run:<run id>
-2 open in audio-codec; rec open lists them
+from-a-worktree: finding, closed: From a worktree
 exit 0
 
 $ rec set from-a-worktree "evidence=file:~/results-b/new/out.json; file:~/audio-codec/tone.wav"
-from-a-worktree: finding, closed: From a worktree
 warning: file:~/results-b/new/out.json is in a linked git worktree, where a later checkout can change it; log the file with run.log_file and cite run:<run id>
-2 open in audio-codec; rec open lists them
+from-a-worktree: finding, closed: From a worktree
 exit 0
 
 $ rec experiment "blur detector" --text "x"
@@ -888,7 +898,6 @@ exit 1
 
 $ cd ~ && rec add finding "From home, named" --in bitrate --text "x" --project audio-codec
 from-home-named: finding, closed: From home, named
-2 open in audio-codec; rec open --project audio-codec lists them
 exit 0
 
 $ cd ~ && python -c "from experiment_lab.lab import Lab; print(Lab(project='audio-codec').run('bitrate', 'from a script').id)"

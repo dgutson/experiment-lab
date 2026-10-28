@@ -200,8 +200,9 @@ answers, and its evidence: items `run:<run id>`, `file:<path>`, `sql:<query over
 `record:<id>`, joined by `; `, the run or record existing. rec warns about a `file:` item in a linked git worktree, where a
 later checkout can change the file; such a file is logged in a run and cited as `run:<run id>`. A
 new question is open and any other record closed unless a status is given, and a record that answers
-an open question closes it. `rec add` and `rec set` print the record they changed and how many of
-the project's records are open; `rec open` lists them. The view `records` has one row per record, with its project, the
+an open question closes it. `rec add` and `rec set` print the records they changed, then, when
+they changed how many of the project's records are open, how many are; `rec open` lists them. With
+`--quiet` they print only the id of the record added or changed. The view `records` has one row per record, with its project, the
 label as its column `experiment`, and its time to the minute (`time`) and in milliseconds
 (`time_ms`, to compare with a run's `start_time`). `--text -` (of `rec add`, `rec experiment` and `rec project`)
 reads the text from stdin, without its last line breaks, so a quoted heredoc

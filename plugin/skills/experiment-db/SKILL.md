@@ -56,8 +56,9 @@ An experiment, in order:
   digits and dashes), else rec makes one from the title's first words and prints it; `--time` its
   time. A time, in rec and in `lab.py` alike, is ISO 8601 text, local unless it ends in `Z` or an
   offset: `"2026-09-10 12:00"`, or `2026-09-10T10:00Z` as it is, with no conversion by hand.
-  `rec set ID FIELD=VALUE` (`status=closed`, `title=...`, `evidence=a;b`); add and set print how
-  many records are open, and `rec open` lists them.
+  `rec set ID FIELD=VALUE` (`status=closed`, `title=...`, `evidence=a;b`); add and set print the
+  records they changed, and how many are open when that changed (`rec open` lists them); with
+  `--quiet`, only the id of the record added or changed.
   Evidence items: `run:<run id>`, `file:<~ or absolute path>`, `sql:<query over the views>`,
   `record:<id>`; rec refuses a run or record id that does not exist. rec writes `lab.db` itself;
   no server is needed, and a text has no length limit. `--text -` reads the text from stdin (for

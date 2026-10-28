@@ -8,7 +8,8 @@ usage: rec project NAME --text DESCRIPTION [--folder F] [--files F] [--views FIL
        rec tree [EXPERIMENT]
        rec add KIND "TITLE" --in EXPERIMENT --text T [--experiment LABEL] [--by WHO]
                             [--status S] [--answers ID] [--evidence ITEM ...] [--id ID] [--time T]
-       rec set ID FIELD=VALUE ...
+                            [--quiet]
+       rec set ID FIELD=VALUE ... [--quiet]
        rec open
        rec run EXPERIMENT NAME [--note T] [--start T]
        rec end RUN [--status FINISHED|FAILED|KILLED] [--at T] [--metric K=V ...] [--tag K=V ...]
@@ -58,13 +59,15 @@ record:<id>, the run or record existing; a file: item in a linked git worktree,
 where a later checkout can change the file, is warned about. --id gives the
 record's id (lower-case letters, digits and dashes), else rec makes one from
 the title's first words; --time its time, now unless given. add prints the
-records it adds or closes, then how many of the project's records are open.
+records it adds or closes, then, if it changed how many of the project's
+records are open, how many are; with --quiet, only the id of the record it
+adds.
 
 set ID FIELD=VALUE ... changes the record ID's FIELD: kind, title, text, by,
 status, experiment, answers or evidence (items separated by ";"). FIELD=-
 reads VALUE from stdin, as --text - does, for one FIELD per call. It warns
 about a file: item as add does, and prints the record, then how many of the
-project's records are open.
+project's records are open, as add does; with --quiet, only its id.
 
 open lists the project's open records.
 
@@ -144,10 +147,23 @@ def show_open(lab: Lab) -> None:
         print(f"  {rid} [{label}, {kind}] {title}")
 
 
-def show_open_count(lab: Lab) -> None:
-    """How many of the project's records are open, and the command that lists them."""
-    named = f" --project {lab.named}" if lab.named else ""
-    print(f"{len(records.open_records(lab, lab.current))} open in {lab.current}; rec open{named} lists them")
+def open_count(lab: Lab) -> int:
+    return len(records.open_records(lab, lab.current))
+
+
+def show_changed(lab: Lab, changed: list[records.Record], before: int, quiet: bool) -> None:
+    """With quiet, the id of the record added or changed, the first; else
+    each record changed, then, if how many of the project's records are open
+    is no longer before, how many are and the command that lists them."""
+    if quiet:
+        print(changed[0]["id"])
+        return
+    for r in changed:
+        show(r)
+    count = open_count(lab)
+    if count != before:
+        named = f" --project {lab.named}" if lab.named else ""
+        print(f"{count} open in {lab.current}; rec open{named} lists them")
 
 
 def run_project(lab: Lab, a: argparse.Namespace) -> None:
@@ -184,12 +200,11 @@ def warn_overwritable(evidence: Iterable[str]) -> None:
 
 
 def run_add(lab: Lab, a: argparse.Namespace) -> None:
-    for r in records.add(lab, a.container, a.kind, a.title, label=a.experiment, text=a.text, author=a.by,
-                         status=a.status, answers=a.answers, evidence=a.evidence, rid=a.id,
-                         time=ms(a.time)):
-        show(r)
+    before = open_count(lab)
+    added = records.add(lab, a.container, a.kind, a.title, label=a.experiment, text=a.text, author=a.by,
+                        status=a.status, answers=a.answers, evidence=a.evidence, rid=a.id, time=ms(a.time))
     warn_overwritable(a.evidence)
-    show_open_count(lab)
+    show_changed(lab, added, before, a.quiet)
 
 
 def run_set(lab: Lab, a: argparse.Namespace) -> None:
@@ -203,9 +218,10 @@ def run_set(lab: Lab, a: argparse.Namespace) -> None:
         value = given_text(value)
         fields[COLUMNS.get(field, field)] = ([v.strip() for v in value.split(";") if v.strip()]
                                              if field == "evidence" else value)
-    show(records.change(lab, a.id, **fields))
+    before = open_count(lab)
+    changed = records.change(lab, a.id, **fields)
     warn_overwritable(fields.get("evidence", []))
-    show_open_count(lab)
+    show_changed(lab, [changed], before, a.quiet)
 
 
 def run_run(lab: Lab, a: argparse.Namespace) -> None:
@@ -248,6 +264,8 @@ def parser() -> argparse.ArgumentParser:
     named.add_argument("--project", metavar="P")
     replace = argparse.ArgumentParser(add_help=False)  # the options of project and experiment
     replace.add_argument("--replace", action="store_true")
+    quiet = argparse.ArgumentParser(add_help=False)  # the options of add and set
+    quiet.add_argument("--quiet", action="store_true")
     sub = p.add_subparsers(dest="command", required=True)
     project = command(sub, "project", replace)
     project.add_argument("name")
@@ -265,7 +283,7 @@ def parser() -> argparse.ArgumentParser:
     tree = command(sub, "tree", named)
     tree.add_argument("top", nargs="?", metavar="EXPERIMENT")
     tree.set_defaults(run=run_tree)
-    add = command(sub, "add", named)
+    add = command(sub, "add", named, quiet)
     add.add_argument("kind")
     add.add_argument("title")
     add.add_argument("--in", dest="container", required=True, metavar="EXPERIMENT")
@@ -278,7 +296,7 @@ def parser() -> argparse.ArgumentParser:
     add.add_argument("--id")
     add.add_argument("--time", type=datetime.datetime.fromisoformat)
     add.set_defaults(run=run_add)
-    setp = command(sub, "set", named)
+    setp = command(sub, "set", named, quiet)
     setp.add_argument("id")
     setp.add_argument("assignments", nargs="+", metavar="FIELD=VALUE")
     setp.set_defaults(run=run_set)

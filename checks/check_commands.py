@@ -33,6 +33,8 @@ rec add finding "64 kbit/s keeps the accuracy" --in bitrate --text "Accuracy sta
 rec add question "Where does accuracy drop?" --in bitrate --text "Not measured below 64 kbit/s."
 rec add decision "Ship 64 kbit/s" --in bitrate --experiment "the bitrate" --by owner --text "It keeps the accuracy." --answers where-does-accuracy-drop
 rec set where-does-accuracy-drop status=open
+rec add finding "Quietly" --in bitrate --text "x" --quiet
+rec add question "Quiet question" --in bitrate --text "x" --quiet && rec set quiet-question status=closed --quiet && rec open
 rec set 64-kbit-s-keeps-the-accuracy "evidence=record:48-khz-is-the-most-accurate-rate; file:$HOME/audio-codec/tone.wav" "text=Accuracy stayed at 0.93 at 64 kbit/s."
 rec add idea "An idea" --in bitrate --text "x"
 rec add finding "Lost" --in nowhere --text "x"
