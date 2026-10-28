@@ -73,8 +73,8 @@ CREATE VIEW experiments_runs_records AS
 SELECT 'experiment' AS kind, name AS id, project, name AS experiment, name AS title, description AS text FROM experiments
 UNION ALL
 SELECT 'run', r.id, x.project, r.experiment, r.name, concat_ws(chr(10), r.note,
-    (SELECT string_agg(key || '=' || value, chr(10) ORDER BY key) FROM lab.params p WHERE p.run = r.id),
-    (SELECT string_agg(key || '=' || value, chr(10) ORDER BY key) FROM lab.tags t WHERE t.run = r.id))
+    (SELECT string_agg(p.key || '=' || p.value, chr(10) ORDER BY p.key) FROM lab.params p WHERE p.run = r.id),
+    (SELECT string_agg(t.key || '=' || t.value, chr(10) ORDER BY t.key) FROM lab.tags t WHERE t.run = r.id))
 FROM lab.runs r JOIN experiments x ON x.name = r.experiment
 UNION ALL
 SELECT 'record', r.id, x.project, r.experiment, r.title, r.text

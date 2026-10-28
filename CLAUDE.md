@@ -16,7 +16,7 @@ kind, a diagram, an audio file and an image. The checks:
 
 - `uv run mypy` and `uv run pyright`: the types of `experiment_lab/` and `checks/`, mypy with
   `--strict`. `uv sync` installs mypy, the Markdown stubs, pyright, ruff, pylint,
-  pylint-complex-struct and Playwright into `.venv` from the `dev` group of `pyproject.toml`, with
+  pylint-complex-struct, sqlfluff and Playwright into `.venv` from the `dev` group of `pyproject.toml`, with
   the package editable. If the two disagree about correct code, mypy stays and pyright goes. mypy
   refuses a `TypedDict` made from a dict built at run time (`Record(**row)`), so a row or rec set's
   fields become one through a function that names every key (`records.as_record`). mypy reports
@@ -28,6 +28,9 @@ kind, a diagram, an audio file and an image. The checks:
   plugin does not load. An annotation nests at most two levels, a name counting as one, so a deeper
   type becomes a type alias (`type Spans = list[Span]`), a `NamedTuple` or a `TypedDict`, and a
   function returns a `NamedTuple` rather than a tuple of different types.
+- `uv run sqlfluff lint experiment_lab/lab.sql`: lab.sql as DuckDB SQL, with the rules of
+  `[tool.sqlfluff.core]` in `pyproject.toml`, which leaves out those of layout and of the file's own
+  style (`lab.runs r` without `AS`, `JOIN`, `USING`, the schema's column names that are keywords).
 - `uv run --script checks/check_views.py` and `uv run --script checks/sqlite_filter_bug.py`: the views
   read the same with `lab.db` attached as with its tables copied. They read the data folder's
   `lab.db`; run them while nothing is logged to it.
