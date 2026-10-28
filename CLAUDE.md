@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 `README.md` is the user documentation: installation and updating, projects and the experiment tree,
-the record format, the architecture diagram, the table of databases, logging from Python, a
+the record format, the architecture diagram, the table of databases, logging and reading runs from Python, a
 project's settings, and the steps for changing the Mermaid or DuckDB version. Read it before changing behavior. This
 file holds what a developer needs beyond it.
 
@@ -45,6 +45,8 @@ kind, a diagram, an audio file and an image. The checks:
   and compares what they print and their exit statuses with `checks/check_commands.txt`. When a change
   to what they print is meant, `--update` rewrites the file, and its diff shows the change. It
   passes under Python 3.12 and 3.14: where their argparse messages differ, it evens them out.
+- `uv run python checks/check_reader.py`: on a new lab of `make_scratch.py`, `Lab.runs` and
+  `Lab.file` read what the views `runs` and `files` and the macro `latest_runs` give.
 - `uv run --script checks/check_pages.py [URL]`: every page of a running server, and its diagrams,
   audio players and images in Chrome, light and dark.
 - `evals/run.sh [--case NAME] [--model sonnet]`: the skill's eval cases, run by agents with and
@@ -98,6 +100,7 @@ changes, not for evals, checks or CI. After the change is on `main`:
   `Lab(project=)`), else the project of the current folder (`lab.holding`), for `Lab.current` and q.
 - Writers: `lab.py` (projects, experiments and runs) and `records.py` (records) use only the
   standard library and Python's sqlite3, so a logging script imports them with `PYTHONPATH` alone.
+  `lab.py` reads runs back the same way (`Lab.runs`, `Lab.file`, `Lab.json`), for a report script.
   Every write is one `Lab.write()` transaction (`BEGIN IMMEDIATE`). `settings.py` and `__init__.py`
   must stay importable without the package's dependencies too.
 - Readers: `query.py` attaches `lab.db` read-only to an in-memory DuckDB with the macro
@@ -137,6 +140,9 @@ Change these together:
 - What rec prints after `rec project` (`project NAME, folder ...`) and `rec experiment`
   (`experiment PROJECT › ... › NAME`): `rec.py` and the graders in `evals/*/case.yaml`,
   which match it.
+- A metric's latest value (of the highest step, then time) and the latest run for each combination
+  of params: the view `runs` and the macro `latest_runs` in `lab.sql`, and `READ` and `latest` in
+  `lab.py`. `checks/check_reader.py` compares them.
 - The order of experiments below the same parent (`created, name`): `rec.tree`, `pages.tree` and
   the Branches list of `pages.experiment`.
 - The DuckDB version: `pyproject.toml`, `checks/check_views.py`, `checks/sqlite_filter_bug.py`.

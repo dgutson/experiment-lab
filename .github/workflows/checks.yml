@@ -29,6 +29,8 @@ jobs:
         run: uv run --script checks/sqlite_filter_bug.py
       - name: Commands print what checks/check_commands.txt holds
         run: uv run python checks/check_commands.py
+      - name: Lab.runs reads what the views read
+        run: uv run python checks/check_reader.py
       - name: Make a lab to check
         run: |
           uv run python checks/make_scratch.py "$RUNNER_TEMP/lab"

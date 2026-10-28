@@ -1,6 +1,6 @@
 ---
 name: experiment-db
-description: "Experiment data kept in the lab's database, lab.db: projects with their experiment trees, runs, parameters, metrics, decisions, findings, protocol rules and open questions. Use it to find past experiments by their text and answer any question about an experiment's state or numbers, or about a project's views, with one SQL call (q), to record a decision, finding, rule or question (rec), and to log runs from Python (experiment_lab.lab), before writing a script over result files."
+description: "Experiment data kept in the lab's database, lab.db: projects with their experiment trees, runs, parameters, metrics, decisions, findings, protocol rules and open questions. Use it to find past experiments by their text and answer any question about an experiment's state or numbers, or about a project's views, with one SQL call (q), to record a decision, finding, rule or question (rec), and to log runs from Python and read them back in a script (experiment_lab.lab), before writing a script over result files."
 ---
 
 # Experiment database
@@ -99,6 +99,17 @@ An experiment, in order:
   `files` (a table function takes no column):
   `q "SET VARIABLE f = (SELECT path FROM files WHERE run = '<run id>' AND name = 'x.json');
   FROM read_json(getvariable('f'))"`.
+- A script reads runs back with `lab.runs`, not by opening lab.db itself:
+
+  ```python
+  for run in lab.runs("rate test", tags={"outcome": "pass"}, latest_by="rate"):  # FINISHED, oldest first
+      print(run.id, run.params["rate"], run.metrics["accuracy"])  # params and tags are text
+      result = lab.json(run.id, "case-1/a.json")  # lab.file(run.id, name): the file's path
+  ```
+
+  Every keyword is optional: `status=None` (any status), `params=` and `tags=` (`{"rate": (16000,
+  48000)}`: a value or a tuple of values), `has_metric="loss"`, and `latest_by`, a param or a list,
+  which keeps the latest run for each combination of their values, as `latest_runs`.
 - Work that runs outside the Python that logs it: `rec run EXPERIMENT NAME [--note T]` before it
   starts prints the run's id. When it ends, log its results and end the run from a script,
   `run = lab.run_by_id("<run id>")`, then `run.log_metrics(...)`, `run.log_file(...)`, `run.end()`;
