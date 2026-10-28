@@ -126,6 +126,9 @@ An experiment, in order:
 `created`, `time`, `started` and `ended` are local time, to the minute (`2026-08-31 21:03`).
 `local_time(ms)` writes any time of the tables (milliseconds, as `lab.metrics.time`) the same way.
 `holds_words(text, words)` is true when text holds every word of words, in any letter case.
+`latest_runs(experiment_name, keys)` is the experiment's latest FINISHED run, by start time, for
+each combination of the values of the params named in the list keys, as rows of `runs`. A later
+run changes what it returns, so evidence cites the runs it returned (`run:<run id>`), not the query.
 
 The project's own view files are listed in its row of `lab.experiments`, column `views`; read
 those files for what each view holds. A query asked again and again goes in a view file, a file of
@@ -145,5 +148,6 @@ SELECT kind, id, experiment, title FROM experiments_runs_records WHERE holds_wor
 SELECT id, kind, status, title FROM records WHERE holds_words(title || ' ' || text, 'sample rate');
 SELECT id, kind, status, title FROM records WHERE status = 'open' OR kind = 'decision' ORDER BY time;
 SELECT experiment, count(*) AS runs FROM runs GROUP BY ALL ORDER BY 2 DESC;
+SELECT name, params['rate'] AS rate, metrics['accuracy'] AS accuracy FROM latest_runs('rate test', ['rate']);
 SELECT key, step, value FROM lab.metrics WHERE run = '<run id>' ORDER BY key, step;
 ```

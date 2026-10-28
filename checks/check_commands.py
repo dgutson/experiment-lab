@@ -79,6 +79,7 @@ q "SELECT name, status FROM runs WHERE experiment = 'sample rate sweep' ORDER BY
 q "SELECT kind, id, experiment, title FROM experiments_runs_records WHERE holds_words(title || ' ' || text, 'RATE sweep') ORDER BY kind, id"
 q "SELECT id, kind, status, title FROM records WHERE holds_words(title || ' ' || text, 'gate  hold') ORDER BY id"
 q "SET TimeZone = 'UTC'; SELECT name, started, ended, minutes FROM runs WHERE experiment = 'sample rate sweep' ORDER BY name LIMIT 2"
+q "SELECT name, params['rate'] AS rate FROM latest_runs('sample rate sweep', ['rate']) ORDER BY name"
 q .views
 q --project vision .views
 q --project vision "FROM blur_scores"

@@ -43,6 +43,14 @@ SELECT r.id AS run, r.experiment, x.project, r.name, r.status, r.start_time, t.t
 FROM lab.runs r JOIN experiments x ON x.name = r.experiment
 LEFT JOIN t ON t.run = r.id LEFT JOIN p ON p.run = r.id LEFT JOIN m ON m.run = r.id;
 
+-- The latest FINISHED run of the experiment experiment_name, by start_time, for
+-- each combination of the values of the params named in the list keys, as rows
+-- of runs: SELECT name, params, metrics FROM latest_runs('rate test', ['rate']).
+-- A param that a run lacks counts as NULL.
+CREATE MACRO latest_runs(experiment_name, keys) AS TABLE
+    SELECT * FROM runs WHERE experiment = experiment_name AND status = 'FINISHED'
+    QUALIFY row_number() OVER (PARTITION BY [params[k] FOR k IN keys] ORDER BY start_time DESC, run DESC) = 1;
+
 -- One row per file logged for a run: run, experiment, project, name (which may
 -- hold folders), bytes and path, the absolute path of the copy, files/<run>/<name>
 -- in the data folder (the macro data_folder(), which query.attach makes).
