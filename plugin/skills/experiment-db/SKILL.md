@@ -82,6 +82,7 @@ An experiment, in order:
       run.log_metrics({"accuracy": 0.91}, step=0)  # every value is kept
       run.set_tags({"outcome": "pass"})
       run.log_file("table.html")                 # copied to the data folder's files/<run id>/
+      run.log_file("out/a.json", name="case-1/a.json")  # name: its path there, which may hold folders
       print(run.id)                              # what evidence cites as run:<run id>
   ```
 
