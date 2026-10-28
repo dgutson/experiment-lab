@@ -35,8 +35,8 @@ An experiment, in order:
   only its rows, then its view files; `--project P` for another project's, `--all` for lab.sql's
   views over every project) on `lab.db`, attached read-only as the catalog `lab`, and prints at
   most 40 rows (`--max N`, `--full` for long cells) of the last statement, naming on stderr the
-  earlier SELECTs, whose rows it leaves out; a result of one cell prints it alone, whole, as stored
-  (`q "SELECT text FROM records WHERE id = '...'"`). `q .views` lists the views and their columns,
+  earlier SELECTs, whose rows it leaves out; a result of one row prints `column: value` lines, and
+  one of one cell prints it alone, whole, as stored (`q "SELECT text FROM records WHERE id = '...'"`). `q .views` lists the views and their columns,
   and `q .keys` the keys of the project's runs' tags, params and metrics, with how many runs have
   each; a key no run has gives NULL, with no error. Query the views: the tables `lab.experiments`,
   `lab.runs`, `lab.params`, `lab.tags`, `lab.metrics`, `lab.files` and `lab.records` hold every

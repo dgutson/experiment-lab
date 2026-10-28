@@ -1,5 +1,5 @@
-"""Runs SQL over the views of the lab's database and prints the result as a
-compact table.
+"""Runs SQL over the views of the lab's database and prints the result: a line
+of column names, then a line per row, cells joined by " | " and not padded.
 
 usage: q [--project P | --all] [--max N] [--full] "SQL"   (SQL from stdin when omitted)
        q [--project P | --all] .views                     (each view and its columns)
@@ -17,8 +17,9 @@ views hold that project's rows only; with --all, they hold every project's and
 no view file runs. From a folder no project holds, q needs --project or --all.
 Several statements may be given; the last one's rows are printed, at most
 --max of them (40), with cells cut at 80 characters unless --full. A result of
-one row and one column prints that cell alone, whole and with its line breaks,
-as in q "SELECT text FROM records WHERE id = '...'". An error about a column
+one row prints a line "column: value" per column, and one of one row and one
+column that cell alone, whole and with its line breaks, as in
+q "SELECT text FROM records WHERE id = '...'". An error about a column
 that is not found names the views that have it, and earlier statements of
 type SELECT, whose rows are not printed, are named on stderr. .keys lists each key of the
 tags, params and metrics of the runs in the view runs, with the number of runs
@@ -46,16 +47,12 @@ def show(t: query.Table, cut: int | None, ordered: bool) -> None:
     """The table with its cells cut at cut characters (None: whole), each on one
     line; ordered: the query's ORDER BY gives every row its place."""
     rows = [[v.replace("\n", " ") for v in query.shorten(r, cut)] for r in t["rows"]]
-    widths = [max([len(n)] + [len(r[i]) for r in rows]) for i, n in enumerate(t["columns"])]
-
-    def fmt(values: list[str]) -> str:
-        return " | ".join(v.rjust(w) if num else v.ljust(w)
-                          for v, w, num in zip(values, widths, t["numeric"])).rstrip()
-
-    print(fmt(t["columns"]))
-    print("-+-".join("-" * w for w in widths))
-    for r in rows:
-        print(fmt(r))
+    if len(rows) == 1 and not t["more"]:
+        lines = [f"{c}: {v}" for c, v in zip(t["columns"], rows[0])]
+    else:
+        lines = [" | ".join(r) for r in [t["columns"], *rows]]
+    for line in lines:
+        print(line.rstrip())
     unordered = "" if ordered else "; without ORDER BY, other rows may come first"
     print(f"({len(rows)} rows{f', more not shown (--max N shows more{unordered})' if t['more'] else ''})")
 
