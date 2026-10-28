@@ -350,11 +350,14 @@ a `with` block, call `run.end()`.
 
 Work that runs outside the Python that logs it, such as a background job, another tool or a person,
 is timed by a run opened before it starts and ended by another process. `rec run EXPERIMENT NAME
-[--note T] [--start T]` starts the run and prints its id. When the work ends, a script logs its
-params, metrics and files through `lab.run_by_id(run_id)`, which refuses an id that is no run of the
-lab's project, and calls `run.end()`; or `rec end RUN [--status FINISHED|FAILED|KILLED]
-[--at T]` ends it. `run.end(at=ms)` and `--at` give an end earlier than now; `rec end` refuses a run
-that has ended and an end before the run's start.
+[--note T] [--start T]` starts the run and prints its id. When the work ends, `rec end RUN
+[--status FINISHED|FAILED|KILLED] [--at T] [--metric K=V ...] [--tag K=V ...] [--file PATH[=NAME] ...]`
+logs its metrics (at step 0), tags and files (copied as NAME, the file's own name unless given),
+then ends it. It refuses a wrong item before it writes anything, a run that has ended and an end
+before the run's start. A result that needs computing, a param or a metric of several steps is
+logged by a script through `lab.run_by_id(run_id)`, which refuses an id that is no run of the lab's
+project, and the script calls `run.end()`. `run.end(at=ms)` and `--at` give an end earlier than
+now.
 
 The macro `latest_runs(experiment_name, keys)` gives an experiment's latest FINISHED run, by start
 time, for each combination of the values of the params named in the list keys, as rows of the view

@@ -11,7 +11,8 @@ usage: rec project NAME --text DESCRIPTION [--folder F] [--files F] [--views FIL
        rec set ID FIELD=VALUE ...
        rec open
        rec run EXPERIMENT NAME [--note T] [--start T]
-       rec end RUN [--status FINISHED|FAILED|KILLED] [--at T]
+       rec end RUN [--status FINISHED|FAILED|KILLED] [--at T] [--metric K=V ...] [--tag K=V ...]
+                   [--file PATH[=NAME] ...]
        (each but project takes --project P)
 
 The experiments form a tree whose roots are the projects. rec works in the
@@ -70,7 +71,12 @@ that runs outside the Python that logs it, and prints its id. --note is the
 run's note, and --start its start, now unless given.
 
 end RUN ends a RUNNING run, FINISHED unless --status says FAILED or KILLED, at
---at, now unless given, which may not be before the run's start.
+--at, now unless given, which may not be before the run's start. First it
+logs its results, as lab.py's log_metrics, set_tags and log_file do: --metric
+KEY=VALUE items, each a number, at step 0 and the end's time; --tag KEY=VALUE
+items; --file items, each PATH, the file copied under its own name, or
+PATH=NAME (split at the last =), copied as NAME. A wrong item is refused
+before anything is written.
 """
 import argparse
 import datetime
@@ -96,6 +102,33 @@ def ms(t: datetime.datetime | None) -> int | None:
 def given_text(value: str) -> str:
     """value; for -, stdin's text without its last line breaks."""
     return sys.stdin.read().rstrip("\n") if value == "-" else value
+
+
+def pair(item: str) -> tuple[str, str]:
+    """KEY=VALUE as (KEY, VALUE)."""
+    key, eq, value = item.partition("=")
+    if not (key and eq):
+        raise argparse.ArgumentTypeError(f"not KEY=VALUE: {item}")
+    return key, value
+
+
+def number(item: str) -> tuple[str, str]:
+    """KEY=VALUE whose VALUE is a number, as (KEY, VALUE)."""
+    key, value = pair(item)
+    try:
+        float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"not a number: {item}") from None
+    return key, value
+
+
+def file_item(item: str) -> tuple[str, str]:
+    """PATH or PATH=NAME, split at the last = unless the whole is a file, as
+    (PATH, NAME), NAME '' when not given; PATH must be a file."""
+    path, _, name = (item, "", "") if Path(item).is_file() else item.rpartition("=")
+    if not Path(path).is_file():
+        raise argparse.ArgumentTypeError(f"no file {path or item}")
+    return path, name
 
 
 def show(r: records.Record) -> None:
@@ -183,7 +216,8 @@ def run_run(lab: Lab, a: argparse.Namespace) -> None:
 
 
 def run_end(lab: Lab, a: argparse.Namespace) -> None:
-    """Ends a RUNNING run, at --at or now, which may not be before its start."""
+    """Logs the results given and ends a RUNNING run, at --at or now, which may
+    not be before its start."""
     run = lab.run_by_id(a.id)
     experiment, name, status, start = lab.db.execute("SELECT experiment, name, status, start_time FROM runs"
                                                      " WHERE id = ?", (a.id,)).fetchone()
@@ -193,6 +227,10 @@ def run_end(lab: Lab, a: argparse.Namespace) -> None:
     if end < start:
         raise ValueError(f"run {name} in {experiment} started at"
                          f" {datetime.datetime.fromtimestamp(start / 1000):%Y-%m-%d %H:%M}, after --at")
+    run.log_metrics({k: float(v) for k, v in a.metric}, at=end)
+    run.set_tags(dict(a.tag))
+    for path, logged_as in a.file:
+        run.log_file(path, logged_as or None)
     run.end(a.status, at=end)
     print(f"run {name} in {experiment}: {a.status}, {(end - start) / 60000:.1f} min")
 
@@ -258,6 +296,9 @@ def parser() -> argparse.ArgumentParser:
     end.add_argument("id", metavar="RUN")
     end.add_argument("--status", choices=("FINISHED", "FAILED", "KILLED"), default="FINISHED")
     end.add_argument("--at", type=datetime.datetime.fromisoformat)
+    end.add_argument("--metric", nargs="+", action="extend", default=[], type=number, metavar="KEY=VALUE")
+    end.add_argument("--tag", nargs="+", action="extend", default=[], type=pair, metavar="KEY=VALUE")
+    end.add_argument("--file", nargs="+", action="extend", default=[], type=file_item, metavar="PATH[=NAME]")
     end.set_defaults(run=run_end)
     return p
 

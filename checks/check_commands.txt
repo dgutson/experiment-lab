@@ -14,7 +14,8 @@ usage: rec project NAME --text DESCRIPTION [--folder F] [--files F] [--views FIL
        rec set ID FIELD=VALUE ...
        rec open
        rec run EXPERIMENT NAME [--note T] [--start T]
-       rec end RUN [--status FINISHED|FAILED|KILLED] [--at T]
+       rec end RUN [--status FINISHED|FAILED|KILLED] [--at T] [--metric K=V ...] [--tag K=V ...]
+                   [--file PATH[=NAME] ...]
        (each but project takes --project P)
 
 The experiments form a tree whose roots are the projects. rec works in the
@@ -73,7 +74,12 @@ that runs outside the Python that logs it, and prints its id. --note is the
 run's note, and --start its start, now unless given.
 
 end RUN ends a RUNNING run, FINISHED unless --status says FAILED or KILLED, at
---at, now unless given, which may not be before the run's start.
+--at, now unless given, which may not be before the run's start. First it
+logs its results, as lab.py's log_metrics, set_tags and log_file do: --metric
+KEY=VALUE items, each a number, at step 0 and the end's time; --tag KEY=VALUE
+items; --file items, each PATH, the file copied under its own name, or
+PATH=NAME (split at the last =), copied as NAME. A wrong item is refused
+before anything is written.
 
 positional arguments:
   {project,experiment,tree,add,set,open,run,end}
@@ -782,14 +788,59 @@ error: run late job in bitrate started at 2026-09-10 12:00, after --at
 exit 1
 
 $ rec end x --status RUNNING
-usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT] RUN
+usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT]
+               [--metric KEY=VALUE [KEY=VALUE ...]] [--tag KEY=VALUE [KEY=VALUE ...]]
+               [--file PATH[=NAME] [PATH[=NAME] ...]]
+               RUN
 rec end: error: argument --status: invalid choice: 'RUNNING' (choose from FINISHED, FAILED, KILLED)
 exit 2
 
 $ rec end x --at yesterday
-usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT] RUN
+usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT]
+               [--metric KEY=VALUE [KEY=VALUE ...]] [--tag KEY=VALUE [KEY=VALUE ...]]
+               [--file PATH[=NAME] [PATH[=NAME] ...]]
+               RUN
 rec end: error: argument --at: invalid fromisoformat value: 'yesterday'
 exit 2
+
+$ echo a > ~/out.txt && id=$(rec run bitrate "shell job" --start "2026-09-10 12:00") && { rec end "$id" --metric accuracy=0.93 --file ~/out.txt ~/missing.txt; q "SELECT status, metrics FROM runs WHERE run = '$id'"; }
+usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT]
+               [--metric KEY=VALUE [KEY=VALUE ...]] [--tag KEY=VALUE [KEY=VALUE ...]]
+               [--file PATH[=NAME] [PATH[=NAME] ...]]
+               RUN
+rec end: error: argument --file: no file FOLDER/home/missing.txt
+status: RUNNING
+metrics:
+(1 rows)
+exit 0
+
+$ rec end x --metric accuracy=high
+usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT]
+               [--metric KEY=VALUE [KEY=VALUE ...]] [--tag KEY=VALUE [KEY=VALUE ...]]
+               [--file PATH[=NAME] [PATH[=NAME] ...]]
+               RUN
+rec end: error: argument --metric: not a number: accuracy=high
+exit 2
+
+$ rec end x --tag outcome
+usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT]
+               [--metric KEY=VALUE [KEY=VALUE ...]] [--tag KEY=VALUE [KEY=VALUE ...]]
+               [--file PATH[=NAME] [PATH[=NAME] ...]]
+               RUN
+rec end: error: argument --tag: not KEY=VALUE: outcome
+exit 2
+
+$ id=$(q "SELECT run FROM runs WHERE name = 'shell job'") && rec end "$id" --at "2026-09-10 12:30" --metric accuracy=0.93 loss=nan --tag outcome=pass --file ~/out.txt ~/out.txt=logs/b.txt && q "SELECT status, tags, metrics FROM runs WHERE run = '$id'" && q "SELECT name, bytes FROM files WHERE run = '$id' ORDER BY name"
+run shell job in bitrate: FINISHED, 30.0 min
+status: FINISHED
+tags: {"outcome": "pass"}
+metrics: {"accuracy": 0.93, "loss": null}
+(1 rows)
+name | bytes
+logs/b.txt | 2
+out.txt | 2
+(2 rows)
+exit 0
 
 $ cd ~ && rec add finding "From home" --in bitrate --text "x"
 error: no project holds FOLDER/home: run in a project's folder, name one (rec --project P, Lab(project="P")), or make one: rec project home --text "what the project is, in one line"

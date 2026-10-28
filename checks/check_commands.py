@@ -126,6 +126,10 @@ rec end "$(q "SELECT run FROM runs WHERE name = 'background job'")"
 id=$(rec run bitrate "late job" --start 2026-09-10T12:00) && rec end "$id" --at 2026-09-10T11:00
 rec end x --status RUNNING
 rec end x --at yesterday
+echo a > ~/out.txt && id=$(rec run bitrate "shell job" --start "2026-09-10 12:00") && { rec end "$id" --metric accuracy=0.93 --file ~/out.txt ~/missing.txt; q "SELECT status, metrics FROM runs WHERE run = '$id'"; }
+rec end x --metric accuracy=high
+rec end x --tag outcome
+id=$(q "SELECT run FROM runs WHERE name = 'shell job'") && rec end "$id" --at "2026-09-10 12:30" --metric accuracy=0.93 loss=nan --tag outcome=pass --file ~/out.txt ~/out.txt=logs/b.txt && q "SELECT status, tags, metrics FROM runs WHERE run = '$id'" && q "SELECT name, bytes FROM files WHERE run = '$id' ORDER BY name"
 cd ~ && rec add finding "From home" --in bitrate --text "x"
 cd ~ && rec experiment "home test" --in bitrate --text "x"
 cd ~ && rec experiment bitrate --dead-end

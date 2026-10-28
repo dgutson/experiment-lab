@@ -115,9 +115,11 @@ An experiment, in order:
   48000)}`: a value or a tuple of values), `has_metric="loss"`, and `latest_by`, a param or a list,
   which keeps the latest run for each combination of their values, as `latest_runs`.
 - Work that runs outside the Python that logs it: `rec run EXPERIMENT NAME [--note T]` before it
-  starts prints the run's id. When it ends, log its results and end the run from a script,
-  `run = lab.run_by_id("<run id>")`, then `run.log_metrics(...)`, `run.log_file(...)`, `run.end()`;
-  or `rec end <run id> [--status FAILED|KILLED]`. `--at "2026-09-10 12:58"` (`run.end(at=ms)`) gives
+  starts prints the run's id. When it ends, `rec end <run id> [--metric K=V ...] [--tag K=V ...]
+  [--file PATH[=NAME] ...] [--status FAILED|KILLED]` logs its results and ends the run (metrics at
+  step 0; NAME, the file's path in the run, its own name unless given). A result that needs
+  computing goes through a script instead: `run = lab.run_by_id("<run id>")`, then
+  `run.log_metrics(...)`, `run.log_file(...)`, `run.end()`. `--at "2026-09-10 12:58"` (`run.end(at=ms)`) gives
   an end earlier than now, and `rec run --start T` a start earlier than now. A run logged after the
   work without its times shows a duration of seconds, which the pages count as measured.
 - The owner reads the same records, experiments, runs and views at http://127.0.0.1:5000/lab, and
