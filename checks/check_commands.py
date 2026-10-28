@@ -112,6 +112,7 @@ q "SET TimeZone = 'UTC'; SELECT TIMESTAMPTZ '2026-01-01 00:00:00+00' AS t"
 q --project nosuch .views
 q "SELECT nosuch FROM runs"
 q "FROM params"
+q "SELECT kind, id FROM texts LIMIT 1"
 q "SELECT params['rate'] + 1 FROM runs"
 q "SELECT name FROM runs WHERE params['rate'] > 20000"
 q "SELECT name FROM lab.experiments WHERE depth = 0"

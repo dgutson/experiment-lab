@@ -147,6 +147,8 @@ Change these together:
   `read.sql`, and `latest` in `lab.py`. `checks/check_reader.py` compares them.
 - The order of experiments below the same parent (`created, name`): `rec.tree`, `pages.tree` and
   the Branches list of `pages.experiment`.
+- A view of `lab.sql` that is renamed: `lab.sql`, and `RENAMED` in `q.py`, which keeps the old name
+  so that q's error about it names the new one to a session whose skill, read once, still uses it.
 - The DuckDB version: `pyproject.toml`, `checks/check_views.py`, `checks/sqlite_filter_bug.py`.
 - The Playwright version: `checks/check_pages.py` and the `dev` group of `pyproject.toml`.
 - The Markdown version: `markdown` in the dependencies of `pyproject.toml` and `types-Markdown`, its

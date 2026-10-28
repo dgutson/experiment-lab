@@ -203,11 +203,12 @@ one row prints a line "column: value" per column, and one of one row and one
 column that cell alone, whole and with its line breaks, as in
 q "SELECT text FROM records WHERE id = '...'". An error about a column
 that is not found names the views that have it; one about the table params,
-tags or metrics, the map column of runs; one about text in params or tags, a
-cast; a list of candidate functions is cut to three. Earlier statements of
-type SELECT, whose rows are not printed, are named on stderr. .keys lists each key of the
-tags, params and metrics of the runs in the view runs, with the number of runs
-that have it.
+tags or metrics, the map column of runs; one about a view that was renamed,
+its new name; one about text in params or tags, a cast; a list of candidate
+functions is cut to three. Earlier statements of type SELECT, whose rows are
+not printed, are named on stderr. .keys lists each key of the tags, params
+and metrics of the runs in the view runs, with the number of runs that have
+it.
 
 positional arguments:
   sql
@@ -710,6 +711,15 @@ Did you mean "lab.params"?
 LINE 1: FROM params
              ^
 params is a map column of the view runs: SELECT params['key'] FROM runs
+exit 1
+
+$ q "SELECT kind, id FROM texts LIMIT 1"
+error: Catalog Error: Table with name texts does not exist!
+Did you mean "experiments_runs_records"?
+
+LINE 1: SELECT kind, id FROM texts LIMIT 1
+                             ^
+the view texts is now named experiments_runs_records
 exit 1
 
 $ q "SELECT params['rate'] + 1 FROM runs"
