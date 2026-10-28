@@ -37,6 +37,8 @@ kind, a diagram, an audio file and an image. The checks:
 - `uv run sqlfluff lint experiment_lab/lab.sql`: lab.sql as DuckDB SQL, with the rules of
   `[tool.sqlfluff.core]` in `pyproject.toml`, which leaves out those of layout and of the file's own
   style (`lab.runs r` without `AS`, `JOIN`, `USING`, the schema's column names that are keywords).
+  `uv run sqlfluff lint --dialect sqlite experiment_lab/read.sql`: read.sql as SQLite SQL, with the
+  same rules.
 - `uv run --script checks/check_views.py` and `uv run --script checks/sqlite_filter_bug.py`: the views
   read the same with `lab.db` attached as with its tables copied. They read the data folder's
   `lab.db`; run them while nothing is logged to it.
@@ -141,8 +143,8 @@ Change these together:
   (`experiment PROJECT › ... › NAME`): `rec.py` and the graders in `evals/*/case.yaml`,
   which match it.
 - A metric's latest value (of the highest step, then time) and the latest run for each combination
-  of params: the view `runs` and the macro `latest_runs` in `lab.sql`, and `READ` and `latest` in
-  `lab.py`. `checks/check_reader.py` compares them.
+  of params: the view `runs` and the macro `latest_runs` in `lab.sql`; the metrics query of
+  `read.sql`, and `latest` in `lab.py`. `checks/check_reader.py` compares them.
 - The order of experiments below the same parent (`created, name`): `rec.tree`, `pages.tree` and
   the Branches list of `pages.experiment`.
 - The DuckDB version: `pyproject.toml`, `checks/check_views.py`, `checks/sqlite_filter_bug.py`.

@@ -237,6 +237,7 @@ a record a text; `rec`, `lab.py` and `records.py` refuse one without. A run's no
 |---|---|
 | `experiment_lab/` | the package; its `__init__.py` lists what each module holds |
 | `experiment_lab/schema.sql` | the tables of `lab.db` |
+| `experiment_lab/read.sql` | the SQLite SQL with which `lab.py` reads runs back |
 | `experiment_lab/lab.sql` | the views `experiments`, `runs`, `files`, `records` and `experiments_runs_records`, which q and the pages query, and the macros `local_time`, `holds_words` and `latest_runs` |
 | `experiment_lab/lab.py` | logging projects, experiments and runs from Python, and reading runs back, with the standard library only |
 | `bin/start.sh` | starts the pages' server, `lab-server`, in the background |

@@ -28,7 +28,8 @@ build-backend = "hatchling.build"
 dev = ["mypy==2.4.0", "types-Markdown==3.10.2.20261007", "pyright==1.1.414", "ruff==0.17.2", "pylint==4.1.3",
        "pylint-complex-struct==0.2.2", "playwright==1.63.0", "sqlfluff==4.4.0"]
 
-# sqlfluff lints lab.sql; the rules left out are of layout and of the file's own style
+# sqlfluff lints lab.sql, and read.sql with --dialect sqlite; the rules left out are of layout and of
+# lab.sql's own style
 [tool.sqlfluff.core]
 dialect = "duckdb"
 exclude_rules = "LT02,LT05,LT07,LT08,LT09,LT14,AL01,AL03,AM04,AM05,RF04,ST06,ST07,ST09"

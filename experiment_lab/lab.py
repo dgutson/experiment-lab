@@ -56,15 +56,7 @@ SCHEMA = Path(__file__).with_name("schema.sql")
 BELOW = ("WITH RECURSIVE below(name) AS (SELECT ? UNION ALL"
          " SELECT e.name FROM experiments e JOIN below ON e.parent = below.name)")
 
-# Each run of the experiment given as the parameter: its params, its tags, and
-# the latest value of each metric as the view runs of lab.sql takes it: of the
-# highest step, then time, then value, NULL the highest as in DuckDB.
-OF_RUNS = "JOIN runs r ON r.id = x.run WHERE r.experiment = ?"
-READ = (f"SELECT x.run, x.key, x.value FROM params x {OF_RUNS} ORDER BY x.key",
-        f"SELECT x.run, x.key, x.value FROM tags x {OF_RUNS} ORDER BY x.key",
-        "SELECT run, key, value FROM (SELECT x.run, x.key, x.value, row_number() OVER (PARTITION BY x.run, x.key"
-        f" ORDER BY x.step DESC, x.time DESC, x.value IS NULL DESC, x.value DESC) AS n FROM metrics x {OF_RUNS})"
-        " WHERE n = 1 ORDER BY key")
+RUNS, *READ = Path(__file__).with_name("read.sql").read_text().split(";")[:4]  # the runs; their params, tags, metrics
 
 type StrPath = str | Path
 type Values = dict[str, Any]  # a run's params, tags or metrics, by key
@@ -386,8 +378,7 @@ class Lab:
 
     def every_run(self, experiment: str) -> list[RunRow]:
         """Every run of the experiment, by start time, then id."""
-        runs = self.db.execute("SELECT id, name, status, start_time, end_time, note FROM runs WHERE experiment = ?"
-                               " ORDER BY start_time, id", (experiment,)).fetchall()
+        runs = self.db.execute(RUNS, (experiment,)).fetchall()
         # read after the runs, so that a run read as ended has all it logged before its end
         params, tags, metrics = (self.by_run(sql, experiment) for sql in READ)
         return [RunRow(rid, name, status, start, end, params.get(rid, {}), tags.get(rid, {}), metrics.get(rid, {}), note)
