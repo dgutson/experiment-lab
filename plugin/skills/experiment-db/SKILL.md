@@ -128,7 +128,17 @@ An experiment, in order:
 `holds_words(text, words)` is true when text holds every word of words, in any letter case.
 
 The project's own view files are listed in its row of `lab.experiments`, column `views`; read
-those files for what each view holds.
+those files for what each view holds. A query asked again and again goes in a view file, a file of
+`CREATE VIEW` statements over these views:
+
+```sql
+-- Each finished run of "rate test", with its accuracy.
+CREATE VIEW accuracy AS SELECT name, metrics['accuracy'] AS accuracy
+    FROM runs WHERE experiment = 'rate test' AND status = 'FINISHED';
+```
+
+`rec project NAME --views FILE ...` sets the project's view files, every one in order. q and the
+owner's pages run them; a Python script does not.
 
 ```sql
 SELECT kind, id, experiment, title FROM experiments_runs_records WHERE holds_words(title || ' ' || text, 'sample rate');
