@@ -204,7 +204,8 @@ an open question closes it. `rec add` and `rec set` print the record they change
 the project's records are open; `rec open` lists them. The view `records` has one row per record, with its project, and the
 label as its column `experiment`. `--text -` (of `rec add`, `rec experiment` and `rec project`)
 reads the text from stdin, without its last line breaks, so a quoted heredoc
-(`--text - <<'EOF'`) or a file (`--text - < notes.md`) needs no escaping.
+(`--text - <<'EOF'`) or a file (`--text - < notes.md`) needs no escaping; so does `FIELD=-` of
+`rec set` (`rec set ID text=- <<'EOF'`), for one field per call.
 
 The Records page shows, under a question's title, the records that answer it, or that it was
 closed without an answer; a question's page shows each answer's text. A record's page links each item of its evidence to its page or file, and shows the rows of a `sql:`

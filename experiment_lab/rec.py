@@ -58,7 +58,8 @@ the title's first words; --time its time, now unless given. add prints the
 records it adds or closes, then how many of the project's records are open.
 
 set ID FIELD=VALUE ... changes the record ID's FIELD: kind, title, text, by,
-status, experiment, answers or evidence (items separated by ";"). It warns
+status, experiment, answers or evidence (items separated by ";"). FIELD=-
+reads VALUE from stdin, as --text - does, for one FIELD per call. It warns
 about a file: item as add does, and prints the record, then how many of the
 project's records are open.
 
@@ -162,11 +163,14 @@ def run_add(lab: Lab, a: argparse.Namespace) -> None:
 
 
 def run_set(lab: Lab, a: argparse.Namespace) -> None:
+    if [x.partition("=")[2] for x in a.assignments].count("-") > 1:
+        raise ValueError("stdin holds one value: one FIELD=- per call")
     fields = {}
     for assignment in a.assignments:
         field, _, value = assignment.partition("=")
         if field not in SETTABLE:
             raise ValueError(f"cannot set {field}; fields: {', '.join(SETTABLE)}")
+        value = given_text(value)
         fields[COLUMNS.get(field, field)] = ([v.strip() for v in value.split(";") if v.strip()]
                                              if field == "evidence" else value)
     show(records.change(lab, a.id, **fields))

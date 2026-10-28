@@ -61,7 +61,8 @@ the title's first words; --time its time, now unless given. add prints the
 records it adds or closes, then how many of the project's records are open.
 
 set ID FIELD=VALUE ... changes the record ID's FIELD: kind, title, text, by,
-status, experiment, answers or evidence (items separated by ";"). It warns
+status, experiment, answers or evidence (items separated by ";"). FIELD=-
+reads VALUE from stdin, as --text - does, for one FIELD per call. It warns
 about a file: item as add does, and prints the record, then how many of the
 project's records are open.
 
@@ -133,7 +134,8 @@ $ rec set --help
 usage: rec set [-h] [--project P] id FIELD=VALUE [FIELD=VALUE ...]
 
 set ID FIELD=VALUE ... changes the record ID's FIELD: kind, title, text, by,
-status, experiment, answers or evidence (items separated by ";"). It warns
+status, experiment, answers or evidence (items separated by ";"). FIELD=-
+reads VALUE from stdin, as --text - does, for one FIELD per call. It warns
 about a file: item as add does, and prints the record, then how many of the
 project's records are open.
 
@@ -325,6 +327,18 @@ exit 0
 
 $ rec add finding "Empty stdin" --in bitrate --text - < /dev/null
 error: a record needs a text: Empty stdin
+exit 1
+
+$ rec set from-stdin "title=Set from stdin" text=- <<< $'Kept "every" word; `rate=48000`, not $RATE.\n' && q "SELECT title, text FROM records WHERE id = 'from-stdin'"
+from-stdin: finding, closed: Set from stdin
+2 open in audio-codec; rec open lists them
+title: Set from stdin
+text: Kept "every" word; `rate=48000`, not $RATE.
+(1 rows)
+exit 0
+
+$ rec set from-stdin text=- title=- < /dev/null
+error: stdin holds one value: one FIELD=- per call
 exit 1
 
 $ rec add finding "Dither noise is heard below 16 bits on headphones" --in "16-bit output" --text "x"

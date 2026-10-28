@@ -59,12 +59,15 @@ An experiment, in order:
   Evidence items: `run:<run id>`, `file:<~ or absolute path>`, `sql:<query over the views>`,
   `record:<id>`; rec refuses a run or record id that does not exist. rec writes `lab.db` itself;
   no server is needed, and a text has no length limit. `--text -` reads the text from stdin (for
-  `rec experiment` and `rec project` too), so a text with line breaks, quotes or backticks goes in
-  a quoted heredoc, which needs no escaping:
+  `rec experiment` and `rec project` too), and so does `FIELD=-` of `rec set`, one field per call,
+  so a text with line breaks, quotes or backticks goes in a quoted heredoc, which needs no escaping:
 
   ```sh
   rec add finding "TITLE" --in NAME --evidence run:<run id> --text - <<'EOF'
   What the runs showed, in Markdown.
+  EOF
+  rec set ID text=- <<'EOF'
+  The whole new text.
   EOF
   ```
 - Evidence must show later what it showed when the record was written. Log a file that a later run
