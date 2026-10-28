@@ -488,6 +488,15 @@ rate 44100 | 2026-09-01 00:03 | 2026-09-01 00:05 |       2
 (2 rows)
 exit 0
 
+$ q "SELECT name, params['rate'] AS rate FROM latest_runs('sample rate sweep', ['rate']) ORDER BY name"
+name                    | rate
+------------------------+------
+rate 16000              | 16000
+rate 44100              | 44100
+rate 48000, listened to | 48000
+(3 rows)
+exit 0
+
 $ q .views
 experiments: name, project, parent, depth, path, dead_end, description, created
 experiments_runs_records: kind, id, project, experiment, title, text

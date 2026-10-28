@@ -88,7 +88,9 @@ An experiment, in order:
 
   Open the run before the work starts, with the work inside the `with` block; the owner's pages add
   up an experiment's run durations. A run ends FINISHED
-  when the `with` block ends and FAILED on an exception. N measurements of one number in a run (one
+  when the `with` block ends and FAILED on an exception. A result loaded rather than computed again
+  is not a new run: add to the run that produced it, `lab.run_by_id("<run id>")`, with `set_tags`
+  or `log_metrics`. N measurements of one number in a run (one
   per session or repetition) go under one key with `step=` set to each, and their mean or count
   under a key of its own: `runs.metrics` holds a key's value of the highest step, `lab.metrics`
   every step. Run `q .keys` before naming a new key, and reuse the project's spelling. A result
@@ -124,14 +126,28 @@ An experiment, in order:
 `created`, `time`, `started` and `ended` are local time, to the minute (`2026-08-31 21:03`).
 `local_time(ms)` writes any time of the tables (milliseconds, as `lab.metrics.time`) the same way.
 `holds_words(text, words)` is true when text holds every word of words, in any letter case.
+`latest_runs(experiment_name, keys)` is the experiment's latest FINISHED run, by start time, for
+each combination of the values of the params named in the list keys, as rows of `runs`. A later
+run changes what it returns, so evidence cites the runs it returned (`run:<run id>`), not the query.
 
 The project's own view files are listed in its row of `lab.experiments`, column `views`; read
-those files for what each view holds.
+those files for what each view holds. A query asked again and again goes in a view file, a file of
+`CREATE VIEW` statements over these views:
+
+```sql
+-- Each finished run of "rate test", with its accuracy.
+CREATE VIEW accuracy AS SELECT name, metrics['accuracy'] AS accuracy
+    FROM runs WHERE experiment = 'rate test' AND status = 'FINISHED';
+```
+
+`rec project NAME --views FILE ...` sets the project's view files, every one in order. q and the
+owner's pages run them; a Python script does not.
 
 ```sql
 SELECT kind, id, experiment, title FROM experiments_runs_records WHERE holds_words(title || ' ' || text, 'sample rate');
 SELECT id, kind, status, title FROM records WHERE holds_words(title || ' ' || text, 'sample rate');
 SELECT id, kind, status, title FROM records WHERE status = 'open' OR kind = 'decision' ORDER BY time;
 SELECT experiment, count(*) AS runs FROM runs GROUP BY ALL ORDER BY 2 DESC;
+SELECT name, params['rate'] AS rate, metrics['accuracy'] AS accuracy FROM latest_runs('rate test', ['rate']);
 SELECT key, step, value FROM lab.metrics WHERE run = '<run id>' ORDER BY key, step;
 ```
