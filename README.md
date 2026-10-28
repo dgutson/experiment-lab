@@ -201,8 +201,9 @@ answers, and its evidence: items `run:<run id>`, `file:<path>`, `sql:<query over
 later checkout can change the file; such a file is logged in a run and cited as `run:<run id>`. A
 new question is open and any other record closed unless a status is given, and a record that answers
 an open question closes it. `rec add` and `rec set` print the record they changed and how many of
-the project's records are open; `rec open` lists them. The view `records` has one row per record, with its project, and the
-label as its column `experiment`. `--text -` (of `rec add`, `rec experiment` and `rec project`)
+the project's records are open; `rec open` lists them. The view `records` has one row per record, with its project, the
+label as its column `experiment`, and its time to the minute (`time`) and in milliseconds
+(`time_ms`, to compare with a run's `start_time`). `--text -` (of `rec add`, `rec experiment` and `rec project`)
 reads the text from stdin, without its last line breaks, so a quoted heredoc
 (`--text - <<'EOF'`) or a file (`--text - < notes.md`) needs no escaping; so does `FIELD=-` of
 `rec set` (`rec set ID text=- <<'EOF'`), for one field per call.
@@ -420,9 +421,9 @@ A view file holds DuckDB `CREATE VIEW` statements over the views of `lab.sql` an
 `lab.metrics`, `lab.files`, `lab.records`). In a project's database the views of `lab.sql` hold only
 that project's rows, whose name `current_project()` returns, and the tables every project's;
 `data_folder()` returns the data folder's absolute path, which the view `files` uses for each
-logged file's `path`. The tables keep times as milliseconds since 1970; the views' `created`,
-`time`, `started` and `ended` are local time to the minute, as `2026-08-31 21:03`, which
-`local_time(ms)` writes. For example:
+logged file's `path`. The tables keep times as milliseconds since 1970, as do the views'
+`start_time`, `end_time` and `time_ms`; their `created`, `time`, `started` and `ended` are local
+time to the minute, as `2026-08-31 21:03`, which `local_time(ms)` writes. For example:
 
 ```sql
 -- One row per finished run of "rate test", with its accuracy.

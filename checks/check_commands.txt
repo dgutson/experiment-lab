@@ -448,7 +448,7 @@ missing.sql: [Errno 2] No such file or directory: 'FOLDER/home/speech/missing.sq
 experiments: name, project, parent, depth, path, dead_end, description, created
 experiments_runs_records: kind, id, project, experiment, title, text
 files: run, experiment, project, name, bytes, path
-records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
+records: id, time, time_ms, project, experiment, kind, title, text, author, status, answers, evidence
 runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, started, ended, minutes, note
 exit 0
 
@@ -527,7 +527,7 @@ $ q .views
 experiments: name, project, parent, depth, path, dead_end, description, created
 experiments_runs_records: kind, id, project, experiment, title, text
 files: run, experiment, project, name, bytes, path
-records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
+records: id, time, time_ms, project, experiment, kind, title, text, author, status, answers, evidence
 runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, started, ended, minutes, note
 exit 0
 
@@ -536,7 +536,7 @@ blur_scores: image, sharpness
 experiments: name, project, parent, depth, path, dead_end, description, created
 experiments_runs_records: kind, id, project, experiment, title, text
 files: run, experiment, project, name, bytes, path
-records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
+records: id, time, time_ms, project, experiment, kind, title, text, author, status, answers, evidence
 runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, started, ended, minutes, note
 exit 0
 
@@ -567,7 +567,7 @@ $ q --all .views
 experiments: name, project, parent, depth, path, dead_end, description, created
 experiments_runs_records: kind, id, project, experiment, title, text
 files: run, experiment, project, name, bytes, path
-records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
+records: id, time, time_ms, project, experiment, kind, title, text, author, status, answers, evidence
 runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, started, ended, minutes, note
 exit 0
 

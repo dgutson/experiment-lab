@@ -140,7 +140,7 @@ An experiment, in order:
 | `experiments` | experiment | name, project, parent, depth (0 for a project), path (`a › b › c`, from the project down to the experiment itself), dead_end, description, created |
 | `runs` | run | run, experiment, project, name, status (RUNNING, FINISHED, FAILED or KILLED), start_time (ms), tags, params, metrics (maps: `metrics['accuracy']` is the latest value, a double; `params['lr']` and tags are text, so `params['lr']::DOUBLE` for a number), end_time (ms), started, ended, minutes (NULL until the run ends), note |
 | `files` | file logged for a run | run, experiment, project, name, bytes, path (the copy's absolute path, `files/<run id>/<name>` in the data folder) |
-| `records` | record | id, time, project, experiment (the label it is shown under), kind, title, text, author, status, answers, evidence (items joined by `; `) |
+| `records` | record | id, time, time_ms (ms, to compare with a run's start_time), project, experiment (the label it is shown under), kind, title, text, author, status, answers, evidence (items joined by `; `) |
 | `experiments_runs_records` | experiment, run and record | kind (`experiment`, `run` or `record`), id, project, experiment, title, text: an experiment's description; a run's note, then its params and tags as `key=value` lines; a record's text |
 
 `created`, `time`, `started` and `ended` are local time, to the minute (`2026-08-31 21:03`).
