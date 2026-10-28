@@ -181,7 +181,9 @@ Several statements may be given; the last one's rows are printed, at most
 one row prints a line "column: value" per column, and one of one row and one
 column that cell alone, whole and with its line breaks, as in
 q "SELECT text FROM records WHERE id = '...'". An error about a column
-that is not found names the views that have it, and earlier statements of
+that is not found names the views that have it; one about the table params,
+tags or metrics, the map column of runs; one about text in params or tags, a
+cast; a list of candidate functions is cut to three. Earlier statements of
 type SELECT, whose rows are not printed, are named on stderr. .keys lists each key of the
 tags, params and metrics of the runs in the view runs, with the number of runs
 that have it.
@@ -663,6 +665,37 @@ Candidate bindings: "note", "status", "minutes", "project", "run"
 
 LINE 1: SELECT nosuch FROM runs
                ^
+exit 1
+
+$ q "FROM params"
+error: Catalog Error: Table with name params does not exist!
+Did you mean "lab.params"?
+
+LINE 1: FROM params
+             ^
+params is a map column of the view runs: SELECT params['key'] FROM runs
+exit 1
+
+$ q "SELECT params['rate'] + 1 FROM runs"
+error: Binder Error: No function matches the given name and argument types '+(VARCHAR, INTEGER_LITERAL)'. You might need to add explicit type casts.
+	Candidate functions:
+	+(TINYINT) -> TINYINT
+	+(TINYINT, TINYINT) -> TINYINT
+	+(SMALLINT) -> SMALLINT
+	…
+
+
+LINE 1: SELECT params['rate'] + 1 FROM runs
+                              ^
+params and tags are text: cast one for a number, as params['rate']::INT or ::DOUBLE
+exit 1
+
+$ q "SELECT name FROM runs WHERE params['rate'] > 20000"
+error: Binder Error: Cannot compare values of type VARCHAR and type INTEGER_LITERAL - an explicit cast is required
+
+LINE 1: SELECT name FROM runs WHERE params['rate'] > 20000
+                                                   ^
+params and tags are text: cast one for a number, as params['rate']::INT or ::DOUBLE
 exit 1
 
 $ q "SELECT name FROM lab.experiments WHERE depth = 0"
