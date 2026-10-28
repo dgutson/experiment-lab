@@ -88,7 +88,9 @@ An experiment, in order:
 
   Open the run before the work starts, with the work inside the `with` block; the owner's pages add
   up an experiment's run durations. A run ends FINISHED
-  when the `with` block ends and FAILED on an exception. N measurements of one number in a run (one
+  when the `with` block ends and FAILED on an exception. A result loaded rather than computed again
+  is not a new run: add to the run that produced it, `lab.run_by_id("<run id>")`, with `set_tags`
+  or `log_metrics`. N measurements of one number in a run (one
   per session or repetition) go under one key with `step=` set to each, and their mean or count
   under a key of its own: `runs.metrics` holds a key's value of the highest step, `lab.metrics`
   every step. Run `q .keys` before naming a new key, and reuse the project's spelling. A result
