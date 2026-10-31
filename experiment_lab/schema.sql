@@ -1,6 +1,7 @@
--- The tables of lab.db. experiment_lab/lab.py makes them when it opens the
--- file; q and the pages read them through the views of lab.sql. Times are
--- milliseconds since 1970; descriptions, notes and record texts are Markdown.
+-- The tables of lab.db. experiment_lab/lab.py makes them in a new lab.db, and
+-- brings an older one to them with the steps of UPGRADES; q and the pages read
+-- them through the views of lab.sql. Times are milliseconds since 1970;
+-- descriptions, notes and record texts are Markdown.
 
 -- The experiments form a tree. One with no parent is a project: folder is
 -- where its work is done (rec, run under it, uses this project), files the
