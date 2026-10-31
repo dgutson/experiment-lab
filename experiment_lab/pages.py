@@ -885,7 +885,7 @@ def main() -> None:
     if not (port.isdigit() and 0 < int(port) < 65536):
         sys.exit(f"error: EXPERIMENT_LAB_PORT is {port!r}, not a port number")
     data = data_folder()
-    # lab.db, or the tables it lacks, made in another process, which prints why it failed: this one reads
+    # lab.db made or upgraded in another process, which prints why it failed: this one reads
     # lab.db with DuckDB only
     if subprocess.run([sys.executable, "-m", "experiment_lab.lab"]).returncode:
         sys.exit(1)

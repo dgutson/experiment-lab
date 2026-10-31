@@ -150,6 +150,13 @@ In a terminal, in this order:
    It stops the server on port `$EXPERIMENT_LAB_PORT` (default 5000), waits for it to end, and
    runs `start.sh`, which prints `running at …`.
 
+Some updates change the tables of `lab.db`. The first program of the new code to open `lab.db`
+upgrades it: rec, q, a logging script, or the server when it starts. It copies `lab.db` to
+`lab.db.v<N>` in the data folder, where N is the version before, then changes the tables in one
+transaction and prints where the copy is. Delete the copy once the new version works. The version
+is SQLite's `PRAGMA user_version`. A `lab.db` of a newer version than the code knows is refused
+until experiment-lab is updated.
+
 ## Projects and the experiment tree
 
 A project is an experiment with no parent. `rec project NAME --text "what the project is"`, run
@@ -397,7 +404,8 @@ does.
 ## The data folder and a project's settings
 
 The lab's files are in the data folder, `$EXPERIMENT_LAB_DATA` (default `~/lab-data`): `lab.db`,
-the runs' files in `files/`, and start.sh's `server.log`. start.sh serves the pages on port
+the runs' files in `files/`, start.sh's `server.log`, and the copy `lab.db.v<N>` that an upgrade
+leaves (Updating). start.sh serves the pages on port
 `$EXPERIMENT_LAB_PORT` (default 5000) and exits at once if a server already answers there;
 restart.sh restarts the server on that port. There is no stop command: kill the `lab-server`
 process, which outlives the shell that started it. `lab.db` and its tables are made by the first

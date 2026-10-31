@@ -494,6 +494,24 @@ $ EXPERIMENT_LAB_DATA=/proc/lab-data rec open
 error: [Errno 2] No such file or directory: '/proc/lab-data'
 exit 1
 
+$ cp -r "$EXPERIMENT_LAB_DATA" ~/old && python -c "import sqlite3; db = sqlite3.connect('$HOME/old/lab.db', isolation_level=None); db.execute('DROP TABLE files'); db.execute('PRAGMA user_version = 0')" && EXPERIMENT_LAB_DATA=~/old rec open > /dev/null && ls ~/old && EXPERIMENT_LAB_DATA=~/old q "SELECT count(*) AS files FROM files" && q "SELECT count(*) AS files FROM files"
+upgraded lab.db from version 0 to 1; its copy from before is FOLDER/home/old/lab.db.v0
+files
+lab.db
+lab.db.v0
+2
+2
+exit 0
+
+$ cp -r "$EXPERIMENT_LAB_DATA" ~/old-q && python -c "import sqlite3; db = sqlite3.connect('$HOME/old-q/lab.db', isolation_level=None); db.execute('DROP TABLE files'); db.execute('PRAGMA user_version = 0')" && EXPERIMENT_LAB_DATA=~/old-q q "SELECT count(*) AS files FROM files"
+upgraded lab.db from version 0 to 1; its copy from before is FOLDER/home/old-q/lab.db.v0
+2
+exit 0
+
+$ cp -r "$EXPERIMENT_LAB_DATA" ~/newer && python -c "import sqlite3; sqlite3.connect('$HOME/newer/lab.db', isolation_level=None).execute('PRAGMA user_version = 99')" && EXPERIMENT_LAB_DATA=~/newer rec open
+error: FOLDER/home/newer/lab.db is of version 99, newer than this experiment-lab's 1: update experiment-lab (README, Updating)
+exit 1
+
 $ q "SELECT name, status FROM runs WHERE experiment = 'sample rate sweep' ORDER BY name"
 name | status
 rate 16000 | FINISHED
