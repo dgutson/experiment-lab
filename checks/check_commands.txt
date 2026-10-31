@@ -11,10 +11,12 @@ usage: rec project NAME --text DESCRIPTION [--folder F] [--files F] [--views FIL
        rec tree [EXPERIMENT]
        rec add KIND "TITLE" --in EXPERIMENT --text T [--experiment LABEL] [--by WHO]
                             [--status S] [--answers ID] [--evidence ITEM ...] [--id ID] [--time T]
-       rec set ID FIELD=VALUE ...
+                            [--quiet]
+       rec set ID FIELD=VALUE ... [--quiet]
        rec open
        rec run EXPERIMENT NAME [--note T] [--start T]
-       rec end RUN [--status FINISHED|FAILED|KILLED] [--at T]
+       rec end RUN [--status FINISHED|FAILED|KILLED] [--at T] [--metric K=V ...] [--tag K=V ...]
+                   [--file PATH[=NAME] ...]
        (each but project takes --project P)
 
 The experiments form a tree whose roots are the projects. rec works in the
@@ -24,8 +26,10 @@ uses only that project's experiments, runs and records; with no project, it
 refuses them, and open prints every project's open records. A --text of -
 reads the text from stdin, without its last line breaks: a quoted heredoc
 (--text - <<'EOF') needs no escaping. add's --time, run's --start and end's
---at are local times as "2026-09-10 12:00" (or 2026-09-10T12:00). The database
-is lab.db in $EXPERIMENT_LAB_DATA, else ~/lab-data.
+--at are ISO 8601 times, as "2026-09-10 12:00" or 2026-09-10T12:00, local
+unless they end in Z or an offset (2026-09-10T10:00Z, 2026-09-10T12:00+02:00),
+as lab.py takes them too. The database is lab.db in $EXPERIMENT_LAB_DATA,
+else ~/lab-data.
 
 project NAME makes a project, once, from its folder, --folder (by default the
 current git repository's main worktree, else the current folder), with --text,
@@ -58,12 +62,15 @@ record:<id>, the run or record existing; a file: item in a linked git worktree,
 where a later checkout can change the file, is warned about. --id gives the
 record's id (lower-case letters, digits and dashes), else rec makes one from
 the title's first words; --time its time, now unless given. add prints the
-records it adds or closes, then how many of the project's records are open.
+records it adds or closes, then, if it changed how many of the project's
+records are open, how many are; with --quiet, only the id of the record it
+adds.
 
 set ID FIELD=VALUE ... changes the record ID's FIELD: kind, title, text, by,
-status, experiment, answers or evidence (items separated by ";"). It warns
+status, experiment, answers or evidence (items separated by ";"). FIELD=-
+reads VALUE from stdin, as --text - does, for one FIELD per call. It warns
 about a file: item as add does, and prints the record, then how many of the
-project's records are open.
+project's records are open, as add does; with --quiet, only its id.
 
 open lists the project's open records.
 
@@ -72,7 +79,12 @@ that runs outside the Python that logs it, and prints its id. --note is the
 run's note, and --start its start, now unless given.
 
 end RUN ends a RUNNING run, FINISHED unless --status says FAILED or KILLED, at
---at, now unless given, which may not be before the run's start.
+--at, now unless given, which may not be before the run's start. First it
+logs its results, as lab.py's log_metrics, set_tags and log_file do: --metric
+KEY=VALUE items, each a number, at step 0 and the end's time; --tag KEY=VALUE
+items; --file items, each PATH, the file copied under its own name, or
+PATH=NAME (split at the last =), copied as NAME. A wrong item is refused
+before anything is written.
 
 positional arguments:
   {project,experiment,tree,add,set,open,run,end}
@@ -82,9 +94,9 @@ options:
 exit 0
 
 $ rec add --help
-usage: rec add [-h] [--project P] --in EXPERIMENT [--experiment EXPERIMENT] --text TEXT [--by BY]
-               [--status STATUS] [--answers ANSWERS] [--evidence [EVIDENCE ...]] [--id ID]
-               [--time TIME]
+usage: rec add [-h] [--project P] [--quiet] --in EXPERIMENT [--experiment EXPERIMENT] --text TEXT
+               [--by BY] [--status STATUS] [--answers ANSWERS] [--evidence [EVIDENCE ...]]
+               [--id ID] [--time TIME]
                kind title
 
 add KIND TITLE files a record in the experiment that --in names, which must
@@ -99,7 +111,9 @@ record:<id>, the run or record existing; a file: item in a linked git worktree,
 where a later checkout can change the file, is warned about. --id gives the
 record's id (lower-case letters, digits and dashes), else rec makes one from
 the title's first words; --time its time, now unless given. add prints the
-records it adds or closes, then how many of the project's records are open.
+records it adds or closes, then, if it changed how many of the project's
+records are open, how many are; with --quiet, only the id of the record it
+adds.
 
 The experiments form a tree whose roots are the projects. rec works in the
 project --project names, else in the one whose folder holds the current folder
@@ -108,8 +122,10 @@ uses only that project's experiments, runs and records; with no project, it
 refuses them, and open prints every project's open records. A --text of -
 reads the text from stdin, without its last line breaks: a quoted heredoc
 (--text - <<'EOF') needs no escaping. add's --time, run's --start and end's
---at are local times as "2026-09-10 12:00" (or 2026-09-10T12:00). The database
-is lab.db in $EXPERIMENT_LAB_DATA, else ~/lab-data.
+--at are ISO 8601 times, as "2026-09-10 12:00" or 2026-09-10T12:00, local
+unless they end in Z or an offset (2026-09-10T10:00Z, 2026-09-10T12:00+02:00),
+as lab.py takes them too. The database is lab.db in $EXPERIMENT_LAB_DATA,
+else ~/lab-data.
 
 positional arguments:
   kind
@@ -118,6 +134,7 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   --project P
+  --quiet
   --in EXPERIMENT
   --experiment EXPERIMENT
   --text TEXT
@@ -130,12 +147,13 @@ options:
 exit 0
 
 $ rec set --help
-usage: rec set [-h] [--project P] id FIELD=VALUE [FIELD=VALUE ...]
+usage: rec set [-h] [--project P] [--quiet] id FIELD=VALUE [FIELD=VALUE ...]
 
 set ID FIELD=VALUE ... changes the record ID's FIELD: kind, title, text, by,
-status, experiment, answers or evidence (items separated by ";"). It warns
+status, experiment, answers or evidence (items separated by ";"). FIELD=-
+reads VALUE from stdin, as --text - does, for one FIELD per call. It warns
 about a file: item as add does, and prints the record, then how many of the
-project's records are open.
+project's records are open, as add does; with --quiet, only its id.
 
 The experiments form a tree whose roots are the projects. rec works in the
 project --project names, else in the one whose folder holds the current folder
@@ -144,8 +162,10 @@ uses only that project's experiments, runs and records; with no project, it
 refuses them, and open prints every project's open records. A --text of -
 reads the text from stdin, without its last line breaks: a quoted heredoc
 (--text - <<'EOF') needs no escaping. add's --time, run's --start and end's
---at are local times as "2026-09-10 12:00" (or 2026-09-10T12:00). The database
-is lab.db in $EXPERIMENT_LAB_DATA, else ~/lab-data.
+--at are ISO 8601 times, as "2026-09-10 12:00" or 2026-09-10T12:00, local
+unless they end in Z or an offset (2026-09-10T10:00Z, 2026-09-10T12:00+02:00),
+as lab.py takes them too. The database is lab.db in $EXPERIMENT_LAB_DATA,
+else ~/lab-data.
 
 positional arguments:
   id
@@ -154,6 +174,7 @@ positional arguments:
 options:
   -h, --help   show this help message and exit
   --project P
+  --quiet
 exit 0
 
 $ q --help
@@ -182,11 +203,12 @@ one row prints a line "column: value" per column, and one of one row and one
 column that cell alone, whole and with its line breaks, as in
 q "SELECT text FROM records WHERE id = '...'". An error about a column
 that is not found names the views that have it; one about the table params,
-tags or metrics, the map column of runs; one about text in params or tags, a
-cast; a list of candidate functions is cut to three. Earlier statements of
-type SELECT, whose rows are not printed, are named on stderr. .keys lists each key of the
-tags, params and metrics of the runs in the view runs, with the number of runs
-that have it.
+tags or metrics, the map column of runs; one about a view that was renamed,
+its new name; one about text in params or tags, a cast; a list of candidate
+functions is cut to three. Earlier statements of type SELECT, whose rows are
+not printed, are named on stderr. .keys lists each key of the tags, params
+and metrics of the runs in the view runs, with the number of runs that have
+it.
 
 positional arguments:
   sql
@@ -240,7 +262,6 @@ exit 0
 
 $ rec add finding "64 kbit/s keeps the accuracy" --in bitrate --text "Accuracy stayed at 0.93." --time 2026-09-10T12:00 --evidence record:48-khz-is-the-most-accurate-rate "sql:SELECT name FROM runs WHERE experiment = 'bitrate'"
 64-kbit-s-keeps-the-accuracy: finding, closed: 64 kbit/s keeps the accuracy
-1 open in audio-codec; rec open lists them
 exit 0
 
 $ rec add question "Where does accuracy drop?" --in bitrate --text "Not measured below 64 kbit/s."
@@ -259,9 +280,20 @@ where-does-accuracy-drop: question, open: Where does accuracy drop?
 2 open in audio-codec; rec open lists them
 exit 0
 
+$ rec add finding "Quietly" --in bitrate --text "x" --quiet
+quietly
+exit 0
+
+$ rec add question "Quiet question" --in bitrate --text "x" --quiet && rec set quiet-question status=closed --quiet && rec open
+quiet-question
+quiet-question
+open in audio-codec (2):
+  does-noise-shaping-lower-the-audible [noise shaping, question] Does noise shaping lower the audible noise?
+  where-does-accuracy-drop [bitrate, question] Where does accuracy drop?
+exit 0
+
 $ rec set 64-kbit-s-keeps-the-accuracy "evidence=record:48-khz-is-the-most-accurate-rate; file:$HOME/audio-codec/tone.wav" "text=Accuracy stayed at 0.93 at 64 kbit/s."
 64-kbit-s-keeps-the-accuracy: finding, closed: 64 kbit/s keeps the accuracy
-2 open in audio-codec; rec open lists them
 exit 0
 
 $ rec add idea "An idea" --in bitrate --text "x"
@@ -285,9 +317,9 @@ error: evidence 'ticket:123' is not one of run:..., file:..., sql:..., record:..
 exit 1
 
 $ rec add finding "Bad time" --in bitrate --text "x" --time yesterday
-usage: rec add [-h] [--project P] --in EXPERIMENT [--experiment EXPERIMENT] --text TEXT [--by BY]
-               [--status STATUS] [--answers ANSWERS] [--evidence [EVIDENCE ...]] [--id ID]
-               [--time TIME]
+usage: rec add [-h] [--project P] [--quiet] --in EXPERIMENT [--experiment EXPERIMENT] --text TEXT
+               [--by BY] [--status STATUS] [--answers ANSWERS] [--evidence [EVIDENCE ...]]
+               [--id ID] [--time TIME]
                kind title
 rec add: error: argument --time: invalid fromisoformat value: 'yesterday'
 exit 2
@@ -317,7 +349,6 @@ exit 0
 
 $ rec add finding "From stdin" --in bitrate --text - <<< $'48 kHz kept "every" word; `rate=48000`, not $RATE.\n\n- one\n' && q "SELECT text FROM records WHERE id = 'from-stdin'"
 from-stdin: finding, closed: From stdin
-2 open in audio-codec; rec open lists them
 48 kHz kept "every" word; `rate=48000`, not $RATE.
 
 - one
@@ -327,19 +358,27 @@ $ rec add finding "Empty stdin" --in bitrate --text - < /dev/null
 error: a record needs a text: Empty stdin
 exit 1
 
+$ rec set from-stdin "title=Set from stdin" text=- <<< $'Kept "every" word; `rate=48000`, not $RATE.\n' && q "SELECT title, text FROM records WHERE id = 'from-stdin'"
+from-stdin: finding, closed: Set from stdin
+title: Set from stdin
+text: Kept "every" word; `rate=48000`, not $RATE.
+(1 rows)
+exit 0
+
+$ rec set from-stdin text=- title=- < /dev/null
+error: stdin holds one value: one FIELD=- per call
+exit 1
+
 $ rec add finding "Dither noise is heard below 16 bits on headphones" --in "16-bit output" --text "x"
 dither-noise-is-heard-below-16-bits-on: finding, closed: Dither noise is heard below 16 bits on headphones
-2 open in audio-codec; rec open lists them
 exit 0
 
 $ rec add finding "Pneumonoultramicroscopicsilicovolcanoconiosis checked" --in bitrate --text "x"
 pneumonoultramicroscopicsilicovolcanocon: finding, closed: Pneumonoultramicroscopicsilicovolcanoconiosis checked
-2 open in audio-codec; rec open lists them
 exit 0
 
 $ rec add finding "Cites a run" --in bitrate --text "x" --evidence "run:$(q "SELECT run FROM runs WHERE name = 'rate 48000, listened to'")" record:keep-48-khz && q "SELECT evidence FROM records WHERE id = 'cites-a-run'"
 cites-a-run: finding, closed: Cites a run
-2 open in audio-codec; rec open lists them
 run:RUN; record:keep-48-khz
 exit 0
 
@@ -352,15 +391,13 @@ error: evidence 'record:nosuch': there is no record nosuch
 exit 1
 
 $ rec add finding "From a worktree" --in bitrate --text "x" --evidence file:~/results-b/out.json file:~/results/out.json
-from-a-worktree: finding, closed: From a worktree
 warning: file:~/results-b/out.json is in a linked git worktree, where a later checkout can change it; log the file with run.log_file and cite run:<run id>
-2 open in audio-codec; rec open lists them
+from-a-worktree: finding, closed: From a worktree
 exit 0
 
 $ rec set from-a-worktree "evidence=file:~/results-b/new/out.json; file:~/audio-codec/tone.wav"
-from-a-worktree: finding, closed: From a worktree
 warning: file:~/results-b/new/out.json is in a linked git worktree, where a later checkout can change it; log the file with run.log_file and cite run:<run id>
-2 open in audio-codec; rec open lists them
+from-a-worktree: finding, closed: From a worktree
 exit 0
 
 $ rec experiment "blur detector" --text "x"
@@ -422,7 +459,7 @@ missing.sql: [Errno 2] No such file or directory: 'FOLDER/home/speech/missing.sq
 experiments: name, project, parent, depth, path, dead_end, description, created
 experiments_runs_records: kind, id, project, experiment, title, text
 files: run, experiment, project, name, bytes, path
-records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
+records: id, time, time_ms, project, experiment, kind, title, text, author, status, answers, evidence
 runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, started, ended, minutes, note
 exit 0
 
@@ -501,7 +538,7 @@ $ q .views
 experiments: name, project, parent, depth, path, dead_end, description, created
 experiments_runs_records: kind, id, project, experiment, title, text
 files: run, experiment, project, name, bytes, path
-records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
+records: id, time, time_ms, project, experiment, kind, title, text, author, status, answers, evidence
 runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, started, ended, minutes, note
 exit 0
 
@@ -510,7 +547,7 @@ blur_scores: image, sharpness
 experiments: name, project, parent, depth, path, dead_end, description, created
 experiments_runs_records: kind, id, project, experiment, title, text
 files: run, experiment, project, name, bytes, path
-records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
+records: id, time, time_ms, project, experiment, kind, title, text, author, status, answers, evidence
 runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, started, ended, minutes, note
 exit 0
 
@@ -541,7 +578,7 @@ $ q --all .views
 experiments: name, project, parent, depth, path, dead_end, description, created
 experiments_runs_records: kind, id, project, experiment, title, text
 files: run, experiment, project, name, bytes, path
-records: id, time, project, experiment, kind, title, text, author, status, answers, evidence
+records: id, time, time_ms, project, experiment, kind, title, text, author, status, answers, evidence
 runs: run, experiment, project, name, status, start_time, tags, params, metrics, end_time, started, ended, minutes, note
 exit 0
 
@@ -676,6 +713,15 @@ LINE 1: FROM params
 params is a map column of the view runs: SELECT params['key'] FROM runs
 exit 1
 
+$ q "SELECT kind, id FROM texts LIMIT 1"
+error: Catalog Error: Table with name texts does not exist!
+Did you mean "experiments_runs_records"?
+
+LINE 1: SELECT kind, id FROM texts LIMIT 1
+                             ^
+the view texts is now named experiments_runs_records
+exit 1
+
 $ q "SELECT params['rate'] + 1 FROM runs"
 error: Binder Error: No function matches the given name and argument types '+(VARCHAR, INTEGER_LITERAL)'. You might need to add explicit type casts.
 	Candidate functions:
@@ -768,14 +814,73 @@ error: run late job in bitrate started at 2026-09-10 12:00, after --at
 exit 1
 
 $ rec end x --status RUNNING
-usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT] RUN
+usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT]
+               [--metric KEY=VALUE [KEY=VALUE ...]] [--tag KEY=VALUE [KEY=VALUE ...]]
+               [--file PATH[=NAME] [PATH[=NAME] ...]]
+               RUN
 rec end: error: argument --status: invalid choice: 'RUNNING' (choose from FINISHED, FAILED, KILLED)
 exit 2
 
 $ rec end x --at yesterday
-usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT] RUN
+usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT]
+               [--metric KEY=VALUE [KEY=VALUE ...]] [--tag KEY=VALUE [KEY=VALUE ...]]
+               [--file PATH[=NAME] [PATH[=NAME] ...]]
+               RUN
 rec end: error: argument --at: invalid fromisoformat value: 'yesterday'
 exit 2
+
+$ id=$(rec run bitrate "utc job" --start 2026-09-10T10:00Z) && rec end "$id" --at 2026-09-10T12:30+02:00 && q "SET TimeZone = 'UTC'; SELECT started, ended FROM runs WHERE run = '$id'"
+run utc job in bitrate: FINISHED, 30.0 min
+started: 2026-09-10 10:00
+ended: 2026-09-10 10:30
+(1 rows)
+exit 0
+
+$ python -c "import datetime; from experiment_lab.lab import Lab; r = Lab().run('bitrate', 'python times', start='2026-09-10T10:00Z'); r.log_metrics({'x': 1}, at='2026-09-10 10:10+00:00'); r.end(at=datetime.datetime(2026, 9, 10, 10, 30, tzinfo=datetime.UTC))" && q "SET TimeZone = 'UTC'; SELECT r.started, r.ended, local_time(m.time) AS measured FROM runs r JOIN lab.metrics m ON m.run = r.run WHERE r.name = 'python times'"
+started: 2026-09-10 10:00
+ended: 2026-09-10 10:30
+measured: 2026-09-10 10:10
+(1 rows)
+exit 0
+
+$ echo a > ~/out.txt && id=$(rec run bitrate "shell job" --start "2026-09-10 12:00") && { rec end "$id" --metric accuracy=0.93 --file ~/out.txt ~/missing.txt; q "SELECT status, metrics FROM runs WHERE run = '$id'"; }
+usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT]
+               [--metric KEY=VALUE [KEY=VALUE ...]] [--tag KEY=VALUE [KEY=VALUE ...]]
+               [--file PATH[=NAME] [PATH[=NAME] ...]]
+               RUN
+rec end: error: argument --file: no file FOLDER/home/missing.txt
+status: RUNNING
+metrics:
+(1 rows)
+exit 0
+
+$ rec end x --metric accuracy=high
+usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT]
+               [--metric KEY=VALUE [KEY=VALUE ...]] [--tag KEY=VALUE [KEY=VALUE ...]]
+               [--file PATH[=NAME] [PATH[=NAME] ...]]
+               RUN
+rec end: error: argument --metric: not a number: accuracy=high
+exit 2
+
+$ rec end x --tag outcome
+usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT]
+               [--metric KEY=VALUE [KEY=VALUE ...]] [--tag KEY=VALUE [KEY=VALUE ...]]
+               [--file PATH[=NAME] [PATH[=NAME] ...]]
+               RUN
+rec end: error: argument --tag: not KEY=VALUE: outcome
+exit 2
+
+$ id=$(q "SELECT run FROM runs WHERE name = 'shell job'") && rec end "$id" --at "2026-09-10 12:30" --metric accuracy=0.93 loss=nan --tag outcome=pass --file ~/out.txt ~/out.txt=logs/b.txt && q "SELECT status, tags, metrics FROM runs WHERE run = '$id'" && q "SELECT name, bytes FROM files WHERE run = '$id' ORDER BY name"
+run shell job in bitrate: FINISHED, 30.0 min
+status: FINISHED
+tags: {"outcome": "pass"}
+metrics: {"accuracy": 0.93, "loss": null}
+(1 rows)
+name | bytes
+logs/b.txt | 2
+out.txt | 2
+(2 rows)
+exit 0
 
 $ cd ~ && rec add finding "From home" --in bitrate --text "x"
 error: no project holds FOLDER/home: run in a project's folder, name one (rec --project P, Lab(project="P")), or make one: rec project home --text "what the project is, in one line"
@@ -803,7 +908,6 @@ exit 1
 
 $ cd ~ && rec add finding "From home, named" --in bitrate --text "x" --project audio-codec
 from-home-named: finding, closed: From home, named
-2 open in audio-codec; rec open --project audio-codec lists them
 exit 0
 
 $ cd ~ && python -c "from experiment_lab.lab import Lab; print(Lab(project='audio-codec').run('bitrate', 'from a script').id)"

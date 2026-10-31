@@ -27,10 +27,13 @@ used; with no project, they are refused.
 A run ends FINISHED when its with block ends, FAILED on an exception, KILLED
 on Ctrl-C; without a with block, call end(). For work that runs elsewhere, a
 run started before it (rec run, or lab.run without with) is ended by another
-process: lab.run_by_id(run_id).end(), end(at=ms) for an earlier end, or rec
-end. Several processes may write at once without a server: the database is in
-WAL mode, every write is one short transaction, and a writer waits up to a
-minute for another's to end.
+process: lab.run_by_id(run_id).end(), end(at=...) for an earlier end, or rec
+end. A time (lab.run's start, log_metrics's and end's at) is milliseconds
+since 1970, a datetime, or text as rec takes it: ISO 8601, as
+"2026-09-10 12:00", local unless it ends in Z or an offset. Several processes
+may write at once without a server: the database is in WAL mode, every write
+is one short transaction, and a writer waits up to a minute for another's to
+end.
 
 lab.runs reads an experiment's FINISHED runs back, oldest first; its keywords
 keep those with the params, tags or metric given, and the latest for each
@@ -38,6 +41,7 @@ combination of the values of the params latest_by names, as q's latest_runs.
 lab.file and lab.json read a file that a run logged.
 """
 import contextlib
+import datetime
 import json
 import shutil
 import sqlite3
@@ -63,6 +67,7 @@ type StrPath = str | Path
 type Values = dict[str, Any]  # a run's params, tags or metrics, by key
 type Names = Sequence[str]
 type Keys = str | Names  # a param's name, or a list of them
+type Time = int | str | datetime.datetime  # milliseconds since 1970, or what ms reads
 
 
 class Project(NamedTuple):
@@ -86,6 +91,14 @@ class RunRow(NamedTuple):
 
 def now() -> int:
     return int(time.time() * 1000)
+
+
+def ms(t: Time | None) -> int | None:
+    """t in milliseconds since 1970; None if None. Text is read by
+    datetime.fromisoformat: ISO 8601, local unless it ends in Z or an offset."""
+    if isinstance(t, str):
+        t = datetime.datetime.fromisoformat(t)
+    return int(t.timestamp() * 1000) if isinstance(t, datetime.datetime) else t
 
 
 def worktrees(folder: Path) -> list[Path]:
@@ -342,13 +355,13 @@ class Lab:
             raise ValueError(f"{name!r} is in the project {project}, not in {current}, {whose}{hint}")
 
     def run(self, experiment: str, name: str, *, note: str = "", params: Mapping[str, object] | None = None,
-            tags: Mapping[str, object] | None = None, start: int | None = None) -> "Run":
+            tags: Mapping[str, object] | None = None, start: Time | None = None) -> "Run":
         """Starts a run, RUNNING, in an existing experiment."""
         self.check_experiment(experiment)
         run = Run(self, uuid.uuid4().hex)
         with self.write() as db:
             db.execute("INSERT INTO runs (id, experiment, name, status, start_time, note) VALUES (?, ?, ?, ?, ?, ?)",
-                       (run.id, experiment, name, "RUNNING", start or now(), note))
+                       (run.id, experiment, name, "RUNNING", ms(start) or now(), note))
         if params:
             run.log_params(params)
         if tags:
@@ -424,10 +437,11 @@ class Run:
     def set_tags(self, tags: Mapping[str, object]) -> None:
         self.put("tags", tags)
 
-    def log_metrics(self, metrics: Mapping[str, float], step: int = 0, at: int | None = None) -> None:
+    def log_metrics(self, metrics: Mapping[str, float], step: int = 0, at: Time | None = None) -> None:
+        when = ms(at) or now()
         with self.lab.write() as db:
             db.executemany("INSERT INTO metrics (run, key, value, step, time) VALUES (?, ?, ?, ?, ?)",
-                           [(self.id, k, float(v), step, at or now()) for k, v in metrics.items()])
+                           [(self.id, k, float(v), step, when) for k, v in metrics.items()])
 
     def set_note(self, text: str) -> None:
         with self.lab.write() as db:
@@ -462,11 +476,10 @@ class Run:
                        (self.id, target.relative_to(folder).as_posix(), target.stat().st_size))
         return target
 
-    def end(self, status: str = "FINISHED", at: int | None = None) -> None:
-        """Ends the run with status, at the time at (milliseconds since 1970;
-        now unless given)."""
+    def end(self, status: str = "FINISHED", at: Time | None = None) -> None:
+        """Ends the run with status, at the time at (now unless given)."""
         with self.lab.write() as db:
-            db.execute("UPDATE runs SET status = ?, end_time = ? WHERE id = ?", (status, at or now(), self.id))
+            db.execute("UPDATE runs SET status = ?, end_time = ? WHERE id = ?", (status, ms(at) or now(), self.id))
 
 
 if __name__ == "__main__":  # for lab-server: makes lab.db, or the tables it lacks; --delete PROJECT deletes one

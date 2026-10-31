@@ -200,11 +200,14 @@ answers, and its evidence: items `run:<run id>`, `file:<path>`, `sql:<query over
 `record:<id>`, joined by `; `, the run or record existing. rec warns about a `file:` item in a linked git worktree, where a
 later checkout can change the file; such a file is logged in a run and cited as `run:<run id>`. A
 new question is open and any other record closed unless a status is given, and a record that answers
-an open question closes it. `rec add` and `rec set` print the record they changed and how many of
-the project's records are open; `rec open` lists them. The view `records` has one row per record, with its project, and the
-label as its column `experiment`. `--text -` (of `rec add`, `rec experiment` and `rec project`)
+an open question closes it. `rec add` and `rec set` print the records they changed, then, when
+they changed how many of the project's records are open, how many are; `rec open` lists them. With
+`--quiet` they print only the id of the record added or changed. The view `records` has one row per record, with its project, the
+label as its column `experiment`, and its time to the minute (`time`) and in milliseconds
+(`time_ms`, to compare with a run's `start_time`). `--text -` (of `rec add`, `rec experiment` and `rec project`)
 reads the text from stdin, without its last line breaks, so a quoted heredoc
-(`--text - <<'EOF'`) or a file (`--text - < notes.md`) needs no escaping.
+(`--text - <<'EOF'`) or a file (`--text - < notes.md`) needs no escaping; so does `FIELD=-` of
+`rec set` (`rec set ID text=- <<'EOF'`), for one field per call.
 
 The Records page shows, under a question's title, the records that answer it, or that it was
 closed without an answer; a question's page shows each answer's text. A record's page links each item of its evidence to its page or file, and shows the rows of a `sql:`
@@ -349,11 +352,19 @@ a `with` block, call `run.end()`.
 
 Work that runs outside the Python that logs it, such as a background job, another tool or a person,
 is timed by a run opened before it starts and ended by another process. `rec run EXPERIMENT NAME
-[--note T] [--start T]` starts the run and prints its id. When the work ends, a script logs its
-params, metrics and files through `lab.run_by_id(run_id)`, which refuses an id that is no run of the
-lab's project, and calls `run.end()`; or `rec end RUN [--status FINISHED|FAILED|KILLED]
-[--at T]` ends it. `run.end(at=ms)` and `--at` give an end earlier than now; `rec end` refuses a run
-that has ended and an end before the run's start.
+[--note T] [--start T]` starts the run and prints its id. When the work ends, `rec end RUN
+[--status FINISHED|FAILED|KILLED] [--at T] [--metric K=V ...] [--tag K=V ...] [--file PATH[=NAME] ...]`
+logs its metrics (at step 0), tags and files (copied as NAME, the file's own name unless given),
+then ends it. It refuses a wrong item before it writes anything, a run that has ended and an end
+before the run's start. A result that needs computing, a param or a metric of several steps is
+logged by a script through `lab.run_by_id(run_id)`, which refuses an id that is no run of the lab's
+project, and the script calls `run.end()`. `run.end(at=...)` and `--at` give an end earlier than
+now.
+
+A time, in rec (`rec add --time`, `rec run --start`, `rec end --at`) and in `lab.py` (`lab.run(start=)`,
+`run.log_metrics(at=)`, `run.end(at=)`), is ISO 8601 text, as `"2026-09-10 12:00"` or
+`2026-09-10T12:00`, local unless it ends in `Z` or an offset (`2026-09-10T10:00Z`,
+`2026-09-10T12:00+02:00`). `lab.py` also takes a `datetime`, or milliseconds since 1970.
 
 The macro `latest_runs(experiment_name, keys)` gives an experiment's latest FINISHED run, by start
 time, for each combination of the values of the params named in the list keys, as rows of the view
@@ -411,9 +422,9 @@ A view file holds DuckDB `CREATE VIEW` statements over the views of `lab.sql` an
 `lab.metrics`, `lab.files`, `lab.records`). In a project's database the views of `lab.sql` hold only
 that project's rows, whose name `current_project()` returns, and the tables every project's;
 `data_folder()` returns the data folder's absolute path, which the view `files` uses for each
-logged file's `path`. The tables keep times as milliseconds since 1970; the views' `created`,
-`time`, `started` and `ended` are local time to the minute, as `2026-08-31 21:03`, which
-`local_time(ms)` writes. For example:
+logged file's `path`. The tables keep times as milliseconds since 1970, as do the views'
+`start_time`, `end_time` and `time_ms`; their `created`, `time`, `started` and `ended` are local
+time to the minute, as `2026-08-31 21:03`, which `local_time(ms)` writes. For example:
 
 ```sql
 -- One row per finished run of "rate test", with its accuracy.

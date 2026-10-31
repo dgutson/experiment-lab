@@ -8,10 +8,12 @@ usage: rec project NAME --text DESCRIPTION [--folder F] [--files F] [--views FIL
        rec tree [EXPERIMENT]
        rec add KIND "TITLE" --in EXPERIMENT --text T [--experiment LABEL] [--by WHO]
                             [--status S] [--answers ID] [--evidence ITEM ...] [--id ID] [--time T]
-       rec set ID FIELD=VALUE ...
+                            [--quiet]
+       rec set ID FIELD=VALUE ... [--quiet]
        rec open
        rec run EXPERIMENT NAME [--note T] [--start T]
-       rec end RUN [--status FINISHED|FAILED|KILLED] [--at T]
+       rec end RUN [--status FINISHED|FAILED|KILLED] [--at T] [--metric K=V ...] [--tag K=V ...]
+                   [--file PATH[=NAME] ...]
        (each but project takes --project P)
 
 The experiments form a tree whose roots are the projects. rec works in the
@@ -21,8 +23,10 @@ uses only that project's experiments, runs and records; with no project, it
 refuses them, and open prints every project's open records. A --text of -
 reads the text from stdin, without its last line breaks: a quoted heredoc
 (--text - <<'EOF') needs no escaping. add's --time, run's --start and end's
---at are local times as "2026-09-10 12:00" (or 2026-09-10T12:00). The database
-is lab.db in $EXPERIMENT_LAB_DATA, else ~/lab-data.
+--at are ISO 8601 times, as "2026-09-10 12:00" or 2026-09-10T12:00, local
+unless they end in Z or an offset (2026-09-10T10:00Z, 2026-09-10T12:00+02:00),
+as lab.py takes them too. The database is lab.db in $EXPERIMENT_LAB_DATA,
+else ~/lab-data.
 
 project NAME makes a project, once, from its folder, --folder (by default the
 current git repository's main worktree, else the current folder), with --text,
@@ -55,12 +59,15 @@ record:<id>, the run or record existing; a file: item in a linked git worktree,
 where a later checkout can change the file, is warned about. --id gives the
 record's id (lower-case letters, digits and dashes), else rec makes one from
 the title's first words; --time its time, now unless given. add prints the
-records it adds or closes, then how many of the project's records are open.
+records it adds or closes, then, if it changed how many of the project's
+records are open, how many are; with --quiet, only the id of the record it
+adds.
 
 set ID FIELD=VALUE ... changes the record ID's FIELD: kind, title, text, by,
-status, experiment, answers or evidence (items separated by ";"). It warns
+status, experiment, answers or evidence (items separated by ";"). FIELD=-
+reads VALUE from stdin, as --text - does, for one FIELD per call. It warns
 about a file: item as add does, and prints the record, then how many of the
-project's records are open.
+project's records are open, as add does; with --quiet, only its id.
 
 open lists the project's open records.
 
@@ -69,7 +76,12 @@ that runs outside the Python that logs it, and prints its id. --note is the
 run's note, and --start its start, now unless given.
 
 end RUN ends a RUNNING run, FINISHED unless --status says FAILED or KILLED, at
---at, now unless given, which may not be before the run's start.
+--at, now unless given, which may not be before the run's start. First it
+logs its results, as lab.py's log_metrics, set_tags and log_file do: --metric
+KEY=VALUE items, each a number, at step 0 and the end's time; --tag KEY=VALUE
+items; --file items, each PATH, the file copied under its own name, or
+PATH=NAME (split at the last =), copied as NAME. A wrong item is refused
+before anything is written.
 """
 import argparse
 import datetime
@@ -79,7 +91,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from experiment_lab import records
-from experiment_lab.lab import Lab, now
+from experiment_lab.lab import Lab, ms, now
 
 # rec's field names for the columns of records that differ
 COLUMNS = {"by": "author", "experiment": "label"}
@@ -87,14 +99,36 @@ SETTABLE = ("kind", "title", "text", "by", "status", "experiment", "answers", "e
 type Commands = argparse._SubParsersAction[argparse.ArgumentParser]  # what add_subparsers returns
 
 
-def ms(t: datetime.datetime | None) -> int | None:
-    """t in milliseconds since 1970; None if None."""
-    return None if t is None else int(t.timestamp() * 1000)
-
-
 def given_text(value: str) -> str:
     """value; for -, stdin's text without its last line breaks."""
     return sys.stdin.read().rstrip("\n") if value == "-" else value
+
+
+def pair(item: str) -> tuple[str, str]:
+    """KEY=VALUE as (KEY, VALUE)."""
+    key, eq, value = item.partition("=")
+    if not (key and eq):
+        raise argparse.ArgumentTypeError(f"not KEY=VALUE: {item}")
+    return key, value
+
+
+def number(item: str) -> tuple[str, str]:
+    """KEY=VALUE whose VALUE is a number, as (KEY, VALUE)."""
+    key, value = pair(item)
+    try:
+        float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"not a number: {item}") from None
+    return key, value
+
+
+def file_item(item: str) -> tuple[str, str]:
+    """PATH or PATH=NAME, split at the last = unless the whole is a file, as
+    (PATH, NAME), NAME '' when not given; PATH must be a file."""
+    path, _, name = (item, "", "") if Path(item).is_file() else item.rpartition("=")
+    if not Path(path).is_file():
+        raise argparse.ArgumentTypeError(f"no file {path or item}")
+    return path, name
 
 
 def show(r: records.Record) -> None:
@@ -113,10 +147,23 @@ def show_open(lab: Lab) -> None:
         print(f"  {rid} [{label}, {kind}] {title}")
 
 
-def show_open_count(lab: Lab) -> None:
-    """How many of the project's records are open, and the command that lists them."""
-    named = f" --project {lab.named}" if lab.named else ""
-    print(f"{len(records.open_records(lab, lab.current))} open in {lab.current}; rec open{named} lists them")
+def open_count(lab: Lab) -> int:
+    return len(records.open_records(lab, lab.current))
+
+
+def show_changed(lab: Lab, changed: list[records.Record], before: int, quiet: bool) -> None:
+    """With quiet, the id of the record added or changed, the first; else
+    each record changed, then, if how many of the project's records are open
+    is no longer before, how many are and the command that lists them."""
+    if quiet:
+        print(changed[0]["id"])
+        return
+    for r in changed:
+        show(r)
+    count = open_count(lab)
+    if count != before:
+        named = f" --project {lab.named}" if lab.named else ""
+        print(f"{count} open in {lab.current}; rec open{named} lists them")
 
 
 def run_project(lab: Lab, a: argparse.Namespace) -> None:
@@ -153,25 +200,28 @@ def warn_overwritable(evidence: Iterable[str]) -> None:
 
 
 def run_add(lab: Lab, a: argparse.Namespace) -> None:
-    for r in records.add(lab, a.container, a.kind, a.title, label=a.experiment, text=a.text, author=a.by,
-                         status=a.status, answers=a.answers, evidence=a.evidence, rid=a.id,
-                         time=ms(a.time)):
-        show(r)
+    before = open_count(lab)
+    added = records.add(lab, a.container, a.kind, a.title, label=a.experiment, text=a.text, author=a.by,
+                        status=a.status, answers=a.answers, evidence=a.evidence, rid=a.id, time=ms(a.time))
     warn_overwritable(a.evidence)
-    show_open_count(lab)
+    show_changed(lab, added, before, a.quiet)
 
 
 def run_set(lab: Lab, a: argparse.Namespace) -> None:
+    if [x.partition("=")[2] for x in a.assignments].count("-") > 1:
+        raise ValueError("stdin holds one value: one FIELD=- per call")
     fields = {}
     for assignment in a.assignments:
         field, _, value = assignment.partition("=")
         if field not in SETTABLE:
             raise ValueError(f"cannot set {field}; fields: {', '.join(SETTABLE)}")
+        value = given_text(value)
         fields[COLUMNS.get(field, field)] = ([v.strip() for v in value.split(";") if v.strip()]
                                              if field == "evidence" else value)
-    show(records.change(lab, a.id, **fields))
+    before = open_count(lab)
+    changed = records.change(lab, a.id, **fields)
     warn_overwritable(fields.get("evidence", []))
-    show_open_count(lab)
+    show_changed(lab, [changed], before, a.quiet)
 
 
 def run_run(lab: Lab, a: argparse.Namespace) -> None:
@@ -179,7 +229,8 @@ def run_run(lab: Lab, a: argparse.Namespace) -> None:
 
 
 def run_end(lab: Lab, a: argparse.Namespace) -> None:
-    """Ends a RUNNING run, at --at or now, which may not be before its start."""
+    """Logs the results given and ends a RUNNING run, at --at or now, which may
+    not be before its start."""
     run = lab.run_by_id(a.id)
     experiment, name, status, start = lab.db.execute("SELECT experiment, name, status, start_time FROM runs"
                                                      " WHERE id = ?", (a.id,)).fetchone()
@@ -189,6 +240,10 @@ def run_end(lab: Lab, a: argparse.Namespace) -> None:
     if end < start:
         raise ValueError(f"run {name} in {experiment} started at"
                          f" {datetime.datetime.fromtimestamp(start / 1000):%Y-%m-%d %H:%M}, after --at")
+    run.log_metrics({k: float(v) for k, v in a.metric}, at=end)
+    run.set_tags(dict(a.tag))
+    for path, logged_as in a.file:
+        run.log_file(path, logged_as or None)
     run.end(a.status, at=end)
     print(f"run {name} in {experiment}: {a.status}, {(end - start) / 60000:.1f} min")
 
@@ -209,6 +264,8 @@ def parser() -> argparse.ArgumentParser:
     named.add_argument("--project", metavar="P")
     replace = argparse.ArgumentParser(add_help=False)  # the options of project and experiment
     replace.add_argument("--replace", action="store_true")
+    quiet = argparse.ArgumentParser(add_help=False)  # the options of add and set
+    quiet.add_argument("--quiet", action="store_true")
     sub = p.add_subparsers(dest="command", required=True)
     project = command(sub, "project", replace)
     project.add_argument("name")
@@ -226,7 +283,7 @@ def parser() -> argparse.ArgumentParser:
     tree = command(sub, "tree", named)
     tree.add_argument("top", nargs="?", metavar="EXPERIMENT")
     tree.set_defaults(run=run_tree)
-    add = command(sub, "add", named)
+    add = command(sub, "add", named, quiet)
     add.add_argument("kind")
     add.add_argument("title")
     add.add_argument("--in", dest="container", required=True, metavar="EXPERIMENT")
@@ -239,7 +296,7 @@ def parser() -> argparse.ArgumentParser:
     add.add_argument("--id")
     add.add_argument("--time", type=datetime.datetime.fromisoformat)
     add.set_defaults(run=run_add)
-    setp = command(sub, "set", named)
+    setp = command(sub, "set", named, quiet)
     setp.add_argument("id")
     setp.add_argument("assignments", nargs="+", metavar="FIELD=VALUE")
     setp.set_defaults(run=run_set)
@@ -254,6 +311,9 @@ def parser() -> argparse.ArgumentParser:
     end.add_argument("id", metavar="RUN")
     end.add_argument("--status", choices=("FINISHED", "FAILED", "KILLED"), default="FINISHED")
     end.add_argument("--at", type=datetime.datetime.fromisoformat)
+    end.add_argument("--metric", nargs="+", action="extend", default=[], type=number, metavar="KEY=VALUE")
+    end.add_argument("--tag", nargs="+", action="extend", default=[], type=pair, metavar="KEY=VALUE")
+    end.add_argument("--file", nargs="+", action="extend", default=[], type=file_item, metavar="PATH[=NAME]")
     end.set_defaults(run=run_end)
     return p
 

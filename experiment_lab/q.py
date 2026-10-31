@@ -21,11 +21,12 @@ one row prints a line "column: value" per column, and one of one row and one
 column that cell alone, whole and with its line breaks, as in
 q "SELECT text FROM records WHERE id = '...'". An error about a column
 that is not found names the views that have it; one about the table params,
-tags or metrics, the map column of runs; one about text in params or tags, a
-cast; a list of candidate functions is cut to three. Earlier statements of
-type SELECT, whose rows are not printed, are named on stderr. .keys lists each key of the
-tags, params and metrics of the runs in the view runs, with the number of runs
-that have it.
+tags or metrics, the map column of runs; one about a view that was renamed,
+its new name; one about text in params or tags, a cast; a list of candidate
+functions is cut to three. Earlier statements of type SELECT, whose rows are
+not printed, are named on stderr. .keys lists each key of the tags, params
+and metrics of the runs in the view runs, with the number of runs that have
+it.
 """
 import argparse
 import re
@@ -43,6 +44,8 @@ SELECT 'tags' AS "table", key, count(*) AS runs FROM lab.tags WHERE run IN (FROM
 UNION ALL SELECT 'params', key, count(*) FROM lab.params WHERE run IN (FROM own) GROUP BY key
 UNION ALL SELECT 'metrics', key, count(DISTINCT run) FROM lab.metrics WHERE run IN (FROM own) GROUP BY key
 ORDER BY "table" DESC, key"""
+# the old names of the views of lab.sql that were renamed, with their new ones
+RENAMED = {"texts": "experiments_runs_records"}
 
 
 def show(t: query.Table, cut: int | None, ordered: bool) -> None:
@@ -99,12 +102,14 @@ def views_with(con: DuckDBPyConnection, error: duckdb.Error) -> str:
 def explained(con: DuckDBPyConnection, sql: str, error: duckdb.Error) -> str:
     """The error with its list of candidate functions cut to three, and a line
     naming the fix where one is known: the views that have a column not found,
-    the map columns of runs for the tables params, tags and metrics, and a cast
-    for params and tags, which are text."""
+    the map columns of runs for the tables params, tags and metrics, the new
+    name of a renamed view, and a cast for params and tags, which are text."""
     text = re.sub(r"(Candidate functions:\n(?:\t.*\n){3})(?:\t.*\n)+", "\\1\t…\n", str(error))
-    table = re.search(r"Table with name (params|tags|metrics) does not exist", text)
-    if table:
+    table = re.search(r"Table with name (\w+) does not exist", text)
+    if table and table[1] in ("params", "tags", "metrics"):
         text += f"\n{table[1]} is a map column of the view runs: SELECT {table[1]}['key'] FROM runs"
+    if table and table[1] in RENAMED:
+        text += f"\nthe view {table[1]} is now named {RENAMED[table[1]]}"
     if "VARCHAR" in text and re.search(r"\b(params|tags)\[", sql):
         text += "\nparams and tags are text: cast one for a number, as params['rate']::INT or ::DOUBLE"
     return text + views_with(con, error)

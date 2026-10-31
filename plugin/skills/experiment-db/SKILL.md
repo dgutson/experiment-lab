@@ -53,18 +53,24 @@ An experiment, in order:
   or with `--in PROJECT` in the project itself when no experiment fits. Its text may not be empty,
   and `--answers` closes that question. A new question is open and any other record closed;
   `--status open|closed|superseded` sets another. `--id` gives a short id (lower-case letters,
-  digits and dashes), else rec makes one from the title's first words and prints it; `--time` a
-  local time as `"2026-09-10 12:00"`. `rec set ID FIELD=VALUE` (`status=closed`, `title=...`,
-  `evidence=a;b`); add and set print how many records are open, and `rec open` lists them.
+  digits and dashes), else rec makes one from the title's first words and prints it; `--time` its
+  time. A time, in rec and in `lab.py` alike, is ISO 8601 text, local unless it ends in `Z` or an
+  offset: `"2026-09-10 12:00"`, or `2026-09-10T10:00Z` as it is, with no conversion by hand.
+  `rec set ID FIELD=VALUE` (`status=closed`, `title=...`, `evidence=a;b`); add and set print the
+  records they changed, and how many are open when that changed (`rec open` lists them); with
+  `--quiet`, only the id of the record added or changed.
   Evidence items: `run:<run id>`, `file:<~ or absolute path>`, `sql:<query over the views>`,
   `record:<id>`; rec refuses a run or record id that does not exist. rec writes `lab.db` itself;
   no server is needed, and a text has no length limit. `--text -` reads the text from stdin (for
-  `rec experiment` and `rec project` too), so a text with line breaks, quotes or backticks goes in
-  a quoted heredoc, which needs no escaping:
+  `rec experiment` and `rec project` too), and so does `FIELD=-` of `rec set`, one field per call,
+  so a text with line breaks, quotes or backticks goes in a quoted heredoc, which needs no escaping:
 
   ```sh
   rec add finding "TITLE" --in NAME --evidence run:<run id> --text - <<'EOF'
   What the runs showed, in Markdown.
+  EOF
+  rec set ID text=- <<'EOF'
+  The whole new text.
   EOF
   ```
 - Evidence must show later what it showed when the record was written. Log a file that a later run
@@ -112,11 +118,14 @@ An experiment, in order:
   48000)}`: a value or a tuple of values), `has_metric="loss"`, and `latest_by`, a param or a list,
   which keeps the latest run for each combination of their values, as `latest_runs`.
 - Work that runs outside the Python that logs it: `rec run EXPERIMENT NAME [--note T]` before it
-  starts prints the run's id. When it ends, log its results and end the run from a script,
-  `run = lab.run_by_id("<run id>")`, then `run.log_metrics(...)`, `run.log_file(...)`, `run.end()`;
-  or `rec end <run id> [--status FAILED|KILLED]`. `--at "2026-09-10 12:58"` (`run.end(at=ms)`) gives
-  an end earlier than now, and `rec run --start T` a start earlier than now. A run logged after the
-  work without its times shows a duration of seconds, which the pages count as measured.
+  starts prints the run's id. When it ends, `rec end <run id> [--metric K=V ...] [--tag K=V ...]
+  [--file PATH[=NAME] ...] [--status FAILED|KILLED]` logs its results and ends the run (metrics at
+  step 0; NAME, the file's path in the run, its own name unless given). A result that needs
+  computing goes through a script instead: `run = lab.run_by_id("<run id>")`, then
+  `run.log_metrics(...)`, `run.log_file(...)`, `run.end()`. `--at "2026-09-10 12:58"`
+  (`run.end(at=...)`) gives an end earlier than now, and `rec run --start T` (`lab.run(start=...)`)
+  a start earlier than now; in Python a time may be a `datetime` too. A run logged after the work
+  without its times shows a duration of seconds, which the pages count as measured.
 - The owner reads the same records, experiments, runs and views at http://127.0.0.1:5000/lab, and
   searches them on its Experiments and Records pages, which search with `holds_words` too. The
   pages link a `file:` item, a `~/` or absolute path in any text, and a table cell, such as a run's
@@ -132,7 +141,7 @@ An experiment, in order:
 | `experiments` | experiment | name, project, parent, depth (0 for a project), path (`a › b › c`, from the project down to the experiment itself), dead_end, description, created |
 | `runs` | run | run, experiment, project, name, status (RUNNING, FINISHED, FAILED or KILLED), start_time (ms), tags, params, metrics (maps: `metrics['accuracy']` is the latest value, a double; `params['lr']` and tags are text, so `params['lr']::DOUBLE` for a number), end_time (ms), started, ended, minutes (NULL until the run ends), note |
 | `files` | file logged for a run | run, experiment, project, name, bytes, path (the copy's absolute path, `files/<run id>/<name>` in the data folder) |
-| `records` | record | id, time, project, experiment (the label it is shown under), kind, title, text, author, status, answers, evidence (items joined by `; `) |
+| `records` | record | id, time, time_ms (ms, to compare with a run's start_time), project, experiment (the label it is shown under), kind, title, text, author, status, answers, evidence (items joined by `; `) |
 | `experiments_runs_records` | experiment, run and record | kind (`experiment`, `run` or `record`), id, project, experiment, title, text: an experiment's description; a run's note, then its params and tags as `key=value` lines; a record's text |
 
 `created`, `time`, `started` and `ended` are local time, to the minute (`2026-08-31 21:03`).

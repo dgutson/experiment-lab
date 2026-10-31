@@ -60,8 +60,9 @@ FROM lab.files f JOIN lab.runs r ON r.id = f.run JOIN experiments x ON x.name = 
 
 -- Decisions, findings, protocol rules and questions. experiment is the label a
 -- record is shown under; lab.records.experiment is the experiment it is filed
--- in, and project that experiment's project. time is local time.
-CREATE VIEW records AS SELECT r.id, local_time(r.time) AS time, x.project,
+-- in, and project that experiment's project. time is local time, and time_ms
+-- the same in lab.db's milliseconds, as runs.start_time.
+CREATE VIEW records AS SELECT r.id, local_time(r.time) AS time, r.time AS time_ms, x.project,
     r.label AS experiment, r.kind, r.title, r.text, r.author, r.status, r.answers, r.evidence
     FROM lab.records r JOIN experiments x ON x.name = r.experiment;
 

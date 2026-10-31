@@ -33,6 +33,8 @@ rec add finding "64 kbit/s keeps the accuracy" --in bitrate --text "Accuracy sta
 rec add question "Where does accuracy drop?" --in bitrate --text "Not measured below 64 kbit/s."
 rec add decision "Ship 64 kbit/s" --in bitrate --experiment "the bitrate" --by owner --text "It keeps the accuracy." --answers where-does-accuracy-drop
 rec set where-does-accuracy-drop status=open
+rec add finding "Quietly" --in bitrate --text "x" --quiet
+rec add question "Quiet question" --in bitrate --text "x" --quiet && rec set quiet-question status=closed --quiet && rec open
 rec set 64-kbit-s-keeps-the-accuracy "evidence=record:48-khz-is-the-most-accurate-rate; file:$HOME/audio-codec/tone.wav" "text=Accuracy stayed at 0.93 at 64 kbit/s."
 rec add idea "An idea" --in bitrate --text "x"
 rec add finding "Lost" --in nowhere --text "x"
@@ -48,6 +50,8 @@ rec set keep-48-khz status=maybe
 git -c init.defaultBranch=main init -q ~/results && git -C ~/results -c user.name=x -c user.email=x commit -q --allow-empty -m x && git -C ~/results worktree add -q ~/results-b && touch ~/results-b/out.json
 rec add finding "From stdin" --in bitrate --text - <<< $'48 kHz kept "every" word; `rate=48000`, not $RATE.\\n\\n- one\\n' && q "SELECT text FROM records WHERE id = 'from-stdin'"
 rec add finding "Empty stdin" --in bitrate --text - < /dev/null
+rec set from-stdin "title=Set from stdin" text=- <<< $'Kept "every" word; `rate=48000`, not $RATE.\\n' && q "SELECT title, text FROM records WHERE id = 'from-stdin'"
+rec set from-stdin text=- title=- < /dev/null
 rec add finding "Dither noise is heard below 16 bits on headphones" --in "16-bit output" --text "x"
 rec add finding "Pneumonoultramicroscopicsilicovolcanoconiosis checked" --in bitrate --text "x"
 rec add finding "Cites a run" --in bitrate --text "x" --evidence "run:$(q "SELECT run FROM runs WHERE name = 'rate 48000, listened to'")" record:keep-48-khz && q "SELECT evidence FROM records WHERE id = 'cites-a-run'"
@@ -108,6 +112,7 @@ q "SET TimeZone = 'UTC'; SELECT TIMESTAMPTZ '2026-01-01 00:00:00+00' AS t"
 q --project nosuch .views
 q "SELECT nosuch FROM runs"
 q "FROM params"
+q "SELECT kind, id FROM texts LIMIT 1"
 q "SELECT params['rate'] + 1 FROM runs"
 q "SELECT name FROM runs WHERE params['rate'] > 20000"
 q "SELECT name FROM lab.experiments WHERE depth = 0"
@@ -124,6 +129,12 @@ rec end "$(q "SELECT run FROM runs WHERE name = 'background job'")"
 id=$(rec run bitrate "late job" --start 2026-09-10T12:00) && rec end "$id" --at 2026-09-10T11:00
 rec end x --status RUNNING
 rec end x --at yesterday
+id=$(rec run bitrate "utc job" --start 2026-09-10T10:00Z) && rec end "$id" --at 2026-09-10T12:30+02:00 && q "SET TimeZone = 'UTC'; SELECT started, ended FROM runs WHERE run = '$id'"
+python -c "import datetime; from experiment_lab.lab import Lab; r = Lab().run('bitrate', 'python times', start='2026-09-10T10:00Z'); r.log_metrics({'x': 1}, at='2026-09-10 10:10+00:00'); r.end(at=datetime.datetime(2026, 9, 10, 10, 30, tzinfo=datetime.UTC))" && q "SET TimeZone = 'UTC'; SELECT r.started, r.ended, local_time(m.time) AS measured FROM runs r JOIN lab.metrics m ON m.run = r.run WHERE r.name = 'python times'"
+echo a > ~/out.txt && id=$(rec run bitrate "shell job" --start "2026-09-10 12:00") && { rec end "$id" --metric accuracy=0.93 --file ~/out.txt ~/missing.txt; q "SELECT status, metrics FROM runs WHERE run = '$id'"; }
+rec end x --metric accuracy=high
+rec end x --tag outcome
+id=$(q "SELECT run FROM runs WHERE name = 'shell job'") && rec end "$id" --at "2026-09-10 12:30" --metric accuracy=0.93 loss=nan --tag outcome=pass --file ~/out.txt ~/out.txt=logs/b.txt && q "SELECT status, tags, metrics FROM runs WHERE run = '$id'" && q "SELECT name, bytes FROM files WHERE run = '$id' ORDER BY name"
 cd ~ && rec add finding "From home" --in bitrate --text "x"
 cd ~ && rec experiment "home test" --in bitrate --text "x"
 cd ~ && rec experiment bitrate --dead-end
