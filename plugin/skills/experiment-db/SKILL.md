@@ -86,7 +86,6 @@ An experiment, in order:
   ```python
   from experiment_lab.lab import Lab
   lab = Lab()
-  lab.experiment("rate test", "What it measures and why.")   # parent="..." as rec's --in
   with lab.run("rate test", "run 1", params={"rate": 48000}, note="What this run tries") as run:
       run.log_metrics({"accuracy": 0.91}, step=0)  # every value is kept
       run.set_tags({"outcome": "pass"})
