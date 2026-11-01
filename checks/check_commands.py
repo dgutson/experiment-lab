@@ -24,6 +24,7 @@ rec set --help
 q --help
 rec tree
 rec tree "16-bit output"
+rec set listen-on-headphones status=superseded --quiet && rec tree "16-bit output" && rec set listen-on-headphones status=closed --quiet
 rec open
 rec project audio-codec --text "A lossy audio codec for voice recordings, at 48 kHz." --replace
 rec experiment bitrate --in "sample rate sweep" --text "Lowers the bitrate at 48 kHz until accuracy drops."

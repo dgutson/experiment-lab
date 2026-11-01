@@ -44,6 +44,13 @@ class OpenRecord(NamedTuple):
     title: str
 
 
+class Rule(NamedTuple):
+    id: str
+    label: str
+    title: str
+    text: str
+
+
 def split(evidence: str | None) -> Evidence:
     return [item for item in (evidence or "").split("; ") if item]
 
@@ -112,6 +119,13 @@ def open_records(lab: Lab, project: str | None = None) -> list[OpenRecord]:
     return [OpenRecord(*row) for row in lab.db.execute(
         f"{BELOW} SELECT id, label, kind, title FROM records WHERE status = 'open'"
         " AND (? IS NULL OR experiment IN below) ORDER BY time", (project, project))]
+
+
+def protocol_rules(lab: Lab, project: str) -> list[Rule]:
+    """The project's protocol records that are not superseded, oldest first."""
+    return [Rule(*row) for row in lab.db.execute(
+        f"{BELOW} SELECT id, label, title, text FROM records WHERE kind = 'protocol'"
+        " AND status <> 'superseded' AND experiment IN below ORDER BY time", (project,))]
 
 
 def free_id(lab: Lab, rid: str | None, title: str) -> str:
