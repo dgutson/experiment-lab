@@ -112,9 +112,10 @@ changes, not for evals, checks or CI. After the change is on `main`:
   no project, `lab.sql`'s views hold every project's rows. q, the pages and `checks/check_views.py`
   all read through it.
 - No process may have `lab.db` open with Python's sqlite3 while DuckDB reads it, since the two copies
-  of SQLite do not see each other's locks (`query.py`'s docstring). So lab-server makes or upgrades
-  `lab.db` and deletes a project (`python -m experiment_lab.lab --delete NAME`) in a child process,
-  and `query.attach` upgrades a `lab.db` older than `db_upgrades.VERSION` the same way.
+  of SQLite do not see each other's locks (`query.py`'s docstring). So lab-server, when it starts,
+  and `query.attach`, for an older `lab.db`, have it made or upgraded in a child process
+  (`db_upgrades.upgrade_in_child`), and lab-server deletes a project in one too
+  (`python -m experiment_lab.lab --delete NAME`).
 - The pages (`pages.py`) keep one DuckDB database per project (`Views`), made again when
   `query.version` changes (the modification time of `lab.sql` or a view file, or the list of view
   files), and give each request a cursor of the project in the query parameter `project`, else in

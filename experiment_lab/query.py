@@ -10,9 +10,6 @@ not have lab.db open with Python's sqlite3 while DuckDB reads it: q and the
 pages never open it with sqlite3, and the writers (lab.py) never use DuckDB.
 """
 import json
-import os
-import subprocess
-import sys
 from collections.abc import Iterable
 from pathlib import Path
 from typing import NamedTuple, TypedDict
@@ -20,7 +17,7 @@ from typing import NamedTuple, TypedDict
 import duckdb
 from duckdb import DuckDBPyConnection
 
-from experiment_lab.db_upgrades import VERSION
+from experiment_lab.db_upgrades import upgrade_attached
 from experiment_lab.lab import Project
 from experiment_lab.settings import database
 
@@ -98,19 +95,14 @@ def attached(path: Path) -> DuckDBPyConnection:
 
 def attach(data: Path) -> DuckDBPyConnection:
     """A new in-memory DuckDB database with lab.db attached as the catalog lab,
-    and the macro data_folder(), the data folder's absolute path. A lab.db
-    older than this code is upgraded first, by lab.py in a child process, since
-    this one reads lab.db with DuckDB only."""
+    and the macro data_folder(), the data folder's absolute path. An older
+    lab.db is upgraded first, a newer one refused (upgrade_attached)."""
     path = database(data)
     if not path.exists():
         raise FileNotFoundError(f"no database {path}; rec project or a logging script makes it")
     con = attached(path)
-    ((found,),) = con.execute("FROM sqlite_query('lab', 'PRAGMA user_version')").fetchall()
-    if int(found) < VERSION:
+    if upgrade_attached(con, data):
         con.close()
-        if subprocess.run([sys.executable, "-m", "experiment_lab.lab"],
-                          env=dict(os.environ, EXPERIMENT_LAB_DATA=str(data))).returncode:
-            raise ValueError(f"could not upgrade {path}")
         con = attached(path)
     con.execute(f"CREATE MACRO data_folder() AS {literal(str(data.resolve()))}")
     return con

@@ -82,6 +82,7 @@ EXPERIMENT_LAB_DATA=/proc/lab-data rec open
 cp -r "$EXPERIMENT_LAB_DATA" ~/old && python -c "import sqlite3; db = sqlite3.connect('$HOME/old/lab.db', isolation_level=None); db.execute('DROP TABLE files'); db.execute('PRAGMA user_version = 0')" && EXPERIMENT_LAB_DATA=~/old rec open > /dev/null && ls ~/old && EXPERIMENT_LAB_DATA=~/old q "SELECT count(*) AS files FROM files" && q "SELECT count(*) AS files FROM files"
 cp -r "$EXPERIMENT_LAB_DATA" ~/old-q && python -c "import sqlite3; db = sqlite3.connect('$HOME/old-q/lab.db', isolation_level=None); db.execute('DROP TABLE files'); db.execute('PRAGMA user_version = 0')" && EXPERIMENT_LAB_DATA=~/old-q q "SELECT count(*) AS files FROM files"
 cp -r "$EXPERIMENT_LAB_DATA" ~/newer && python -c "import sqlite3; sqlite3.connect('$HOME/newer/lab.db', isolation_level=None).execute('PRAGMA user_version = 99')" && EXPERIMENT_LAB_DATA=~/newer rec open
+EXPERIMENT_LAB_DATA=~/newer q "SELECT count(*) FROM runs"
 q "SELECT name, status FROM runs WHERE experiment = 'sample rate sweep' ORDER BY name"
 q "SELECT kind, id, experiment, title FROM experiments_runs_records WHERE holds_words(title || ' ' || text, 'RATE sweep') ORDER BY kind, id"
 q "SELECT id, kind, status, title FROM records WHERE holds_words(title || ' ' || text, 'gate  hold') ORDER BY id"

@@ -15,15 +15,26 @@ version it makes (to_2, to_3, ...). A step:
   a later change to schema.sql does not change what it does;
 - does not change once on main, since lab.db files that it upgraded exist.
 
-It uses only Python's standard library, as lab.py, which imports it, does.
+A process that reads lab.db through DuckDB must not open it with sqlite3
+(query.py's docstring), so it has lab.db made or upgraded in a child process
+(upgrade_in_child, upgrade_attached).
+
+It uses only Python's standard library, as lab.py, which imports it, does;
+DuckDB is imported for the type checkers alone.
 """
 import contextlib
+import os
 import sqlite3
+import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from experiment_lab.settings import database
+
+if TYPE_CHECKING:
+    from duckdb import DuckDBPyConnection
 
 SCHEMA = Path(__file__).with_name("schema.sql")
 
@@ -51,6 +62,13 @@ def version(db: sqlite3.Connection) -> int:
     return int(db.execute("PRAGMA user_version").fetchone()[0])
 
 
+def check_version(data: Path, found: int) -> None:
+    """Refuses the data folder's lab.db, of version found, if newer than VERSION."""
+    if found > VERSION:
+        raise ValueError(f"{database(data)} is of version {found}, newer than this experiment-lab's"
+                         f" {VERSION}: update experiment-lab (README, Updating)")
+
+
 def backup(data: Path, found: int) -> Path:
     """Copies the data folder's lab.db, of version found, to lab.db.v<found>
     there, through connections of its own, which read lab.db while the
@@ -76,9 +94,7 @@ def upgrade(db: sqlite3.Connection, data: Path) -> None:
     db.execute("BEGIN IMMEDIATE")
     with db:  # commits, or rolls back on an exception
         found = version(db)  # again, now that no other process writes
-        if found > VERSION:
-            raise ValueError(f"{database(data)} is of version {found}, newer than this experiment-lab's"
-                             f" {VERSION}: update experiment-lab (README, Updating)")
+        check_version(data, found)
         if found == VERSION:  # another process upgraded it
             return
         copy = backup(data, found)
@@ -86,3 +102,25 @@ def upgrade(db: sqlite3.Connection, data: Path) -> None:
             step(db, data)
         db.execute(f"PRAGMA user_version = {VERSION}")
     print(f"upgraded lab.db from version {found} to {VERSION}; its copy from before is {copy}", file=sys.stderr)
+
+
+def upgrade_in_child(data: Path) -> bool:
+    """Makes or upgrades the data folder's lab.db in a child process
+    (python -m experiment_lab.lab), which prints why it failed. True if it
+    succeeded."""
+    return not subprocess.run([sys.executable, "-m", "experiment_lab.lab"],
+                              env=dict(os.environ, EXPERIMENT_LAB_DATA=str(data)), check=False).returncode
+
+
+def upgrade_attached(con: "DuckDBPyConnection", data: Path) -> bool:
+    """For the DuckDB database con, with the data folder's lab.db attached as
+    the catalog lab: refuses a newer lab.db, and upgrades an older one in a
+    child process. True if it upgraded, after which con's catalog lab still
+    lists the tables from before."""
+    ((found,),) = con.execute("FROM sqlite_query('lab', 'PRAGMA user_version')").fetchall()
+    check_version(data, int(found))
+    if int(found) == VERSION:
+        return False
+    if not upgrade_in_child(data):
+        raise ValueError(f"could not upgrade {database(data)}")
+    return True

@@ -512,6 +512,10 @@ $ cp -r "$EXPERIMENT_LAB_DATA" ~/newer && python -c "import sqlite3; sqlite3.con
 error: FOLDER/home/newer/lab.db is of version 99, newer than this experiment-lab's 1: update experiment-lab (README, Updating)
 exit 1
 
+$ EXPERIMENT_LAB_DATA=~/newer q "SELECT count(*) FROM runs"
+error: FOLDER/home/newer/lab.db is of version 99, newer than this experiment-lab's 1: update experiment-lab (README, Updating)
+exit 1
+
 $ q "SELECT name, status FROM runs WHERE experiment = 'sample rate sweep' ORDER BY name"
 name | status
 rate 16000 | FINISHED

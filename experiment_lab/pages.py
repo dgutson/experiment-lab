@@ -48,6 +48,7 @@ from markdown.treeprocessors import Treeprocessor
 from markupsafe import Markup
 
 from experiment_lab import query, records
+from experiment_lab.db_upgrades import upgrade_in_child
 from experiment_lab.lab import Project, holding
 from experiment_lab.settings import data_folder
 
@@ -885,8 +886,6 @@ def main() -> None:
     if not (port.isdigit() and 0 < int(port) < 65536):
         sys.exit(f"error: EXPERIMENT_LAB_PORT is {port!r}, not a port number")
     data = data_folder()
-    # lab.db made or upgraded in another process, which prints why it failed: this one reads
-    # lab.db with DuckDB only
-    if subprocess.run([sys.executable, "-m", "experiment_lab.lab"]).returncode:
+    if not upgrade_in_child(data):
         sys.exit(1)
     uvicorn.run(create_app(data), host="127.0.0.1", port=int(port), log_level="warning")

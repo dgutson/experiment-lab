@@ -311,7 +311,7 @@ it.
 
 | Database | Engine | Where | Written by | Read by | Lasts |
 |---|---|---|---|---|---|
-| `lab.db` | SQLite, WAL mode | data folder | `experiment_lab.lab` and `experiment_lab.records`, with Python's sqlite3: rec, the logging scripts, and lab-server's child process that deletes a project | q and the pages, through DuckDB | always |
+| `lab.db` | SQLite, WAL mode | data folder | `experiment_lab.lab`, `experiment_lab.records` and `experiment_lab.db_upgrades`, with Python's sqlite3: rec, the logging scripts, the child process that lab-server and q start to make or upgrade `lab.db`, and lab-server's child process that deletes a project | q and the pages, through DuckDB | always |
 | the pages' databases, one per project, and one of every project for the pages of an experiment, a run or a record and the Projects page | DuckDB, in memory | the lab-server process | the pages: `lab.db` attached read-only as the catalog `lab`, then the views of `lab.sql` and of the project's view files | the pages, a cursor per request, with file access off | until `lab.sql`, one of the project's view files or its list of them changes |
 | q's database | DuckDB, in memory | q's process | q: `lab.db` attached read-only as the catalog `lab`, then the views of `lab.sql` and of the project's view files (with `--all`, lab.sql's alone, over every project) | the SQL given to q | one q call |
 
