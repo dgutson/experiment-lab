@@ -33,6 +33,8 @@ jobs:
         run: uv run python checks/check_upgrades.py
       - name: Commands print what checks/check_commands.txt holds
         run: uv run python checks/check_commands.py
+      - name: The feedback module prints what checks/check_feedback.txt holds
+        run: uv run python checks/check_feedback.py
       - name: Lab.runs reads what the views read
         run: uv run python checks/check_reader.py
       - name: Make a lab to check

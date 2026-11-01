@@ -1,7 +1,7 @@
 {
   "name": "experiment-lab",
-  "version": "0.2.39",
-  "description": "The experiment-db skill: Claude answers questions about experiments with one DuckDB SQL query (q) over the lab's database, records decisions, findings, protocol rules and open questions with rec, and logs runs from Python. Needs experiment-lab installed as its README says, with the clone at ~/experiment-lab.",
+  "version": "0.2.40",
+  "description": "The experiment-db skill: Claude answers questions about experiments with one DuckDB SQL query (q) over the lab's database, records decisions, findings, protocol rules and open questions with rec, and logs runs from Python. The feedback skill, which the person runs as /experiment-lab:feedback, has Claude write a report on how the lab served the session and send it as an issue. Needs experiment-lab installed as its README says, with the clone at ~/experiment-lab.",
   "author": {
     "name": "Daniel Gutson",
     "url": "https://github.com/dgutson"

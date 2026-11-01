@@ -1,0 +1,44 @@
+schema_version: "1.1"
+name: feedback
+description: After a session that used the lab (history.jsonl, a dead-end run whose first rec tree ran in ~/experiment-lab, which no project holds), the person runs /experiment-lab:feedback; the agent drafts the report, adds what only it knows, and asks before sending.
+context:
+  scaffold_script: setup.sh
+  history_file: history.jsonl
+execution:
+  prompt: /experiment-lab:feedback
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: draft-made
+    type: tool_used
+    tool: Bash
+    input_match: experiment_lab.feedback draft
+  - name: not-sent
+    type: tool_used
+    tool: Bash
+    input_match: experiment_lab.feedback send
+    min: 0
+    max: 0
+  - name: friction-reported
+    type: llm
+    focus: trace
+    criteria: |
+      PASS if the report shown in the agent's last message lists, as a friction, the first lab command
+      of the earlier session, which ran rec tree and q in ~/experiment-lab and failed with "no project
+      holds" that folder, and says what did that work next. FAIL otherwise.
+  - name: names-neutral
+    type: llm
+    focus: trace
+    criteria: |
+      PASS if the report shown in the agent's last message names none of the lab's projects or
+      experiments (audio-codec, vision, sample rate sweep, 16-bit output, noise shaping, noise gate,
+      blur detector) and does not quote the finding's title about the gate cutting off the quiet ends
+      of notes, using neutral names such as project-a and experiment-a instead. FAIL otherwise.
+  - name: asks-before-sending
+    type: llm
+    focus: trace
+    criteria: |
+      PASS if the agent's last message holds the report's text itself, not only the path of its file
+      or a pointer to what a command printed, and asks the person whether to send it as a public
+      issue, and no issue was opened. FAIL otherwise.

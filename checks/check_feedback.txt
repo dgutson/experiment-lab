@@ -1,0 +1,79 @@
+$ draft --session 0f0f0f0f-0000-4000-8000-000000000000 --plugin /home/dfg/src/experiment-lab/plugin
+FOLDER/lab-data/feedback/TIME.md
+
+## Versions
+
+plugin VERSION; experiment-lab VERSION; Claude Code 2.1.316; claude-sonnet-5-5
+
+## The lab in this session
+
+12 lab commands of 16 tool calls: 6 rec, 5 q, 1 other; 4 failed; they printed 4.9 kB, about 1,234 tokens.
+
+## Lab commands that failed
+
+- `q "SELECT * FROM runz"`: `error: Catalog Error: Table with name runz does not exist!`; not done later
+- `rec add finding "<text>" --in "experiment-b" --text "<text>" --evidence run:run-a`: `error: no run run-a: rec run prints a run's id` (2 tries); done 2 turns later by `rec add finding "<text>" --in "experiment-b" --text "<text>"`
+- `PYTHONPATH=~/experiment-lab python3 - <<'EOF' ⏎ <text> ⏎ EOF`: `KeyError: '<text>'`; not done later
+
+## Searches that found nothing, run again
+
+- `q "SELECT id, title FROM records WHERE holds_words(title || ' ' || text, '<text>')"`: no rows; found 1 turn later by `q "SELECT kind, id FROM experiments_runs_records WHERE holds_words(title || ' ' || text, '<text>')"`
+
+## Run more than once
+
+- `cd ~/project-a && rec tree`: 2 times
+- `rec add finding "<text>" --in "experiment-b" --text "<text>" --evidence run:run-a`: 2 times
+
+## Printed much
+
+- `q "SELECT name, metrics['<text>'] FROM runs WHERE experiment = 'experiment-a'"`: 4.4 kB
+
+## Help, skill files and lab code read
+
+- `~/.claude/plugins/cache/experiment-lab-marketplace/experiment-lab/0.2.40/skills/experiment-db/references/runs.md`
+- `rec experiment --help`
+[exit 0]
+$ draft --session 0f0f0f0f-0000-4000-8000-000000000000 --plugin /home/dfg/src/experiment-lab/plugin --real
+FOLDER/lab-data/feedback/TIME-2.md
+
+## Versions
+
+plugin VERSION; experiment-lab VERSION; Claude Code 2.1.316; claude-sonnet-5-5
+
+## The lab in this session
+
+12 lab commands of 16 tool calls: 6 rec, 5 q, 1 other; 4 failed; they printed 4.9 kB, about 1,234 tokens.
+
+## Lab commands that failed
+
+- `q "SELECT * FROM runz"`: `error: Catalog Error: Table with name runz does not exist!`; not done later
+- `rec add finding "Dither helps" --in "16-bit output" --text "Better at 44100 Hz." --evidence run:0123456789abcdef0123456789abcdef`: `error: no run 0123456789abcdef0123456789abcdef: rec run prints a run's id` (2 tries); done 2 turns later by `rec add finding "Dither helps" --in "16-bit output" --text "Better at 44100 Hz."`
+- `PYTHONPATH=~/experiment-lab python3 - <<'EOF' ⏎ from experiment_lab.lab import Lab ⏎ print(Lab().runs('noise gate')[0].metrics['snr']) ⏎ EOF`: `KeyError: 'snr'`; not done later
+
+## Searches that found nothing, run again
+
+- `q "SELECT id, title FROM records WHERE holds_words(title || ' ' || text, 'sample rate')"`: no rows; found 1 turn later by `q "SELECT kind, id FROM experiments_runs_records WHERE holds_words(title || ' ' || text, 'rate')"`
+
+## Run more than once
+
+- `cd ~/audio-codec && rec tree`: 2 times
+- `rec add finding "Dither helps" --in "16-bit output" --text "Better at 44100 Hz." --evidence run:0123456789abcdef0123456789abcdef`: 2 times
+
+## Printed much
+
+- `q "SELECT name, metrics['accuracy'] FROM runs WHERE experiment = 'sample rate sweep'"`: 4.4 kB
+
+## Help, skill files and lab code read
+
+- `~/.claude/plugins/cache/experiment-lab-marketplace/experiment-lab/0.2.40/skills/experiment-db/references/runs.md`
+- `rec experiment --help`
+[exit 0]
+$ draft --session none
+error: no transcript of the session none in FOLDER/claude/projects or FOLDER/home/.claude/projects
+[exit 1]
+$ send FOLDER/lab-data/feedback/TIME.md --title Agent report: a check
+https://github.com/dgutson/experiment-lab/issues/1
+[exit 0]
+$ send FOLDER/lab-data/feedback/TIME.md --title Agent report: a check
+not sent: open https://github.com/dgutson/experiment-lab/issues/new, give it the title 'Agent report: a check' and paste the text of FOLDER/lab-data/feedback/TIME.md
+[exit 1]
