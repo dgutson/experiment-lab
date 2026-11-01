@@ -93,9 +93,9 @@ def run(command: list[str], env: dict[str, str]) -> str:
 
 def even(text: str, folder: Path) -> str:
     """text, with what changes from run to run made fixed: the folder, the
-    draft's time, the plugin's version and experiment-lab's version and
-    commit."""
-    text = text.replace(str(folder), "FOLDER")
+    clone's folder, the draft's time, the plugin's version and
+    experiment-lab's version and commit."""
+    text = text.replace(str(folder), "FOLDER").replace(str(ROOT), "ROOT")
     text = re.sub(r"\d{4}-\d\d-\d\dT\d\d-\d\d-\d\dZ", "TIME", text)
     return re.sub(r"plugin [\w.]+; experiment-lab [^;]+;", "plugin VERSION; experiment-lab VERSION;", text)
 

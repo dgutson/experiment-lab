@@ -1,4 +1,4 @@
-$ draft --session 0f0f0f0f-0000-4000-8000-000000000000 --plugin /home/dfg/src/experiment-lab/plugin
+$ draft --session 0f0f0f0f-0000-4000-8000-000000000000 --plugin ROOT/plugin
 FOLDER/lab-data/feedback/TIME.md
 
 ## Versions
@@ -33,7 +33,7 @@ plugin VERSION; experiment-lab VERSION; Claude Code 2.1.316; claude-sonnet-5-5
 - `~/.claude/plugins/cache/experiment-lab-marketplace/experiment-lab/0.2.40/skills/experiment-db/references/runs.md`
 - `rec experiment --help`
 [exit 0]
-$ draft --session 0f0f0f0f-0000-4000-8000-000000000000 --plugin /home/dfg/src/experiment-lab/plugin --real
+$ draft --session 0f0f0f0f-0000-4000-8000-000000000000 --plugin ROOT/plugin --real
 FOLDER/lab-data/feedback/TIME-2.md
 
 ## Versions
