@@ -1,0 +1,32 @@
+schema_version: "1.1"
+name: report-latest
+description: A report script tables the latest run of each key, in an experiment that also holds an earlier report run.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    Write report.py, which makes a table of the latest quality of each codec and bitrate of the codec bitrate
+    sweep, prints it, and keeps it in the lab as the earlier report was kept. Run it.
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  - name: latest-table
+    type: llm
+    focus: trace
+    criteria: |
+      PASS if report.py ran without an error and the table it printed has exactly one row for each of the six
+      codec and bitrate pairs, with these qualities: opus 32 3.6, opus 64 4.3, opus 128 4.4, aac 32 3.4,
+      aac 64 3.7, aac 128 4.2, in any order. FAIL if the script's last run failed, a pair is missing, a quality
+      is an older run's (opus 64 4.1, aac 32 3.1), or the table has another row, such as one for the run named
+      "report", which has no codec, bitrate or quality.
+  - name: table-kept
+    type: llm
+    focus: trace
+    criteria: |
+      PASS if report.py logged the table in the lab as a file of a run (run.log_file, log_text or log_json),
+      and that file holds the six rows of the printed table. FAIL otherwise.
