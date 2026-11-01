@@ -20,7 +20,8 @@ from typing import NamedTuple, TypedDict
 import duckdb
 from duckdb import DuckDBPyConnection
 
-from experiment_lab.lab import VERSION, Project
+from experiment_lab.db_upgrades import VERSION
+from experiment_lab.lab import Project
 from experiment_lab.settings import database
 
 LAB_SQL = Path(__file__).with_name("lab.sql")

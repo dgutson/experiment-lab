@@ -54,9 +54,9 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any, NamedTuple, Self
 
+from experiment_lab.db_upgrades import upgrade
 from experiment_lab.settings import data_folder, database
 
-SCHEMA = Path(__file__).with_name("schema.sql")
 # the experiment given as the parameter, and those below it, as the table below
 BELOW = ("WITH RECURSIVE below(name) AS (SELECT ? UNION ALL"
          " SELECT e.name FROM experiments e JOIN below ON e.parent = below.name)")
@@ -68,7 +68,6 @@ type Values = dict[str, Any]  # a run's params, tags or metrics, by key
 type Names = Sequence[str]
 type Keys = str | Names  # a param's name, or a list of them
 type Time = int | str | datetime.datetime  # milliseconds since 1970, or what ms reads
-type Step = Callable[[Lab], None]  # a step of UPGRADES
 
 
 class Project(NamedTuple):
@@ -202,7 +201,7 @@ def update(db: sqlite3.Connection, name: str, changes: Mapping[str, object]) -> 
 class Lab:
     def __init__(self, data: StrPath | None = None, project: str | None = None) -> None:
         """Opens the data folder's lab.db, making the folder and the tables if
-        missing, and upgrading an older lab.db (upgrade). The lab works in
+        missing, and upgrading an older lab.db (db_upgrades). The lab works in
         project, else in the project of the current folder."""
         self.named = project
         self.data = Path(data) if data else data_folder()
@@ -210,52 +209,7 @@ class Lab:
         self.db = sqlite3.connect(database(self.data), timeout=60, isolation_level=None)
         self.db.execute("PRAGMA journal_mode = WAL")
         self.db.execute("PRAGMA foreign_keys = ON")
-        self.upgrade()
-
-    def version(self) -> int:
-        return int(self.db.execute("PRAGMA user_version").fetchone()[0])
-
-    def upgrade(self) -> None:
-        """Brings lab.db to VERSION. A new one gets the tables of schema.sql. An
-        older one is copied to lab.db.v<its version> in the data folder, then
-        the steps of UPGRADES it lacks run, in one transaction, and stderr says
-        where the copy is. A newer one is refused."""
-        if self.version() == VERSION:
-            return
-        if not self.db.execute("SELECT 1 FROM sqlite_master WHERE type = 'table'").fetchone():
-            # each statement makes only what is missing, so two processes may make lab.db at once
-            self.db.executescript(f"BEGIN IMMEDIATE;\n{SCHEMA.read_text()}\nPRAGMA user_version = {VERSION};\nCOMMIT;")
-            return
-        copy = None
-        with self.write() as db:
-            found = self.version()  # again, now that no other process writes
-            if found > VERSION:
-                raise ValueError(f"{database(self.data)} is of version {found}, newer than this experiment-lab's"
-                                 f" {VERSION}: update experiment-lab (README, Updating)")
-            if found < VERSION:
-                copy = self.data / f"lab.db.v{found}"
-                # through connections of its own, which read lab.db while this one holds the write lock
-                with (contextlib.closing(sqlite3.connect(database(self.data))) as source,
-                      contextlib.closing(sqlite3.connect(copy)) as target):
-                    source.backup(target)
-                for step in UPGRADES[found:]:
-                    step(self)
-                db.execute(f"PRAGMA user_version = {VERSION}")
-        if copy:
-            print(f"upgraded lab.db from version {found} to {VERSION}; its copy from before is {copy}", file=sys.stderr)
-
-    def add_files(self) -> None:
-        """Upgrade step 0 to 1: the table files, which a lab.db made before it
-        lacks, with a row for each file in files/<run id>/ of a run."""
-        if self.db.execute("SELECT 1 FROM sqlite_master WHERE name = 'files'").fetchone():
-            return
-        self.db.execute("CREATE TABLE files (run TEXT NOT NULL REFERENCES runs (id) ON DELETE CASCADE,"
-                        " name TEXT NOT NULL, bytes INTEGER NOT NULL, PRIMARY KEY (run, name))")
-        folder = self.data / "files"
-        ids = {rid for (rid,) in self.db.execute("SELECT id FROM runs")}
-        self.db.executemany("INSERT INTO files (run, name, bytes) VALUES (?, ?, ?)",
-                            [(d.name, p.relative_to(d).as_posix(), p.stat().st_size)
-                             for d in folder.glob("*") if d.name in ids for p in d.rglob("*") if p.is_file()])
+        upgrade(self.db, self.data)
 
     def close(self) -> None:
         self.db.close()
@@ -446,11 +400,6 @@ class Lab:
     def json(self, rid: str, name: str) -> Any:  # noqa: ANN401, a JSON value as json.loads gives it
         """The value of the JSON file that the run logged as name."""
         return json.loads(self.file(rid, name).read_text())
-
-
-# the steps that upgrade lab.db: UPGRADES[i] takes it from version i to i + 1
-UPGRADES: list[Step] = [Lab.add_files]
-VERSION = len(UPGRADES)  # PRAGMA user_version of a lab.db that this code made or upgraded
 
 
 class Run:

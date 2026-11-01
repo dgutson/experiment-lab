@@ -103,8 +103,9 @@ changes, not for evals, checks or CI. After the change is on `main`:
 - Writers: `lab.py` (projects, experiments and runs) and `records.py` (records) use only the
   standard library and Python's sqlite3, so a logging script imports them with `PYTHONPATH` alone.
   `lab.py` reads runs back the same way (`Lab.runs`, `Lab.file`, `Lab.json`), for a report script.
-  Every write is one `Lab.write()` transaction (`BEGIN IMMEDIATE`). `settings.py` and `__init__.py`
-  must stay importable without the package's dependencies too.
+  Every write is one `Lab.write()` transaction (`BEGIN IMMEDIATE`), and an upgrade one of its own
+  (`db_upgrades.upgrade`). `settings.py`, `db_upgrades.py` and `__init__.py` must stay importable
+  without the package's dependencies too.
 - Readers: `query.py` attaches `lab.db` read-only to an in-memory DuckDB with the macro
   `data_folder()`, makes the macro `current_project()` and runs `lab.sql`, whose views keep that project's rows, then the project's
   view files, so that each project's views are in a database of their own and may reuse names. With
@@ -113,7 +114,7 @@ changes, not for evals, checks or CI. After the change is on `main`:
 - No process may have `lab.db` open with Python's sqlite3 while DuckDB reads it, since the two copies
   of SQLite do not see each other's locks (`query.py`'s docstring). So lab-server makes or upgrades
   `lab.db` and deletes a project (`python -m experiment_lab.lab --delete NAME`) in a child process,
-  and `query.attach` upgrades a `lab.db` older than `lab.VERSION` the same way.
+  and `query.attach` upgrades a `lab.db` older than `db_upgrades.VERSION` the same way.
 - The pages (`pages.py`) keep one DuckDB database per project (`Views`), made again when
   `query.version` changes (the modification time of `lab.sql` or a view file, or the list of view
   files), and give each request a cursor of the project in the query parameter `project`, else in
@@ -134,10 +135,9 @@ changes, not for evals, checks or CI. After the change is on `main`:
 
 Change these together:
 
-- The tables: `schema.sql`; a step of `UPGRADES` in `lab.py`, which brings an existing `lab.db`
-  from the version before to the new tables; the inserts in `lab.py` and `records.save`; the views
-  in `lab.sql`. A step runs inside the upgrade's transaction, so it uses `lab.db.execute`, not
-  `executescript`, which commits.
+- The tables: `schema.sql`; a new step at the end of `STEPS` in `db_upgrades.py`, which brings an
+  existing `lab.db` from the version before to the new tables (the module's docstring says what a
+  step may do); the inserts in `lab.py` and `records.save`; the views in `lab.sql`.
 - The record kinds and statuses: the CHECKs in `schema.sql`, and `KINDS` (in the order the pages
   show them) and `STATUSES` in `records.py`.
 - The evidence kinds: `EVIDENCE` in `records.py`, `record_page` in `pages.py` and

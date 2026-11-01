@@ -1,5 +1,5 @@
--- The tables of lab.db. experiment_lab/lab.py makes them in a new lab.db, and
--- brings an older one to them with the steps of UPGRADES; q and the pages read
+-- The tables of lab.db. experiment_lab/db_upgrades.py makes them in a new
+-- lab.db, and brings an older one to them with its steps; q and the pages read
 -- them through the views of lab.sql. Times are milliseconds since 1970;
 -- descriptions, notes and record texts are Markdown.
 
