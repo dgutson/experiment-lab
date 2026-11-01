@@ -172,6 +172,7 @@ Change these together:
   stubs, in the `dev` group.
 - The usage of q, rec and `lab.py`, the record fields and the views' columns: the module docstrings
   of `q.py`, `rec.py` and `lab.py`, `README.md`, and `plugin/skills/experiment-db/SKILL.md`, which
-  is what an agent using the lab reads.
+  is what an agent using the lab reads, with its `references/`, which SKILL.md names for what an
+  agent seldom needs (runs outside Python, projects and installation, the owner's pages, view files).
 - The Mermaid file name, `experiment_lab/static/mermaid-<version>.min.js`, in
   `templates/lab/base.html`; its version must match the one mermaid-cli uses.

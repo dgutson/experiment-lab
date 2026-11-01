@@ -18,55 +18,35 @@ An experiment, in order:
 3. When a protocol rule asks for a prediction, `rec add question "Will ...?" --in NAME --text
    "the outcome expected, and why"` before the first run.
 4. The work, inside `with lab.run(...)` (below), so that the lab measures how long each run took.
-   For work that runs elsewhere (a background job or agent, another tool), `rec run` before it
-   starts (below).
+   For work that runs elsewhere (a background job or agent, another tool), read
+   [references/runs-elsewhere.md](references/runs-elsewhere.md) before it starts.
 5. `rec add finding "TITLE" --in NAME --text "what the runs showed" --evidence run:<run id>`, with
    `--answers <question id>` when step 3 wrote one.
 6. If the idea failed, `rec experiment NAME --dead-end`, and the finding says why.
 
-- `q`, `rec` and `lab-server` are commands of experiment-lab, installed with `uv tool install` from the
-  clone at `~/experiment-lab`. If `q` is not on the PATH, ask the owner where experiment-lab is.
-  The data folder is `$EXPERIMENT_LAB_DATA`, default `~/lab-data`; the database is its `lab.db`.
-- The lab holds several projects. q, rec and `lab.py` work in the project of the current folder
-  (the one whose folder holds it, or the folder at the same place in its git repository's main
-  worktree). A script works in the
-  project of its working folder, not of the folder the script is in. From another folder, name the
-  project: `--project P` for q and rec, `Lab(project="P")` in a script; with no project, rec and
-  `lab.py` write nothing. If rec says no project holds the folder and the work is a new project,
-  make it once there: `rec project NAME --text "what the project is, in one line"`.
-- `q "SQL"` runs DuckDB SQL over the project's views (those of `experiment_lab/lab.sql`, which hold
-  only its rows, then its view files; `--project P` for another project's, `--all` for lab.sql's
-  views over every project) on `lab.db`, attached read-only as the catalog `lab`, and prints at
-  most 40 rows (`--max N`, `--full` for long cells) of the last statement, naming on stderr the
-  earlier SELECTs, whose rows it leaves out; a result of one row prints `column: value` lines, and
-  one of one cell prints it alone, whole, as stored (`q "SELECT text FROM records WHERE id = '...'"`). `q .views` lists the views and their columns,
+- `q`, `rec` and `lab.py` come from the clone at `~/experiment-lab`; if `q` is not on the PATH, ask
+  the owner where it is. They work in the project whose folder holds the current folder, and their
+  errors say how to name another or make one ([references/projects.md](references/projects.md)).
+- `q "SQL"` runs DuckDB SQL over the project's views (the table below, then the project's view
+  files; `--project P` for another project's, `--all` for every project's) on `lab.db`, attached
+  read-only as the catalog `lab`, and prints the last statement's rows, at most 40 (`--max N`,
+  `--full` for long cells); one cell prints whole, as stored
+  (`q "SELECT text FROM records WHERE id = '...'"`). `q .views` lists the views and their columns,
   and `q .keys` the keys of the project's runs' tags, params and metrics, with how many runs have
-  each; a key no run has gives NULL, with no error. Query the views: the tables `lab.experiments`,
-  `lab.runs`, `lab.params`, `lab.tags`, `lab.metrics`, `lab.files` and `lab.records` hold every
-  project's rows, and only what is stored, for what the views leave out, such as every value logged
-  of a metric, with its `step` and `time` (`lab.metrics`).
-- `rec experiment NAME --text DESCRIPTION [--in PARENT] [--dead-end | --no-dead-end]` makes an
-  experiment, or changes it when it exists. A new experiment needs a description, in Markdown: what
-  it measures and why, in the words a later search would use. Names are unique across the lab: with
-  a description other than an existing experiment's own, rec refuses; a new experiment needs another
-  name, and `--replace` changes the existing one's description (the same for `rec project`).
-  `rec add KIND "TITLE" --in EXPERIMENT --text T [--experiment LABEL] [--by WHO] [--status S]
-  [--answers ID] [--evidence ITEM ...] [--id ID] [--time T]` records a decision, finding, protocol
-  rule or question, KIND `decision`, `finding`, `protocol` or `question`, in an existing experiment,
-  or with `--in PROJECT` in the project itself when no experiment fits. Its text may not be empty,
-  and `--answers` closes that question. A new question is open and any other record closed;
-  `--status open|closed|superseded` sets another. `--id` gives a short id (lower-case letters,
-  digits and dashes), else rec makes one from the title's first words and prints it; `--time` its
-  time. A time, in rec and in `lab.py` alike, is ISO 8601 text, local unless it ends in `Z` or an
-  offset: `"2026-09-10 12:00"`, or `2026-09-10T10:00Z` as it is, with no conversion by hand.
-  `rec set ID FIELD=VALUE` (`status=closed`, `title=...`, `evidence=a;b`); add and set print the
-  records they changed, and how many are open when that changed (`rec open` lists them); with
-  `--quiet`, only the id of the record added or changed.
-  Evidence items: `run:<run id>`, `file:<~ or absolute path>`, `sql:<query over the views>`,
-  `record:<id>`. rec writes `lab.db` itself; no server is needed, and a text has no length limit.
-  `--text -` reads the text from stdin (for `rec experiment` and `rec project` too), and so does
-  `FIELD=-` of `rec set`, one field per call, so a text with line breaks, quotes or backticks goes
-  in a quoted heredoc, which needs no escaping:
+  each; a key no run has gives NULL, with no error. The tables `lab.experiments`, `lab.runs`,
+  `lab.params`, `lab.tags`, `lab.metrics`, `lab.files` and `lab.records` hold every project's rows,
+  only as stored: query them for what the views leave out, such as every value logged of a metric,
+  with its `step` and `time` (`lab.metrics`).
+- `rec experiment NAME --text DESCRIPTION [--in PARENT] [--dead-end]` makes an experiment, or
+  changes it; the description, in Markdown, says what it measures and why, in the words a later
+  search would use. `rec add KIND "TITLE" --in EXPERIMENT --text T [--answers ID] [--evidence ITEM
+  ...]` records a `decision`, `finding`, `protocol` rule or `question`, with `--in PROJECT` when no
+  experiment fits; `--answers` closes that question. Evidence items: `run:<run id>`, `file:<~ or
+  absolute path>`, `sql:<query over the views>`, `record:<id>`. `rec set ID FIELD=VALUE`
+  (`status=closed`, `evidence=a;b`) changes a record; `rec open` lists the open ones. rec writes
+  `lab.db` itself, with no server, and a text has no length limit; `rec COMMAND --help` gives every
+  option. `--text -` reads the text from stdin, and so does `FIELD=-` of `rec set`, so a text with
+  line breaks, quotes or backticks goes in a quoted heredoc, which needs no escaping:
 
   ```sh
   rec add finding "TITLE" --in NAME --evidence run:<run id> --text - <<'EOF'
@@ -78,8 +58,7 @@ An experiment, in order:
   ```
 - Evidence must show later what it showed when the record was written. Log a file that a later run
   or checkout can overwrite, and numbers, in a run (`run.log_file`, below) and cite `run:<run id>`;
-  `file:` is for a file that stays as it is, such as one committed to git. rec warns about a
-  `file:` item in a linked git worktree.
+  `file:` is for a file that stays as it is, such as one committed to git.
 - To log runs, use the module `experiment_lab.lab` (standard library only):
   `PYTHONPATH=~/experiment-lab python3 script.py`, with
 
@@ -119,23 +98,8 @@ An experiment, in order:
   Every keyword is optional: `status=None` (any status), `params=` and `tags=` (`{"rate": (16000,
   48000)}`: a value or a tuple of values), `has_metric="loss"`, and `latest_by`, a param or a list,
   which keeps the latest run for each combination of their values, as `latest_runs`.
-- Work that runs outside the Python that logs it: `rec run EXPERIMENT NAME [--note T]` before it
-  starts prints the run's id. When it ends, `rec end <run id> [--metric K=V ...] [--tag K=V ...]
-  [--file PATH[=NAME] ...] [--status FAILED|KILLED]` logs its results and ends the run (metrics at
-  step 0; NAME, the file's path in the run, its own name unless given). A result that needs
-  computing goes through a script instead: `run = lab.run_by_id("<run id>")`, then
-  `run.log_metrics(...)`, `run.log_file(...)`, `run.end()`. `--at "2026-09-10 12:58"`
-  (`run.end(at=...)`) gives an end earlier than now, and `rec run --start T` (`lab.run(start=...)`)
-  a start earlier than now; in Python a time may be a `datetime` too. A run logged after the work
-  without its times shows a duration of seconds, which the pages count as measured.
-- The owner reads the same records, experiments, runs and views at http://127.0.0.1:5000/lab, and
-  searches them on its Experiments and Records pages, which search with `holds_words` too. The
-  pages link a `file:` item, a `~/` or absolute path in any text, and a table cell, such as a run's
-  param or tag, that is all such a path, to the file when it is under a project's folder or files
-  folder, with a player for audio and the image for an image; a relative path is not linked.
-  Record texts, notes, descriptions and `.md` files there are Markdown; a ```` ```mermaid ```` block
-  is drawn as a diagram by mermaid 11.17.2, the version mmdc uses, so check a diagram with
-  `mmdc -i x.mmd -o x.svg` before recording it.
+- The owner reads the same data on pages at http://127.0.0.1:5000/lab. Texts are Markdown; before
+  putting a diagram, a file path or an image in one, read [references/pages.md](references/pages.md).
 - Quote column names that are SQL keywords (`by`, `load`) with double quotes.
 
 | View | One row per | Columns |
@@ -153,17 +117,8 @@ An experiment, in order:
 each combination of the values of the params named in the list keys, as rows of `runs`.
 
 The project's own view files are listed in its row of `lab.experiments`, column `views`; read
-those files for what each view holds. A query asked again and again goes in a view file, a file of
-`CREATE VIEW` statements over these views:
-
-```sql
--- Each finished run of "rate test", with its accuracy.
-CREATE VIEW accuracy AS SELECT name, metrics['accuracy'] AS accuracy
-    FROM runs WHERE experiment = 'rate test' AND status = 'FINISHED';
-```
-
-`rec project NAME --views FILE ...` sets the project's view files, every one in order. q and the
-owner's pages run them; a Python script does not.
+those files for what each view holds. A query asked again and again goes in a view file
+([references/view-files.md](references/view-files.md)).
 
 ```sql
 SELECT kind, id, experiment, title FROM experiments_runs_records WHERE holds_words(title || ' ' || text, 'sample rate');
