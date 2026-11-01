@@ -361,6 +361,18 @@ with lab.run("rate test", "run 1", params={"rate": 48000}, note="Markdown") as r
 A run ends FINISHED when its `with` block ends, FAILED on an exception and KILLED on Ctrl-C; without
 a `with` block, call `run.end()`.
 
+A process stopped by SIGTERM (`kill`, `timeout`, a background task that is stopped) ends the runs of
+its `with` blocks KILLED, then dies of the signal as it would without the lab. The lab sets this
+handler only from the main thread and only while SIGTERM has its default action, so a script's own
+handler is left alone, and gives the default back when the last block ends. A process killed in a
+way it cannot see (SIGKILL, the OOM killer, a restart) leaves its runs RUNNING; every `Lab` opened
+on the same host, which includes every rec command, ends KILLED each RUNNING run whose process is
+gone, at the time of its last metric, else its start. A run is matched to its process by the host
+name, the pid namespace and the pid that its `with` block stored, so a run started inside a
+container or a sandbox with its own pid namespace is left to a `Lab` opened there. A run without a
+`with` block, such as one of `rec run`, has no process of its own and is ended only by `run.end()`
+or `rec end`.
+
 Work that runs outside the Python that logs it, such as a background job, another tool or a person,
 is timed by a run opened before it starts and ended by another process. `rec run EXPERIMENT NAME
 [--note T] [--start T]` starts the run and prints its id. When the work ends, `rec end RUN

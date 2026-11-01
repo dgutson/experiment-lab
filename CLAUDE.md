@@ -110,6 +110,12 @@ changes, not for evals, checks or CI. After the change is on `main`:
   Every write is one `Lab.write()` transaction (`BEGIN IMMEDIATE`), and an upgrade one of its own
   (`db_upgrades.upgrade`). `settings.py`, `db_upgrades.py` and `__init__.py` must stay importable
   without the package's dependencies too.
+- Opening a `Lab` upgrades `lab.db` and ends the RUNNING runs whose process is gone from this host
+  (`Lab.end_lost`). lab-server does both when it starts, in the child process that makes or upgrades
+  `lab.db`; q ends no run, since it opens no `Lab` unless `lab.db` is older. The SIGTERM handler of
+  `with` blocks (`lab.stopped`) ends only the runs entered by the process it runs in: a child forked
+  inside a block inherits the handler and a copy of `lab.ENTERED`, and must not end its parent's
+  runs.
 - Readers: `query.py` attaches `lab.db` read-only to an in-memory DuckDB with the macro
   `data_folder()`, makes the macro `current_project()` and runs `lab.sql`, whose views keep that project's rows, then the project's
   view files, so that each project's views are in a database of their own and may reuse names. With

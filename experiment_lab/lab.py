@@ -25,15 +25,17 @@ parent is given, and only that project's experiments, runs and records are
 used; with no project, they are refused.
 
 A run ends FINISHED when its with block ends, FAILED on an exception, KILLED
-on Ctrl-C; without a with block, call end(). For work that runs elsewhere, a
-run started before it (rec run, or lab.run without with) is ended by another
-process: lab.run_by_id(run_id).end(), end(at=...) for an earlier end, or rec
-end. A time (lab.run's start, log_metrics's and end's at) is milliseconds
-since 1970, a datetime, or text as rec takes it: ISO 8601, as
-"2026-09-10 12:00", local unless it ends in Z or an offset. Several processes
-may write at once without a server: the database is in WAL mode, every write
-is one short transaction, and a writer waits up to a minute for another's to
-end.
+on Ctrl-C or SIGTERM; without a with block, call end(). A run whose with
+block's process was killed otherwise (SIGKILL, a restart) is ended KILLED by
+the next Lab opened on its host, at its last metric's time, else its start.
+For work that runs elsewhere, a run started before it (rec run, or lab.run
+without with) is ended by another process: lab.run_by_id(run_id).end(),
+end(at=...) for an earlier end, or rec end. A time (lab.run's start,
+log_metrics's and end's at) is milliseconds since 1970, a datetime, or text as
+rec takes it: ISO 8601, as "2026-09-10 12:00", local unless it ends in Z or an
+offset. Several processes may write at once without a server: the database is
+in WAL mode, every write is one short transaction, and a writer waits up to a
+minute for another's to end.
 
 lab.runs reads an experiment's FINISHED runs back, oldest first; its keywords
 keep those with the params, tags or metric given, and the latest for each
@@ -43,15 +45,20 @@ lab.file and lab.json read a file that a run logged.
 import contextlib
 import datetime
 import json
+import os
 import shutil
+import signal
+import socket
 import sqlite3
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from functools import cached_property
 from pathlib import Path
+from types import FrameType
 from typing import Any, NamedTuple, Self
 
 from experiment_lab.db_upgrades import upgrade
@@ -99,6 +106,27 @@ def ms(t: Time | None) -> int | None:
     if isinstance(t, str):
         t = datetime.datetime.fromisoformat(t)
     return int(t.timestamp() * 1000) if isinstance(t, datetime.datetime) else t
+
+
+def host() -> str:
+    """This host's name and pid namespace: a pid names the same process only to
+    a process of the same."""
+    try:
+        namespace = os.readlink("/proc/self/ns/pid")
+    except OSError:  # not Linux
+        namespace = ""
+    return f"{socket.gethostname()} {namespace}".rstrip()
+
+
+def alive(pid: int) -> bool:
+    """Whether a process of this host has that pid."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:  # another user's
+        pass
+    return True
 
 
 def worktrees(folder: Path) -> list[Path]:
@@ -201,8 +229,9 @@ def update(db: sqlite3.Connection, name: str, changes: Mapping[str, object]) -> 
 class Lab:
     def __init__(self, data: StrPath | None = None, project: str | None = None) -> None:
         """Opens the data folder's lab.db, making the folder and the tables if
-        missing, and upgrading an older lab.db (db_upgrades). The lab works in
-        project, else in the project of the current folder."""
+        missing, upgrading an older lab.db (db_upgrades) and ending the runs
+        whose process is gone (end_lost). The lab works in project, else in
+        the project of the current folder."""
         self.named = project
         self.data = Path(data) if data else data_folder()
         self.data.mkdir(parents=True, exist_ok=True)
@@ -210,9 +239,22 @@ class Lab:
         self.db.execute("PRAGMA journal_mode = WAL")
         self.db.execute("PRAGMA foreign_keys = ON")
         upgrade(self.db, self.data)
+        self.end_lost()
 
     def close(self) -> None:
         self.db.close()
+
+    def end_lost(self) -> None:
+        """Ends KILLED every project's RUNNING runs whose with block ran in a
+        process of this host that is gone, at the time of the run's last
+        metric, else at its start."""
+        lost = [(rid,) for rid, pid in self.db.execute("SELECT id, pid FROM runs WHERE status = 'RUNNING'"
+                                                       " AND host = ?", (host(),)).fetchall() if not alive(pid)]
+        if lost:
+            with self.write() as db:
+                db.executemany("UPDATE runs SET status = 'KILLED', end_time = coalesce(max(start_time,"
+                               " (SELECT max(time) FROM metrics WHERE run = runs.id)), start_time)"
+                               " WHERE id = ? AND status = 'RUNNING'", lost)
 
     def delete_project(self, name: str) -> None:
         """Deletes the project and, through ON DELETE CASCADE, the experiments
@@ -407,9 +449,17 @@ class Run:
         self.lab, self.id = lab, rid
 
     def __enter__(self) -> Self:
+        """Stores this process's host and pid, by which Lab.end_lost finds the
+        run once the process is gone, and has SIGTERM end the run KILLED."""
+        with self.lab.write() as db:
+            db.execute("UPDATE runs SET host = ?, pid = ? WHERE id = ?", (host(), os.getpid(), self.id))
+        ENTERED[self] = os.getpid()
+        watch_sigterm()
         return self
 
     def __exit__(self, kind: type[BaseException] | None, *_: object) -> None:
+        ENTERED.pop(self, None)
+        watch_sigterm()
         self.end("FINISHED" if kind is None else "KILLED" if issubclass(kind, KeyboardInterrupt) else "FAILED")
 
     def put(self, table: str, values: Mapping[str, object]) -> None:
@@ -467,6 +517,41 @@ class Run:
         """Ends the run with status, at the time at (now unless given)."""
         with self.lab.write() as db:
             db.execute("UPDATE runs SET status = ?, end_time = ? WHERE id = ?", (status, ms(at) or now(), self.id))
+
+
+# the runs whose with block a process is in, with that process's pid, which a forked child's copy keeps
+ENTERED: dict[Run, int] = {}
+
+
+def entered() -> list[Run]:
+    """The runs whose with block this process is in."""
+    return [run for run, pid in ENTERED.items() if pid == os.getpid()]
+
+
+def watch_sigterm() -> None:
+    """Has SIGTERM end the runs of entered() (stopped) while there are any,
+    else gives it back its default action; only from the main thread, the one
+    that can set a handler, and never over a handler of the script's own."""
+    if threading.current_thread() is not threading.main_thread():
+        return
+    handler = signal.getsignal(signal.SIGTERM)
+    if entered() and handler == signal.SIG_DFL:
+        signal.signal(signal.SIGTERM, stopped)
+    elif not entered() and handler is stopped:
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+
+
+def stopped(signum: int, _: FrameType | None) -> None:
+    """The SIGTERM handler: ends KILLED the runs of entered(), rolling back the
+    write their lab may be in, which the process would lose anyway, then ends
+    the process by the signal, as without the handler."""
+    for run in entered():
+        with contextlib.suppress(sqlite3.Error):  # a connection of another thread, or lab.db locked for a minute
+            if run.lab.db.in_transaction:
+                run.lab.db.execute("ROLLBACK")
+            run.end("KILLED")
+    signal.signal(signum, signal.SIG_DFL)
+    signal.raise_signal(signum)
 
 
 if __name__ == "__main__":  # for lab-server and query.attach: makes or upgrades lab.db; --delete PROJECT deletes one

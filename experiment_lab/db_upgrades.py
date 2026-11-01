@@ -191,3 +191,11 @@ def _(db: sqlite3.Connection, data: Path) -> None:
     db.executemany("INSERT INTO files (run, name, bytes) VALUES (?, ?, ?)",
                    [(d.name, p.relative_to(d).as_posix(), p.stat().st_size)
                     for d in (data / "files").glob("*") if d.name in ids for p in d.rglob("*") if p.is_file()])
+
+
+@version("0.4.0")
+def _(db: sqlite3.Connection, _data: Path) -> None:
+    """The columns host and pid of runs: the process whose with block runs a
+    run, NULL for the runs before."""
+    db.execute("ALTER TABLE runs ADD COLUMN host TEXT")
+    db.execute("ALTER TABLE runs ADD COLUMN pid INTEGER")
