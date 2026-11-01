@@ -41,7 +41,7 @@ given again, it moves it below --in, or marks it as a dead end with --dead-end
 (an idea that failed; a finding says why) or not with --no-dead-end. A
 description other than an existing experiment's own is refused unless
 --replace, since a new experiment needs a name that no experiment of the lab
-has.
+has, of at most 32 characters.
 
 tree prints the project's experiments, or those below EXPERIMENT, one per line,
 each indented below the one it came from, with [dead end] after those marked

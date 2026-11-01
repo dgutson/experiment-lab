@@ -211,6 +211,17 @@ def check_folder(db: sqlite3.Connection, name: str, folder: str | None) -> None:
                          " project another folder, such as --folder . for the current one")
 
 
+LONGEST_NAME = 32  # of a new experiment, which every q filter, --in and sql: item retypes
+
+
+def check_name(name: str) -> None:
+    """Refuses name for a new experiment if it is longer than LONGEST_NAME."""
+    if len(name) > LONGEST_NAME:
+        raise ValueError(f"a new experiment's name is at most {LONGEST_NAME} characters, since every q filter,"
+                         f" --in and sql: item retypes it, and {name!r} has {len(name)}: use a short one, such as"
+                         " a ticket id, and put the words a search needs in the description")
+
+
 def check_description(kind: str, name: str, where: str, own: str | None, given: str | None, replace: bool,
                       hint: str = "") -> None:
     """Refuses given as the description of the existing experiment or project
@@ -341,13 +352,15 @@ class Lab:
         its description (Markdown: what it measures and why, which a new
         experiment needs and a search finds), other than its own only with
         replace; its parent (moving it with the experiments below it); whether
-        it is a dead end (an idea that failed). Returns the names from its
-        project down to it."""
+        it is a dead end (an idea that failed). A new experiment's name is at
+        most LONGEST_NAME characters. Returns the names from its project down
+        to it."""
         with self.write() as db:
             found = db.execute("SELECT parent, description FROM experiments WHERE name = ?", (name,)).fetchone()
             if found is None:
                 if not description:
                     raise ValueError(f"a new experiment needs a description: {name}")
+                check_name(name)
                 parent = parent or self.here()
             else:
                 self.check_experiment(name, "; experiment names are unique across the lab, so a new experiment"

@@ -67,6 +67,7 @@ rec add finding "From a worktree" --in bitrate --text "x" --evidence file:~/resu
 rec set from-a-worktree "evidence=file:~/results-b/new/out.json; file:~/audio-codec/tone.wav"
 rec experiment "blur detector" --text "x"
 rec experiment "noise shaping" --text "A new idea."
+rec experiment "a name of thirty-three characters" --text "x"
 rec experiment bitrate --in "sample rate sweep" --text "Lowers the bitrate at 48 kHz until accuracy drops."
 rec experiment bitrate --text "Lowers the bitrate until accuracy drops." --replace && q "SELECT description FROM experiments WHERE name = 'bitrate'"
 rec project audio-codec --text "A new project."

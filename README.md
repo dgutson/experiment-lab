@@ -182,7 +182,9 @@ the project's experiments, one indented line each, with `[dead end]` after those
 records not superseded, each with its text. Experiment names are unique across the lab, so
 a new experiment or project needs a name no experiment has: `rec experiment` and `rec project`
 refuse to give an existing one a description other than its own unless `--replace`
-(`replace=True` in Python), and an experiment of another project is refused.
+(`replace=True` in Python), and an experiment of another project is refused. A new experiment's name
+is at most 32 characters, since every q filter, `--in` and `sql:` item retypes it; the words a search
+needs go in its description.
 
 The Experiments page shows the tree with, for each experiment, its records, when its first run
 started (with no runs, when it was made), its processing duration (the sum of its runs' durations)
