@@ -136,9 +136,10 @@ changes, not for evals, checks or CI. After the change is on `main`:
 
 Change these together:
 
-- The tables: `schema.sql`; a new step at the end of `STEPS` in `db_upgrades.py`, which brings an
-  existing `lab.db` from the version before to the new tables (the module's docstring says what a
-  step may do); the inserts in `lab.py` and `records.save`; the views in `lab.sql`.
+- The tables: `schema.sql`; the version in `pyproject.toml`, raised; an upgrade in `db_upgrades.py`,
+  a function named `_` decorated with `@version("<that version>")`, which brings an existing
+  `lab.db` to the new tables (the module's docstring says what an upgrade may do); the inserts in
+  `lab.py` and `records.save`; the views in `lab.sql`.
 - The record kinds and statuses: the CHECKs in `schema.sql`, and `KINDS` (in the order the pages
   show them) and `STATUSES` in `records.py`.
 - The evidence kinds: `EVIDENCE` in `records.py`, `record_page` in `pages.py` and

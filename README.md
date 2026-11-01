@@ -151,13 +151,14 @@ In a terminal, in this order:
    runs `start.sh`, which prints `running at …`.
 
 Some updates change the tables of `lab.db`. The first program of the new code to open `lab.db`
-upgrades it: rec, q, a logging script, or the server when it starts. It copies `lab.db` to
-`lab.db.v<N>` in the data folder, where N is the version before, then brings it up one version at a
-time, printing `upgrading lab.db to version …` for each, and at the end prints where the copy is.
-All the versions are one transaction: if one fails, `lab.db` stays at version N. Delete the copy
-once the new version works. The version
-is SQLite's `PRAGMA user_version`. A `lab.db` of a newer version than the code knows is refused
-until experiment-lab is updated.
+upgrades it: rec, q, a logging script, or the server when it starts. `lab.db`'s version is the
+experiment-lab version whose tables it has, 0.0.0 for a `lab.db` that has none. The program copies
+`lab.db` to `lab.db.v<version>` in the data folder (`lab.db.v0.0.0`), then runs the upgrade of each
+experiment-lab version above it in turn, printing `upgrading lab.db to version …` for each, and at
+the end prints where the copy is. All the upgrades are one transaction: if one fails, `lab.db`
+keeps the version it had. Delete the copy once the new version works. The version is in SQLite's
+`PRAGMA user_version`, as major × 1,000,000 + minor × 1,000 + patch. A `lab.db` of a newer version
+than the code knows is refused until experiment-lab is updated.
 
 ## Projects and the experiment tree
 
@@ -406,7 +407,7 @@ does.
 ## The data folder and a project's settings
 
 The lab's files are in the data folder, `$EXPERIMENT_LAB_DATA` (default `~/lab-data`): `lab.db`,
-the runs' files in `files/`, start.sh's `server.log`, and the copy `lab.db.v<N>` that an upgrade
+the runs' files in `files/`, start.sh's `server.log`, and the copy `lab.db.v<version>` that an upgrade
 leaves (Updating). start.sh serves the pages on port
 `$EXPERIMENT_LAB_PORT` (default 5000) and exits at once if a server already answers there;
 restart.sh restarts the server on that port. There is no stop command: kill the `lab-server`
