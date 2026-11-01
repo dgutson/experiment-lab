@@ -8,7 +8,8 @@ that version's. latest(), the highest of these versions, is the version of a
 lab.db that this code makes or upgrades. An older lab.db goes through the
 upgrades above its version, lowest first (pending). A new lab.db gets the
 tables of schema.sql and latest() directly, so schema.sql's tables must be
-those that the upgrades make from a lab.db of version 0.0.0.
+those that the upgrades make from a lab.db of version 0.0.0
+(checks/check_upgrades.py).
 
 The version is kept in SQLite's PRAGMA user_version, an integer, as
 major * 1000000 + minor * 1000 + patch, so each part is below 1000; a lab.db

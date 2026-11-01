@@ -42,6 +42,10 @@ kind, a diagram, an audio file and an image. The checks:
 - `uv run --script checks/check_views.py` and `uv run --script checks/sqlite_filter_bug.py`: the views
   read the same with `lab.db` attached as with its tables copied. They read the data folder's
   `lab.db`; run them while nothing is logged to it.
+- `uv run python checks/check_upgrades.py`: a `lab.db` made from `schema.sql` has the tables and
+  indexes that the upgrades of `db_upgrades.py` make from version 0.0.0 (`checks/schema-0.0.0.sql`,
+  with and without the table `files`), and no upgrade is for a version above `pyproject.toml`'s.
+  A difference is shown as a diff with a line for each column and constraint.
 - `uv run python checks/check_commands.py`: runs a fixed list of rec, q and lab-server
   commands, wrong input among them, in order on a new lab of `make_scratch.py`,
   and compares what they print and their exit statuses with `checks/check_commands.txt`. When a change

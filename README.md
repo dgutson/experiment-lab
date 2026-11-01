@@ -258,6 +258,7 @@ a record a text; `rec`, `lab.py` and `records.py` refuse one without. A run's no
 | `checks/check_pages.py` | opens every page of a running server and checks it |
 | `checks/check_views.py`, `checks/sqlite_filter_bug.py` | checks to run before changing the DuckDB version |
 | `checks/check_commands.py` | runs the commands on a new lab and compares what they print with `checks/check_commands.txt` |
+| `checks/check_upgrades.py`, `checks/schema-0.0.0.sql` | checks that the upgrades of `lab.db` make the tables of `schema.sql` from those of version 0.0.0 |
 | `checks/make_scratch.py` | makes a lab with data in it, for the checks and for trying changes |
 | `evals/` | the skill's eval cases, and `run.sh`, which runs them |
 | `plugin/` | a Claude Code plugin holding the skill `experiment-db`, which tells the agent how to use q, rec and `lab.py` |
