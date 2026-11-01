@@ -494,9 +494,10 @@ $ EXPERIMENT_LAB_DATA=/proc/lab-data rec open
 error: [Errno 2] No such file or directory: '/proc/lab-data'
 exit 1
 
-$ cp -r "$EXPERIMENT_LAB_DATA" ~/old && python -c "import sqlite3; db = sqlite3.connect('$HOME/old/lab.db', isolation_level=None); db.execute('DROP TABLE files'); db.execute('PRAGMA user_version = 0')" && EXPERIMENT_LAB_DATA=~/old rec open > /dev/null && ls ~/old && EXPERIMENT_LAB_DATA=~/old q "SELECT count(*) AS files FROM files" && q "SELECT count(*) AS files FROM files"
-upgrading lab.db to version 0.3.0 (1 of 1)
-upgraded lab.db from version 0.0.0 to 0.3.0; its copy from before is FOLDER/home/old/lab.db.v0.0.0
+$ cp -r "$EXPERIMENT_LAB_DATA" ~/old && python -c "import sqlite3; db = sqlite3.connect('$HOME/old/lab.db', isolation_level=None); db.executescript('DROP TABLE files; ALTER TABLE runs DROP COLUMN host; ALTER TABLE runs DROP COLUMN pid; PRAGMA user_version = 0')" && EXPERIMENT_LAB_DATA=~/old rec open > /dev/null && ls ~/old && EXPERIMENT_LAB_DATA=~/old q "SELECT count(*) AS files FROM files" && q "SELECT count(*) AS files FROM files"
+upgrading lab.db to version 0.3.0 (1 of 2)
+upgrading lab.db to version 0.4.0 (2 of 2)
+upgraded lab.db from version 0.0.0 to 0.4.0; its copy from before is FOLDER/home/old/lab.db.v0.0.0
 files
 lab.db
 lab.db.v0.0.0
@@ -504,18 +505,19 @@ lab.db.v0.0.0
 2
 exit 0
 
-$ cp -r "$EXPERIMENT_LAB_DATA" ~/old-q && python -c "import sqlite3; db = sqlite3.connect('$HOME/old-q/lab.db', isolation_level=None); db.execute('DROP TABLE files'); db.execute('PRAGMA user_version = 0')" && EXPERIMENT_LAB_DATA=~/old-q q "SELECT count(*) AS files FROM files"
-upgrading lab.db to version 0.3.0 (1 of 1)
-upgraded lab.db from version 0.0.0 to 0.3.0; its copy from before is FOLDER/home/old-q/lab.db.v0.0.0
+$ cp -r "$EXPERIMENT_LAB_DATA" ~/old-q && python -c "import sqlite3; db = sqlite3.connect('$HOME/old-q/lab.db', isolation_level=None); db.executescript('DROP TABLE files; ALTER TABLE runs DROP COLUMN host; ALTER TABLE runs DROP COLUMN pid; PRAGMA user_version = 0')" && EXPERIMENT_LAB_DATA=~/old-q q "SELECT count(*) AS files FROM files"
+upgrading lab.db to version 0.3.0 (1 of 2)
+upgrading lab.db to version 0.4.0 (2 of 2)
+upgraded lab.db from version 0.0.0 to 0.4.0; its copy from before is FOLDER/home/old-q/lab.db.v0.0.0
 2
 exit 0
 
 $ cp -r "$EXPERIMENT_LAB_DATA" ~/newer && python -c "import sqlite3; sqlite3.connect('$HOME/newer/lab.db', isolation_level=None).execute('PRAGMA user_version = 9000000')" && EXPERIMENT_LAB_DATA=~/newer rec open
-error: FOLDER/home/newer/lab.db has the tables of experiment-lab 9.0.0, newer than those of this one, 0.3.0: update experiment-lab (README, Updating)
+error: FOLDER/home/newer/lab.db has the tables of experiment-lab 9.0.0, newer than those of this one, 0.4.0: update experiment-lab (README, Updating)
 exit 1
 
 $ EXPERIMENT_LAB_DATA=~/newer q "SELECT count(*) FROM runs"
-error: FOLDER/home/newer/lab.db has the tables of experiment-lab 9.0.0, newer than those of this one, 0.3.0: update experiment-lab (README, Updating)
+error: FOLDER/home/newer/lab.db has the tables of experiment-lab 9.0.0, newer than those of this one, 0.4.0: update experiment-lab (README, Updating)
 exit 1
 
 $ q "SELECT name, status FROM runs WHERE experiment = 'sample rate sweep' ORDER BY name"
@@ -865,6 +867,28 @@ started: 2026-09-10 10:00
 ended: 2026-09-10 10:30
 measured: 2026-09-10 10:10
 (1 rows)
+exit 0
+
+$ python -c "import os, signal; from experiment_lab.lab import Lab; Lab().run('bitrate', 'stopped').__enter__(); os.kill(os.getpid(), signal.SIGTERM)"; echo "exit $?"; q "SELECT name, status, ended IS NOT NULL AS ended FROM runs WHERE name = 'stopped'"
+Terminated
+exit 143
+name: stopped
+status: KILLED
+ended: true
+(1 rows)
+exit 0
+
+$ python -c "from experiment_lab.lab import Lab; Lab().run('bitrate', 'lost', start='2026-09-10 12:00').__enter__().log_metrics({'x': 1}, at='2026-09-10 12:30')" && q "SELECT status FROM runs WHERE name = 'lost'" && rec tree > /dev/null && q "SELECT name, status, started, ended FROM runs WHERE name = 'lost'"
+RUNNING
+name: lost
+status: KILLED
+started: 2026-09-10 12:00
+ended: 2026-09-10 12:30
+(1 rows)
+exit 0
+
+$ python -c "import os, signal, time; from experiment_lab.lab import Lab; lab = Lab(); r = lab.run('bitrate', 'forked').__enter__(); child = os.fork() or time.sleep(9); time.sleep(0.5); os.kill(child, signal.SIGTERM); os.waitpid(child, 0); print('after the child is stopped:', lab.db.execute('SELECT status FROM runs WHERE id = ?', (r.id,)).fetchone()[0]); r.__exit__(None)"
+after the child is stopped: RUNNING
 exit 0
 
 $ echo a > ~/out.txt && id=$(rec run bitrate "shell job" --start "2026-09-10 12:00") && { rec end "$id" --metric accuracy=0.93 --file ~/out.txt ~/missing.txt; q "SELECT status, metrics FROM runs WHERE run = '$id'"; }

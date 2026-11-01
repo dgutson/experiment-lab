@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS experiments (
 );
 CREATE INDEX IF NOT EXISTS experiments_by_parent ON experiments (parent);
 
+-- host (the host name and pid namespace) and pid are those of the process
+-- whose with block runs the run (lab.py's Run.__enter__), by which a RUNNING
+-- run whose process is gone is ended; NULL for a run whose work runs elsewhere.
 CREATE TABLE IF NOT EXISTS runs (
     id TEXT PRIMARY KEY,
     experiment TEXT NOT NULL REFERENCES experiments (name) ON UPDATE CASCADE ON DELETE CASCADE,
@@ -28,7 +31,9 @@ CREATE TABLE IF NOT EXISTS runs (
     status TEXT NOT NULL CHECK (status IN ('RUNNING', 'FINISHED', 'FAILED', 'KILLED')),
     start_time INTEGER NOT NULL,
     end_time INTEGER,
-    note TEXT NOT NULL DEFAULT ''
+    note TEXT NOT NULL DEFAULT '',
+    host TEXT,
+    pid INTEGER
 );
 CREATE INDEX IF NOT EXISTS runs_by_experiment ON runs (experiment);
 
