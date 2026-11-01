@@ -59,8 +59,6 @@ CUT = 300  # characters shown per cell, except in the query box
 LONGEST_FIND, LONGEST_SQL = 200, 5000  # characters of a search and of a query from the query box
 TEXT_TYPES = ("application/json", "application/javascript", "application/xml", "application/sql",
               "application/x-sh", "application/toml")
-# statements that would act outside the transaction that is rolled back
-REFUSED = (duckdb.StatementType.TRANSACTION, duckdb.StatementType.ATTACH, duckdb.StatementType.DETACH)
 # a ~/ or absolute path in a text, after the start, a space, a parenthesis or a quote; a . , ; : ! or ?
 # at its end is not part of it
 PATH = re.compile(r"""(?<![^\s("'])~?/[^\s()<>"'`\[\]]*[^\s()<>"'`\[\].,;:!?]""")
@@ -206,8 +204,7 @@ class Views:
             con, sources = self.made.get(project, (None, []))
             if con is None or query.version(con, project) != [(s["path"], s["mtime"]) for s in sources]:
                 con, sources = query.connect(self.data, project)
-                con.execute("SET enable_external_access = false")
-                con.execute("SET lock_configuration = true")
+                query.lock(con)
                 self.made[project] = query.Database(con, sources)
             return con.cursor()
 
@@ -306,16 +303,8 @@ def row_cells(row: query.Row, numeric: Sequence[bool], link: str | None, tops: I
 def run_sql(con: DuckDBPyConnection, sql: str, limit: int = ROWS, cut: int | None = CUT) -> Shown | Failure:
     """The last statement's rows as a table, or the error text."""
     try:
-        if any(s.type in REFUSED for s in con.extract_statements(sql)):
-            return Failure(error="BEGIN, COMMIT, ROLLBACK, ATTACH and DETACH are not run here")
-        con.begin()
-        try:
-            last = query.run(con, sql)
-            if last.result is None:
-                return Failure(error="the statement returns no rows")
-            return shown(last.result, limit, cut, hidden_note=last.hidden_note)
-        finally:
-            con.rollback()
+        with query.trial(con, sql) as last:
+            return shown(last.rows(), limit, cut, hidden_note=last.hidden_note)
     except (duckdb.Error, ValueError) as e:
         return Failure(error=str(e))
 

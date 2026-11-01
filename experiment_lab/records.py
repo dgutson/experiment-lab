@@ -70,8 +70,8 @@ def check(lab: Lab, r: Record, fields: Collection[str] = ("kind", "status", "tex
 
 
 def check_evidence(lab: Lab, items: Iterable[str]) -> None:
-    """Refuses an item of no kind of EVIDENCE, and a run: or record: item
-    whose id no run or record has."""
+    """Refuses an item of no kind of EVIDENCE, a run: or record: item whose
+    id no run or record has, and a file: item whose path does not exist."""
     for item in items:
         kind, _, value = item.partition(":")
         if kind not in EVIDENCE or not value:
@@ -79,6 +79,8 @@ def check_evidence(lab: Lab, items: Iterable[str]) -> None:
         if kind in ID_TABLES and not lab.db.execute(f"SELECT 1 FROM {ID_TABLES[kind]} WHERE id = ?",
                                                      (value,)).fetchone():
             raise ValueError(f"evidence {item!r}: there is no {kind} {value}")
+        if kind == "file" and not Path(value).expanduser().exists():
+            raise ValueError(f"evidence {item!r}: there is no file {value}")
 
 
 def in_linked_worktree(items: Iterable[str]) -> list[str]:

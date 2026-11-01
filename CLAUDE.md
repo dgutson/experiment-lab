@@ -132,8 +132,10 @@ changes, not for evals, checks or CI. After the change is on `main`:
   the cookie `project`; the pages of an experiment, a run or a record and the Projects page read
   the database of no project (`every_project`). Attaching costs
   about 140 ms, since each new DuckDB database loads the SQLite extension again. File access
-  is off and the configuration locked. SQL from the query box and from `sql:` evidence runs in a
-  transaction that is rolled back; `REFUSED` lists the statement types that would act outside it.
+  is off and the configuration locked (`query.lock`). SQL from the query box and from `sql:`
+  evidence runs in a transaction that is rolled back (`query.trial`); `query.REFUSED` lists the
+  statement types that would act outside it. rec runs a record's `sql:` items the same way, with
+  its sqlite3 connection closed (`Lab.closed`).
 - The templates only lay out what `pages.py` gives them. `pages.py` writes every sentence, number,
   link (`url`, `file_url`, `view_url` and `query_url`, which the templates may call) and piece of
   SQL as the page shows it, and a name in SQL text through `query.literal` or `query.identifier`. A

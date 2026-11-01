@@ -60,10 +60,10 @@ An experiment, in order:
   records they changed, and how many are open when that changed (`rec open` lists them); with
   `--quiet`, only the id of the record added or changed.
   Evidence items: `run:<run id>`, `file:<~ or absolute path>`, `sql:<query over the views>`,
-  `record:<id>`; rec refuses a run or record id that does not exist. rec writes `lab.db` itself;
-  no server is needed, and a text has no length limit. `--text -` reads the text from stdin (for
-  `rec experiment` and `rec project` too), and so does `FIELD=-` of `rec set`, one field per call,
-  so a text with line breaks, quotes or backticks goes in a quoted heredoc, which needs no escaping:
+  `record:<id>`. rec writes `lab.db` itself; no server is needed, and a text has no length limit.
+  `--text -` reads the text from stdin (for `rec experiment` and `rec project` too), and so does
+  `FIELD=-` of `rec set`, one field per call, so a text with line breaks, quotes or backticks goes
+  in a quoted heredoc, which needs no escaping:
 
   ```sh
   rec add finding "TITLE" --in NAME --evidence run:<run id> --text - <<'EOF'
@@ -148,8 +148,7 @@ An experiment, in order:
 `local_time(ms)` writes any time of the tables (milliseconds, as `lab.metrics.time`) the same way.
 `holds_words(text, words)` is true when text holds every word of words, in any letter case.
 `latest_runs(experiment_name, keys)` is the experiment's latest FINISHED run, by start time, for
-each combination of the values of the params named in the list keys, as rows of `runs`. A later
-run changes what it returns, so evidence cites the runs it returned (`run:<run id>`), not the query.
+each combination of the values of the params named in the list keys, as rows of `runs`.
 
 The project's own view files are listed in its row of `lab.experiments`, column `views`; read
 those files for what each view holds. A query asked again and again goes in a view file, a file of

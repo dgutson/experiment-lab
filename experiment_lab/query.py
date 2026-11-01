@@ -7,10 +7,12 @@ DuckDB reads lab.db through its own copy of SQLite, and two copies of SQLite in
 one process do not see each other's locks
 (https://www.sqlite.org/howtocorrupt.html, section 2.2.1). So a process must
 not have lab.db open with Python's sqlite3 while DuckDB reads it: q and the
-pages never open it with sqlite3, and the writers (lab.py) never use DuckDB.
+pages never open it with sqlite3, lab.py never uses DuckDB, and rec closes its
+sqlite3 connection (Lab.closed) while it runs a record's sql: evidence.
 """
+import contextlib
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import NamedTuple, TypedDict
 
@@ -22,6 +24,8 @@ from experiment_lab.lab import Project
 from experiment_lab.settings import database
 
 LAB_SQL = Path(__file__).with_name("lab.sql")
+# the statements that would act outside the transaction that trial rolls back
+REFUSED = (duckdb.StatementType.TRANSACTION, duckdb.StatementType.ATTACH, duckdb.StatementType.DETACH)
 
 type Row = list[str]
 
@@ -51,6 +55,12 @@ class LastResult(NamedTuple):
     ('' if none)."""
     result: DuckDBPyConnection | None
     hidden_note: str
+
+    def rows(self) -> DuckDBPyConnection:
+        """result; a ValueError if the statement returns no rows."""
+        if self.result is None:
+            raise ValueError("the statement returns no rows")
+        return self.result
 
 
 class View(NamedTuple):
@@ -161,6 +171,44 @@ def run(con: DuckDBPyConnection, sql: str) -> LastResult:
     note = (f"The rows of statement{'s' if len(hidden) > 1 else ''} {', '.join(hidden)} are not shown;"
             " only the last statement's are.") if hidden else ""
     return LastResult(result if result.description else None, note)
+
+
+def lock(con: DuckDBPyConnection) -> None:
+    """Turns off con's access to files and locks its configuration, for SQL
+    that a page or a record gives, so that rec judges a sql: item as the
+    record page runs it."""
+    con.execute("SET enable_external_access = false")
+    con.execute("SET lock_configuration = true")
+
+
+@contextlib.contextmanager
+def trial(con: DuckDBPyConnection, sql: str) -> Iterator[LastResult]:
+    """Runs sql (run) in a transaction that is rolled back after the block,
+    refusing a statement of REFUSED, as the pages run SQL from the query box
+    and sql: evidence and rec checks a sql: item."""
+    if any(s.type in REFUSED for s in con.extract_statements(sql)):
+        raise ValueError("BEGIN, COMMIT, ROLLBACK, ATTACH and DETACH are not run here")
+    con.begin()
+    try:
+        yield run(con, sql)
+    finally:
+        con.rollback()
+
+
+def evidence_runs(con: DuckDBPyConnection, sql: str) -> list[str]:
+    """The run ids in the column run of the rows that the sql: evidence item
+    sql returns, run as trial runs it, each once; none without that column. A
+    ValueError naming the item if it fails."""
+    try:
+        with trial(con, sql) as last:
+            rows = last.rows()
+            names = [d[0] for d in rows.description]
+            if "run" not in names:
+                return []
+            column = names.index("run")
+            return list(dict.fromkeys(str(row[column]) for row in rows.fetchall()))
+    except (duckdb.Error, ValueError) as e:
+        raise ValueError(f"evidence 'sql:{sql}': {e}") from e
 
 
 def view_columns(con: DuckDBPyConnection) -> list[View]:
