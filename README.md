@@ -355,7 +355,7 @@ from experiment_lab.lab import Lab
 
 lab = Lab()                                       # $EXPERIMENT_LAB_DATA, else ~/lab-data
 lab.project("my-project", "What the project is.")  # once, from the project's folder
-lab.experiment("rate test", "What it measures and why.")       # parent="..." to put it below another
+lab.experiment("rate test", "What it measures and why.")       # once, as rec experiment; parent="..." to put it below another
 with lab.run("rate test", "run 1", params={"rate": 48000}, note="Markdown") as run:
     run.log_metrics({"accuracy": 0.91}, step=3)   # every value is kept, with its step and time
     run.set_tags({"outcome": "pass"})

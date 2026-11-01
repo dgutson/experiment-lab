@@ -460,7 +460,7 @@ error: 'blur detector' is in the project vision, not in audio-codec, whose folde
 exit 1
 
 $ rec experiment "noise shaping" --text "A new idea."
-error: experiment noise shaping exists (audio-codec › 16-bit output › noise shaping); a new experiment needs another name; --replace (replace=True) changes its description
+error: experiment noise shaping exists (audio-codec › 16-bit output › noise shaping); a new experiment needs another name; --replace (replace=True) changes its description; a script that logs runs in it as it is needs only lab.run
 exit 1
 
 $ rec experiment bitrate --in "sample rate sweep" --text "Lowers the bitrate at 48 kHz until accuracy drops."

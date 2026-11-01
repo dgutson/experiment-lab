@@ -7,7 +7,7 @@ PYTHONPATH=<clone of experiment-lab>.
     from experiment_lab.lab import Lab
     lab = Lab()                                  # $EXPERIMENT_LAB_DATA, else ~/lab-data
     lab.project("my-project", "What the project is.")   # once, from the project's folder
-    lab.experiment("rate test", "What it measures and why.")
+    lab.experiment("rate test", "What it measures and why.")   # once, as rec experiment
     with lab.run("rate test", "run 1", params={"rate": 48000}) as run:
         run.log_metrics({"accuracy": 0.91}, step=3)
         run.set_tags({"outcome": "pass"})
@@ -211,12 +211,14 @@ def check_folder(db: sqlite3.Connection, name: str, folder: str | None) -> None:
                          " project another folder, such as --folder . for the current one")
 
 
-def check_description(kind: str, name: str, where: str, own: str | None, given: str | None, replace: bool) -> None:
+def check_description(kind: str, name: str, where: str, own: str | None, given: str | None, replace: bool,
+                      hint: str = "") -> None:
     """Refuses given as the description of the existing experiment or project
-    (kind) name, unless it is its own or replace; where tells which it is."""
+    (kind) name, unless it is its own or replace; where tells which it is, and
+    hint is added at the end."""
     if given and given != own and not replace:
         raise ValueError(f"{kind} {name} exists ({where}); a new {kind} needs another name;"
-                         " --replace (replace=True) changes its description")
+                         f" --replace (replace=True) changes its description{hint}")
 
 
 def update(db: sqlite3.Connection, name: str, changes: Mapping[str, object]) -> None:
@@ -350,7 +352,8 @@ class Lab:
             else:
                 self.check_experiment(name, "; experiment names are unique across the lab, so a new experiment"
                                             " needs another name")
-                check_description("experiment", name, " › ".join(self.path(name)), found[1], description, replace)
+                check_description("experiment", name, " › ".join(self.path(name)), found[1], description, replace,
+                                  "; a script that logs runs in it as it is needs only lab.run")
             if parent is not None:
                 self.check_parent(name, parent, is_project=found is not None and found[0] is None)
             if found is None:
