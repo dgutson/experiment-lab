@@ -54,9 +54,9 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any, NamedTuple, Self
 
+from experiment_lab.db_upgrades import upgrade
 from experiment_lab.settings import data_folder, database
 
-SCHEMA = Path(__file__).with_name("schema.sql")
 # the experiment given as the parameter, and those below it, as the table below
 BELOW = ("WITH RECURSIVE below(name) AS (SELECT ? UNION ALL"
          " SELECT e.name FROM experiments e JOIN below ON e.parent = below.name)")
@@ -201,28 +201,15 @@ def update(db: sqlite3.Connection, name: str, changes: Mapping[str, object]) -> 
 class Lab:
     def __init__(self, data: StrPath | None = None, project: str | None = None) -> None:
         """Opens the data folder's lab.db, making the folder and the tables if
-        missing; with the table files, the rows of the files already logged.
-        The lab works in project, else in the project of the current folder."""
+        missing, and upgrading an older lab.db (db_upgrades). The lab works in
+        project, else in the project of the current folder."""
         self.named = project
         self.data = Path(data) if data else data_folder()
         self.data.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(database(self.data), timeout=60, isolation_level=None)
         self.db.execute("PRAGMA journal_mode = WAL")
         self.db.execute("PRAGMA foreign_keys = ON")
-        had_files = self.db.execute("SELECT 1 FROM sqlite_master WHERE name = 'files'").fetchone() is not None
-        self.db.executescript(SCHEMA.read_text())
-        if not had_files:
-            self.add_files()
-
-    def add_files(self) -> None:
-        """A row in the table files for each file in files/<run id>/ of a run
-        of lab.db, which a lab.db made without that table lacks."""
-        folder = self.data / "files"
-        with self.write() as db:
-            ids = {rid for (rid,) in db.execute("SELECT id FROM runs")}
-            db.executemany("INSERT OR IGNORE INTO files (run, name, bytes) VALUES (?, ?, ?)",
-                           [(d.name, p.relative_to(d).as_posix(), p.stat().st_size)
-                            for d in folder.glob("*") if d.name in ids for p in d.rglob("*") if p.is_file()])
+        upgrade(self.db, self.data)
 
     def close(self) -> None:
         self.db.close()
@@ -482,7 +469,7 @@ class Run:
             db.execute("UPDATE runs SET status = ?, end_time = ? WHERE id = ?", (status, ms(at) or now(), self.id))
 
 
-if __name__ == "__main__":  # for lab-server: makes lab.db, or the tables it lacks; --delete PROJECT deletes one
+if __name__ == "__main__":  # for lab-server and query.attach: makes or upgrades lab.db; --delete PROJECT deletes one
     try:
         lab = Lab()
         match sys.argv[1:]:

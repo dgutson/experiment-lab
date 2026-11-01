@@ -150,6 +150,16 @@ In a terminal, in this order:
    It stops the server on port `$EXPERIMENT_LAB_PORT` (default 5000), waits for it to end, and
    runs `start.sh`, which prints `running at …`.
 
+Some updates change the tables of `lab.db`. The first program of the new code to open `lab.db`
+upgrades it: rec, q, a logging script, or the server when it starts. `lab.db`'s version is the
+experiment-lab version whose tables it has, 0.0.0 for a `lab.db` that has none. The program copies
+`lab.db` to `lab.db.v<version>` in the data folder (`lab.db.v0.0.0`), then runs the upgrade of each
+experiment-lab version above it in turn, printing `upgrading lab.db to version …` for each, and at
+the end prints where the copy is. All the upgrades are one transaction: if one fails, `lab.db`
+keeps the version it had. Delete the copy once the new version works. The version is in SQLite's
+`PRAGMA user_version`, as major × 1,000,000 + minor × 1,000 + patch. A `lab.db` of a newer version
+than the code knows is refused until experiment-lab is updated.
+
 ## Projects and the experiment tree
 
 A project is an experiment with no parent. `rec project NAME --text "what the project is"`, run
@@ -248,6 +258,7 @@ a record a text; `rec`, `lab.py` and `records.py` refuse one without. A run's no
 | `checks/check_pages.py` | opens every page of a running server and checks it |
 | `checks/check_views.py`, `checks/sqlite_filter_bug.py` | checks to run before changing the DuckDB version |
 | `checks/check_commands.py` | runs the commands on a new lab and compares what they print with `checks/check_commands.txt` |
+| `checks/check_upgrades.py`, `checks/schema-0.0.0.sql` | checks that the upgrades of `lab.db` make the tables of `schema.sql` from those of version 0.0.0 |
 | `checks/make_scratch.py` | makes a lab with data in it, for the checks and for trying changes |
 | `evals/` | the skill's eval cases, and `run.sh`, which runs them |
 | `plugin/` | a Claude Code plugin holding the skill `experiment-db`, which tells the agent how to use q, rec and `lab.py` |
@@ -304,7 +315,7 @@ it.
 
 | Database | Engine | Where | Written by | Read by | Lasts |
 |---|---|---|---|---|---|
-| `lab.db` | SQLite, WAL mode | data folder | `experiment_lab.lab` and `experiment_lab.records`, with Python's sqlite3: rec, the logging scripts, and lab-server's child process that deletes a project | q and the pages, through DuckDB | always |
+| `lab.db` | SQLite, WAL mode | data folder | `experiment_lab.lab`, `experiment_lab.records` and `experiment_lab.db_upgrades`, with Python's sqlite3: rec, the logging scripts, the child process that lab-server and q start to make or upgrade `lab.db`, and lab-server's child process that deletes a project | q and the pages, through DuckDB | always |
 | the pages' databases, one per project, and one of every project for the pages of an experiment, a run or a record and the Projects page | DuckDB, in memory | the lab-server process | the pages: `lab.db` attached read-only as the catalog `lab`, then the views of `lab.sql` and of the project's view files | the pages, a cursor per request, with file access off | until `lab.sql`, one of the project's view files or its list of them changes |
 | q's database | DuckDB, in memory | q's process | q: `lab.db` attached read-only as the catalog `lab`, then the views of `lab.sql` and of the project's view files (with `--all`, lab.sql's alone, over every project) | the SQL given to q | one q call |
 
@@ -397,7 +408,8 @@ does.
 ## The data folder and a project's settings
 
 The lab's files are in the data folder, `$EXPERIMENT_LAB_DATA` (default `~/lab-data`): `lab.db`,
-the runs' files in `files/`, and start.sh's `server.log`. start.sh serves the pages on port
+the runs' files in `files/`, start.sh's `server.log`, and the copy `lab.db.v<version>` that an upgrade
+leaves (Updating). start.sh serves the pages on port
 `$EXPERIMENT_LAB_PORT` (default 5000) and exits at once if a server already answers there;
 restart.sh restarts the server on that port. There is no stop command: kill the `lab-server`
 process, which outlives the shell that started it. `lab.db` and its tables are made by the first

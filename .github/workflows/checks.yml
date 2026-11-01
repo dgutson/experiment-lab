@@ -29,6 +29,8 @@ jobs:
           uv run sqlfluff lint --dialect sqlite experiment_lab/read.sql experiment_lab/schema.sql
       - name: DuckDB reads attached SQLite tables correctly
         run: uv run --script checks/sqlite_filter_bug.py
+      - name: schema.sql's tables are those that the upgrades make
+        run: uv run python checks/check_upgrades.py
       - name: Commands print what checks/check_commands.txt holds
         run: uv run python checks/check_commands.py
       - name: Lab.runs reads what the views read

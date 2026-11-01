@@ -42,6 +42,10 @@ kind, a diagram, an audio file and an image. The checks:
 - `uv run --script checks/check_views.py` and `uv run --script checks/sqlite_filter_bug.py`: the views
   read the same with `lab.db` attached as with its tables copied. They read the data folder's
   `lab.db`; run them while nothing is logged to it.
+- `uv run python checks/check_upgrades.py`: a `lab.db` made from `schema.sql` has the tables and
+  indexes that the upgrades of `db_upgrades.py` make from version 0.0.0 (`checks/schema-0.0.0.sql`,
+  with and without the table `files`), and no upgrade is for a version above `pyproject.toml`'s.
+  A difference is shown as a diff with a line for each column and constraint.
 - `uv run python checks/check_commands.py`: runs a fixed list of rec, q and lab-server
   commands, wrong input among them, in order on a new lab of `make_scratch.py`,
   and compares what they print and their exit statuses with `checks/check_commands.txt`. When a change
@@ -103,17 +107,19 @@ changes, not for evals, checks or CI. After the change is on `main`:
 - Writers: `lab.py` (projects, experiments and runs) and `records.py` (records) use only the
   standard library and Python's sqlite3, so a logging script imports them with `PYTHONPATH` alone.
   `lab.py` reads runs back the same way (`Lab.runs`, `Lab.file`, `Lab.json`), for a report script.
-  Every write is one `Lab.write()` transaction (`BEGIN IMMEDIATE`). `settings.py` and `__init__.py`
-  must stay importable without the package's dependencies too.
+  Every write is one `Lab.write()` transaction (`BEGIN IMMEDIATE`), and an upgrade one of its own
+  (`db_upgrades.upgrade`). `settings.py`, `db_upgrades.py` and `__init__.py` must stay importable
+  without the package's dependencies too.
 - Readers: `query.py` attaches `lab.db` read-only to an in-memory DuckDB with the macro
   `data_folder()`, makes the macro `current_project()` and runs `lab.sql`, whose views keep that project's rows, then the project's
   view files, so that each project's views are in a database of their own and may reuse names. With
   no project, `lab.sql`'s views hold every project's rows. q, the pages and `checks/check_views.py`
   all read through it.
 - No process may have `lab.db` open with Python's sqlite3 while DuckDB reads it, since the two copies
-  of SQLite do not see each other's locks (`query.py`'s docstring). So lab-server makes `lab.db`, or
-  the tables it lacks, and deletes a project (`python -m experiment_lab.lab --delete NAME`) in a
-  child process.
+  of SQLite do not see each other's locks (`query.py`'s docstring). So lab-server, when it starts,
+  and `query.attach`, for an older `lab.db`, have it made or upgraded in a child process
+  (`db_upgrades.upgrade_in_child`), and lab-server deletes a project in one too
+  (`python -m experiment_lab.lab --delete NAME`).
 - The pages (`pages.py`) keep one DuckDB database per project (`Views`), made again when
   `query.version` changes (the modification time of `lab.sql` or a view file, or the list of view
   files), and give each request a cursor of the project in the query parameter `project`, else in
@@ -134,7 +140,10 @@ changes, not for evals, checks or CI. After the change is on `main`:
 
 Change these together:
 
-- The tables: `schema.sql`; the inserts in `lab.py` and `records.save`; the views in `lab.sql`.
+- The tables: `schema.sql`; the version in `pyproject.toml`, raised; an upgrade in `db_upgrades.py`,
+  a function named `_` decorated with `@version("<that version>")`, which brings an existing
+  `lab.db` to the new tables (the module's docstring says what an upgrade may do); the inserts in
+  `lab.py` and `records.save`; the views in `lab.sql`.
 - The record kinds and statuses: the CHECKs in `schema.sql`, and `KINDS` (in the order the pages
   show them) and `STATUSES` in `records.py`.
 - The evidence kinds: `EVIDENCE` in `records.py`, `record_page` in `pages.py` and

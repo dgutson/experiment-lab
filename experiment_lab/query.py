@@ -17,6 +17,7 @@ from typing import NamedTuple, TypedDict
 import duckdb
 from duckdb import DuckDBPyConnection
 
+from experiment_lab.db_upgrades import upgrade_attached
 from experiment_lab.lab import Project
 from experiment_lab.settings import database
 
@@ -86,14 +87,23 @@ def identifier(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
 
 
+def attached(path: Path) -> DuckDBPyConnection:
+    con = duckdb.connect()
+    con.execute(f"ATTACH {literal(str(path))} AS lab (TYPE sqlite, READ_ONLY)")
+    return con
+
+
 def attach(data: Path) -> DuckDBPyConnection:
     """A new in-memory DuckDB database with lab.db attached as the catalog lab,
-    and the macro data_folder(), the data folder's absolute path."""
+    and the macro data_folder(), the data folder's absolute path. An older
+    lab.db is upgraded first, a newer one refused (upgrade_attached)."""
     path = database(data)
     if not path.exists():
         raise FileNotFoundError(f"no database {path}; rec project or a logging script makes it")
-    con = duckdb.connect()
-    con.execute(f"ATTACH {literal(str(path))} AS lab (TYPE sqlite, READ_ONLY)")
+    con = attached(path)
+    if upgrade_attached(con, data):
+        con.close()
+        con = attached(path)
     con.execute(f"CREATE MACRO data_folder() AS {literal(str(data.resolve()))}")
     return con
 
