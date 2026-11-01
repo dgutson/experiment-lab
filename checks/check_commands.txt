@@ -44,7 +44,7 @@ given again, it moves it below --in, or marks it as a dead end with --dead-end
 (an idea that failed; a finding says why) or not with --no-dead-end. A
 description other than an existing experiment's own is refused unless
 --replace, since a new experiment needs a name that no experiment of the lab
-has.
+has, of at most 32 characters.
 
 tree prints the project's experiments, or those below EXPERIMENT, one per line,
 each indented below the one it came from, with [dead end] after those marked
@@ -461,6 +461,10 @@ exit 1
 
 $ rec experiment "noise shaping" --text "A new idea."
 error: experiment noise shaping exists (audio-codec › 16-bit output › noise shaping); a new experiment needs another name; --replace (replace=True) changes its description; a script that logs runs in it as it is needs only lab.run
+exit 1
+
+$ rec experiment "a name of thirty-three characters" --text "x"
+error: a new experiment's name is at most 32 characters, since every q filter, --in and sql: item retypes it, and 'a name of thirty-three characters' has 33: use a short one, such as a ticket id, and put the words a search needs in the description
 exit 1
 
 $ rec experiment bitrate --in "sample rate sweep" --text "Lowers the bitrate at 48 kHz until accuracy drops."
