@@ -207,8 +207,12 @@ A record is a row of the table `records`: an id, the experiment it is filed in (
 for a record that no experiment fits, with `rec add --in PROJECT`), the label it is shown under (the experiment's name unless given), a kind (decision, finding, protocol or question),
 a title, a text in Markdown, an author, a status (open, closed or superseded), the question it
 answers, and its evidence: items `run:<run id>`, `file:<path>`, `sql:<query over the views>` or
-`record:<id>`, joined by `; `, the run or record existing. rec warns about a `file:` item in a linked git worktree, where a
-later checkout can change the file; such a file is logged in a run and cited as `run:<run id>`. A
+`record:<id>`, joined by `; `, the run, record or file existing. A `sql:` item runs as the record's
+page runs it and is refused if it fails, and each run it returns in a column `run` is added as a
+`run:` item, so that the record keeps the runs it relied on (none from an item that returns more
+than 20). rec warns about a `file:` item in a linked git worktree, where a later checkout can change
+the file (such a file is logged in a run and cited as `run:<run id>`), and about a run id in the
+text that the evidence does not cite. A
 new question is open and any other record closed unless a status is given, and a record that answers
 an open question closes it. `rec add` and `rec set` print the records they changed, then, when
 they changed how many of the project's records are open, how many are; `rec open` lists them. With

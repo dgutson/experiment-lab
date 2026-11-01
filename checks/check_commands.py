@@ -47,7 +47,7 @@ rec add finding "Elsewhere" --in "blur detector" --text "x"
 rec set no-such-record status=closed
 rec set keep-48-khz color=red
 rec set keep-48-khz status=maybe
-git -c init.defaultBranch=main init -q ~/results && git -C ~/results -c user.name=x -c user.email=x commit -q --allow-empty -m x && git -C ~/results worktree add -q ~/results-b && touch ~/results-b/out.json
+git -c init.defaultBranch=main init -q ~/results && git -C ~/results -c user.name=x -c user.email=x commit -q --allow-empty -m x && git -C ~/results worktree add -q ~/results-b && mkdir ~/results-b/new && touch ~/results-b/out.json ~/results-b/new/out.json ~/results/out.json
 rec add finding "From stdin" --in bitrate --text - <<< $'48 kHz kept "every" word; `rate=48000`, not $RATE.\\n\\n- one\\n' && q "SELECT text FROM records WHERE id = 'from-stdin'"
 rec add finding "Empty stdin" --in bitrate --text - < /dev/null
 rec set from-stdin "title=Set from stdin" text=- <<< $'Kept "every" word; `rate=48000`, not $RATE.\\n' && q "SELECT title, text FROM records WHERE id = 'from-stdin'"
@@ -57,6 +57,11 @@ rec add finding "Pneumonoultramicroscopicsilicovolcanoconiosis checked" --in bit
 rec add finding "Cites a run" --in bitrate --text "x" --evidence "run:$(q "SELECT run FROM runs WHERE name = 'rate 48000, listened to'")" record:keep-48-khz && q "SELECT evidence FROM records WHERE id = 'cites-a-run'"
 rec add finding "Cites no run" --in bitrate --text "x" --evidence run:nosuch
 rec set cites-a-run "evidence=record:nosuch"
+rec add finding "Names a run" --in bitrate --text "Run $(q "SELECT run FROM runs WHERE name = 'rate 48000, listened to'") and checksum d41d8cd98f00b204e9800998ecf8427e." --evidence record:keep-48-khz
+rec add finding "Fails a query" --in bitrate --text "x" --evidence "sql:SELECT nosuch FROM runs"
+rec add finding "Reads a file in a query" --in bitrate --text "x" --evidence "sql:FROM read_csv('/etc/hostname')"
+rec add finding "Cites no file" --in bitrate --text "x" --evidence file:~/nosuch.txt
+rec add finding "Cites a query" --in bitrate --text "x" --evidence "sql:SELECT run, name FROM runs WHERE experiment = 'sample rate sweep'" && q "SELECT evidence FROM records WHERE id = 'cites-a-query'"
 rec add finding "From a worktree" --in bitrate --text "x" --evidence file:~/results-b/out.json file:~/results/out.json
 rec set from-a-worktree "evidence=file:~/results-b/new/out.json; file:~/audio-codec/tone.wav"
 rec experiment "blur detector" --text "x"
@@ -156,6 +161,7 @@ rec open --project vision
 rec tree --project vision
 rec add finding "Named elsewhere" --in bitrate --text "x" --project vision
 rec open --project nosuch
+python -c "from experiment_lab.lab import Lab; lab = Lab(); [lab.run('bitrate', f'batch {i}').end() for i in range(21)]" && rec add finding "Cites a long query" --in bitrate --text "x" --evidence "sql:SELECT run FROM runs WHERE name LIKE 'batch %'" && q "SELECT evidence FROM records WHERE id = 'cites-a-long-query'"
 EXPERIMENT_LAB_PORT=abc lab-server
 EXPERIMENT_LAB_PORT=70000 lab-server
 EXPERIMENT_LAB_DATA=/proc/lab-data lab-server

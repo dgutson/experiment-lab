@@ -55,8 +55,12 @@ protocol or question; TITLE is its title, not its id. --text, its text
 question is open and any other record closed, unless --status says otherwise
 (open, closed or superseded); --answers ID closes the question ID. --evidence
 items are run:<run id>, file:<path>, sql:<query over the views> or
-record:<id>, the run or record existing; a file: item in a linked git worktree,
-where a later checkout can change the file, is warned about. --id gives the
+record:<id>, the run, record or file existing. A sql: item runs as the record
+page runs it and is refused if it fails; each run it returns in a column run
+is added as a run: item, so that the record keeps the runs it relied on (none
+from an item that returns more than 20). A file: item in a linked git
+worktree, where a later checkout can change the file, is warned about, and so
+is a run id in the text that the evidence does not cite. --id gives the
 record's id (lower-case letters, digits and dashes), else rec makes one from
 the title's first words; --time its time, now unless given. add prints the
 records it adds or closes, then, if it changed how many of the project's
@@ -65,9 +69,9 @@ adds.
 
 set ID FIELD=VALUE ... changes the record ID's FIELD: kind, title, text, by,
 status, experiment, answers or evidence (items separated by ";"). FIELD=-
-reads VALUE from stdin, as --text - does, for one FIELD per call. It warns
-about a file: item as add does, and prints the record, then how many of the
-project's records are open, as add does; with --quiet, only its id.
+reads VALUE from stdin, as --text - does, for one FIELD per call. It checks
+the evidence and warns as add does, and prints the record, then how many of
+the project's records are open, as add does; with --quiet, only its id.
 
 open lists the project's open records.
 
@@ -84,7 +88,9 @@ PATH=NAME (split at the last =), copied as NAME. A wrong item is refused
 before anything is written.
 """
 import argparse
+import contextlib
 import datetime
+import re
 import sqlite3
 import sys
 from collections.abc import Iterable
@@ -96,6 +102,8 @@ from experiment_lab.lab import Lab, ms, now
 # rec's field names for the columns of records that differ
 COLUMNS = {"by": "author", "experiment": "label"}
 SETTABLE = ("kind", "title", "text", "by", "status", "experiment", "answers", "evidence")
+RUN_ID = re.compile(r"\b[0-9a-f]{32}\b")  # as Lab.run makes it
+MOST_RUNS = 20  # the most runs that a sql: item adds to the evidence
 type Commands = argparse._SubParsersAction[argparse.ArgumentParser]  # what add_subparsers returns
 
 
@@ -199,11 +207,49 @@ def warn_overwritable(evidence: Iterable[str]) -> None:
               " log the file with run.log_file and cite run:<run id>", file=sys.stderr)
 
 
+def with_returned_runs(lab: Lab, evidence: list[str]) -> list[str]:
+    """evidence, then a run: item for each run that one of its sql: items
+    returns in a column run and evidence does not cite, unless that item
+    returns more than MOST_RUNS runs, which is warned about. Each sql: item
+    runs on the views of the project the lab works in, as the record page runs
+    it, and one that fails is refused."""
+    sqls = [item.removeprefix("sql:") for item in evidence if item.startswith("sql:")]
+    if not sqls:
+        return evidence
+    from experiment_lab import query  # DuckDB, imported only for a record with sql: items
+    project = lab.here()
+    with lab.closed(), contextlib.closing(query.connect(lab.data, project).con) as con:
+        query.lock(con)
+        returned = [query.evidence_runs(con, sql) for sql in sqls]
+    added = list(evidence)
+    for sql, runs in zip(sqls, returned):
+        if len(runs) > MOST_RUNS:
+            print(f"warning: sql:{sql} returns {len(runs)} runs, too many to cite each as run:<id>, so a later"
+                  " run may change what it returns", file=sys.stderr)
+            continue
+        added += [f"run:{rid}" for rid in runs if f"run:{rid}" not in added]
+    return added
+
+
+def warn_uncited(lab: Lab, r: records.Record) -> None:
+    """Warns about each run id in the record's text that its evidence does
+    not cite, or that is no run's."""
+    for rid in dict.fromkeys(RUN_ID.findall(r["text"])):
+        if f"run:{rid}" in r["evidence"]:
+            continue
+        if lab.db.execute("SELECT 1 FROM runs WHERE id = ?", (rid,)).fetchone():
+            print(f"warning: the text names run {rid}, which the evidence does not cite", file=sys.stderr)
+        else:
+            print(f"warning: the text names {rid}, which is no run's id", file=sys.stderr)
+
+
 def run_add(lab: Lab, a: argparse.Namespace) -> None:
     before = open_count(lab)
     added = records.add(lab, a.container, a.kind, a.title, label=a.experiment, text=a.text, author=a.by,
-                        status=a.status, answers=a.answers, evidence=a.evidence, rid=a.id, time=ms(a.time))
+                        status=a.status, answers=a.answers, evidence=with_returned_runs(lab, a.evidence),
+                        rid=a.id, time=ms(a.time))
     warn_overwritable(a.evidence)
+    warn_uncited(lab, added[0])
     show_changed(lab, added, before, a.quiet)
 
 
@@ -216,11 +262,13 @@ def run_set(lab: Lab, a: argparse.Namespace) -> None:
         if field not in SETTABLE:
             raise ValueError(f"cannot set {field}; fields: {', '.join(SETTABLE)}")
         value = given_text(value)
-        fields[COLUMNS.get(field, field)] = ([v.strip() for v in value.split(";") if v.strip()]
+        fields[COLUMNS.get(field, field)] = (with_returned_runs(lab, [v.strip() for v in value.split(";") if v.strip()])
                                              if field == "evidence" else value)
     before = open_count(lab)
     changed = records.change(lab, a.id, **fields)
     warn_overwritable(fields.get("evidence", []))
+    if {"text", "evidence"} & fields.keys():
+        warn_uncited(lab, changed)
     show_changed(lab, [changed], before, a.quiet)
 
 

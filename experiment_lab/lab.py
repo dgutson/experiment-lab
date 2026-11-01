@@ -235,14 +235,30 @@ class Lab:
         self.named = project
         self.data = Path(data) if data else data_folder()
         self.data.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(database(self.data), timeout=60, isolation_level=None)
-        self.db.execute("PRAGMA journal_mode = WAL")
-        self.db.execute("PRAGMA foreign_keys = ON")
+        self.db = self.connect()
         upgrade(self.db, self.data)
         self.end_lost()
 
+    def connect(self) -> sqlite3.Connection:
+        """lab.db, in WAL mode and with foreign keys on; a write waits up to a
+        minute for another's."""
+        db = sqlite3.connect(database(self.data), timeout=60, isolation_level=None)
+        db.execute("PRAGMA journal_mode = WAL")
+        db.execute("PRAGMA foreign_keys = ON")
+        return db
+
     def close(self) -> None:
         self.db.close()
+
+    @contextlib.contextmanager
+    def closed(self) -> Iterator[None]:
+        """Closes lab.db for the block, so that DuckDB may read it in this
+        process (query.py's docstring), then opens it again."""
+        self.db.close()
+        try:
+            yield
+        finally:
+            self.db = self.connect()
 
     def end_lost(self) -> None:
         """Ends KILLED every project's RUNNING runs whose with block ran in a
