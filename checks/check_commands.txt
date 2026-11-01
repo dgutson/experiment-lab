@@ -48,7 +48,8 @@ has.
 
 tree prints the project's experiments, or those below EXPERIMENT, one per line,
 each indented below the one it came from, with [dead end] after those marked
-so.
+so, then the project's protocol rules, its protocol records not superseded,
+each with its text.
 
 add KIND TITLE files a record in the experiment that --in names, which must
 exist, or with --in PROJECT in the project itself. KIND is decision, finding,
@@ -235,11 +236,24 @@ audio-codec  (~/audio-codec)
   16-bit output
     noise shaping
   noise gate
+protocol rules:
+  listen-on-headphones [16-bit output] Listen on headphones
+    Every change to the dither is heard on headphones before it is kept.
 exit 0
 
 $ rec tree "16-bit output"
 audio-codec › 16-bit output
   noise shaping
+protocol rules:
+  listen-on-headphones [16-bit output] Listen on headphones
+    Every change to the dither is heard on headphones before it is kept.
+exit 0
+
+$ rec set listen-on-headphones status=superseded --quiet && rec tree "16-bit output" && rec set listen-on-headphones status=closed --quiet
+listen-on-headphones
+audio-codec › 16-bit output
+  noise shaping
+listen-on-headphones
 exit 0
 
 $ rec open
@@ -266,6 +280,9 @@ audio-codec  (~/audio-codec)
   16-bit output
     noise shaping
   noise gate  [dead end]
+protocol rules:
+  listen-on-headphones [16-bit output] Listen on headphones
+    Every change to the dither is heard on headphones before it is kept.
 exit 0
 
 $ rec add finding "64 kbit/s keeps the accuracy" --in bitrate --text "Accuracy stayed at 0.93." --time 2026-09-10T12:00 --evidence record:48-khz-is-the-most-accurate-rate "sql:SELECT name FROM runs WHERE experiment = 'bitrate'"

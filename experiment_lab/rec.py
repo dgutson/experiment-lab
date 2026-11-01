@@ -45,7 +45,8 @@ has.
 
 tree prints the project's experiments, or those below EXPERIMENT, one per line,
 each indented below the one it came from, with [dead end] after those marked
-so.
+so, then the project's protocol rules, its protocol records not superseded,
+each with its text.
 
 add KIND TITLE files a record in the experiment that --in names, which must
 exist, or with --in PROJECT in the project itself. KIND is decision, finding,
@@ -93,6 +94,7 @@ import datetime
 import re
 import sqlite3
 import sys
+import textwrap
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -199,6 +201,11 @@ def run_tree(lab: Lab, a: argparse.Namespace) -> None:
             walk(child, depth + 1)
 
     walk(top, 1)
+    rules = records.protocol_rules(lab, path[0])
+    if rules:
+        print("protocol rules:")
+    for rid, label, title, text in rules:
+        print(f"  {rid} [{label}] {title}\n{textwrap.indent(text, '    ')}")
 
 
 def warn_overwritable(evidence: Iterable[str]) -> None:

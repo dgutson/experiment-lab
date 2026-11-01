@@ -177,8 +177,9 @@ project, q needs `--project` or `--all`, and rec and `lab.py` write nothing.
 project, or below an earlier experiment with `--in PARENT`; given again, `--in` moves it with the
 experiments below it. `--dead-end` marks an idea that failed, which keeps its runs and records so
 the reason can be found (a finding says why); `--no-dead-end` clears the mark. `rec tree` prints
-the project's experiments, one indented line each, with `[dead end]` after those marked so;
-`rec tree EXPERIMENT`, only those below EXPERIMENT. Experiment names are unique across the lab, so
+the project's experiments, one indented line each, with `[dead end]` after those marked so
+(`rec tree EXPERIMENT`, only those below EXPERIMENT), then the project's protocol rules, its protocol
+records not superseded, each with its text. Experiment names are unique across the lab, so
 a new experiment or project needs a name no experiment has: `rec experiment` and `rec project`
 refuse to give an existing one a description other than its own unless `--replace`
 (`replace=True` in Python), and an experiment of another project is refused.
@@ -214,7 +215,9 @@ than 20). rec warns about a `file:` item in a linked git worktree, where a later
 the file (such a file is logged in a run and cited as `run:<run id>`), and about a run id in the
 text that the evidence does not cite. A
 new question is open and any other record closed unless a status is given, and a record that answers
-an open question closes it. `rec add` and `rec set` print the records they changed, then, when
+an open question closes it. A prediction, the outcome expected before an experiment's first run, is
+written as a question, which the finding that checks it answers, so that it stays open until
+checked. `rec add` and `rec set` print the records they changed, then, when
 they changed how many of the project's records are open, how many are; `rec open` lists them. With
 `--quiet` they print only the id of the record added or changed. The view `records` has one row per record, with its project, the
 label as its column `experiment`, and its time to the minute (`time`) and in milliseconds

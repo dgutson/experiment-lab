@@ -11,15 +11,18 @@ only), then query the numbers of what it finds.
 
 An experiment, in order:
 
-1. `rec tree` prints the project's experiments, one per line, each indented below the one it came from;
-   `rec tree EXPERIMENT`, only those below EXPERIMENT.
+1. `rec tree` prints the project's experiments, one per line, each indented below the one it came from
+   (`rec tree EXPERIMENT`, only those below EXPERIMENT), then the protocol rules the experiment follows.
 2. `rec experiment NAME --text DESCRIPTION`, with `--in PARENT` when it follows from the result of
    PARENT, an experiment of `rec tree`; without it for an idea unrelated to the earlier ones.
-3. The work, inside `with lab.run(...)` (below), so that the lab measures how long each run took.
+3. When a protocol rule asks for a prediction, `rec add question "Will ...?" --in NAME --text
+   "the outcome expected, and why"` before the first run.
+4. The work, inside `with lab.run(...)` (below), so that the lab measures how long each run took.
    For work that runs elsewhere (a background job or agent, another tool), `rec run` before it
    starts (below).
-4. `rec add finding "TITLE" --in NAME --text "what the runs showed" --evidence run:<run id>`.
-5. If the idea failed, `rec experiment NAME --dead-end`, and the finding says why.
+5. `rec add finding "TITLE" --in NAME --text "what the runs showed" --evidence run:<run id>`, with
+   `--answers <question id>` when step 3 wrote one.
+6. If the idea failed, `rec experiment NAME --dead-end`, and the finding says why.
 
 - `q`, `rec` and `lab-server` are commands of experiment-lab, installed with `uv tool install` from the
   clone at `~/experiment-lab`. If `q` is not on the PATH, ask the owner where experiment-lab is.

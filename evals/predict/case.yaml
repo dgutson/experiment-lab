@@ -1,0 +1,33 @@
+schema_version: "1.1"
+name: predict
+description: In a project whose protocol asks for a prediction, the agent writes it as a question before the first run, and the finding answers it.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    Find out how the encoder's time grows with the frame size: log bench.py's runs in the lab, in a
+    new experiment, and record what they showed.
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  - name: prediction-before-runs
+    type: llm
+    focus: trace
+    criteria: |
+      The project's protocol asks for each experiment's expected outcome to be recorded before its first run.
+      PASS if the agent recorded the expected outcome as a question (`rec add question ...`) in the new
+      experiment, rec printed the new record rather than an error, and this happened before the agent ran
+      bench.py's work. FAIL if the prediction is another kind of record, was recorded after the work ran, or is
+      missing.
+  - name: finding-answers-prediction
+    type: llm
+    focus: trace
+    criteria: |
+      PASS if the agent filed a finding in the new experiment with `--answers` naming the id of the question
+      that holds the prediction, rec printed the finding and the question as closed rather than an error, and
+      the finding's text says whether the prediction held. FAIL otherwise.
