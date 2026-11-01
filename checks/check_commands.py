@@ -84,6 +84,9 @@ git -c init.defaultBranch=main init -q ~/mono && git -C ~/mono -c user.name=x -c
 cd ~/mono/sub && rec project inner --text "The project of a subfolder."
 cd ~/mono/sub && rec project inner --text "The project of a subfolder." --folder . && rec experiment "subfolder test" --text "x"
 git -C ~/mono worktree add -q ~/mono-b && mkdir ~/mono-b/sub && cd ~/mono-b/sub && rec tree && cd .. && rec tree
+git -c init.defaultBranch=main init -q ~/ws && git -C ~/ws -c user.name=x -c user.email=x commit -q --allow-empty -m x && mkdir ~/ws/a ~/ws/b && cd ~/ws/a && rec project ws-a --folder . --text "A project in a subfolder of a repository."
+cd ~/ws/b && rec tree
+cd ~/ws/b && rec project ws-b --text "Another subfolder of the same repository."
 EXPERIMENT_LAB_DATA=~/missing/lab-data rec open
 EXPERIMENT_LAB_DATA=/proc/lab-data rec open
 cp -r "$EXPERIMENT_LAB_DATA" ~/old && python -c "import sqlite3; db = sqlite3.connect('$HOME/old/lab.db', isolation_level=None); db.executescript('DROP TABLE files; ALTER TABLE runs DROP COLUMN host; ALTER TABLE runs DROP COLUMN pid; PRAGMA user_version = 0')" && EXPERIMENT_LAB_DATA=~/old rec open > /dev/null && ls ~/old && EXPERIMENT_LAB_DATA=~/old q "SELECT count(*) AS files FROM files" && q "SELECT count(*) AS files FROM files"
