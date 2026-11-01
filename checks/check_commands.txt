@@ -495,6 +495,7 @@ error: [Errno 2] No such file or directory: '/proc/lab-data'
 exit 1
 
 $ cp -r "$EXPERIMENT_LAB_DATA" ~/old && python -c "import sqlite3; db = sqlite3.connect('$HOME/old/lab.db', isolation_level=None); db.execute('DROP TABLE files'); db.execute('PRAGMA user_version = 0')" && EXPERIMENT_LAB_DATA=~/old rec open > /dev/null && ls ~/old && EXPERIMENT_LAB_DATA=~/old q "SELECT count(*) AS files FROM files" && q "SELECT count(*) AS files FROM files"
+upgrading lab.db to version 1 of 1
 upgraded lab.db from version 0 to 1; its copy from before is FOLDER/home/old/lab.db.v0
 files
 lab.db
@@ -504,6 +505,7 @@ lab.db.v0
 exit 0
 
 $ cp -r "$EXPERIMENT_LAB_DATA" ~/old-q && python -c "import sqlite3; db = sqlite3.connect('$HOME/old-q/lab.db', isolation_level=None); db.execute('DROP TABLE files'); db.execute('PRAGMA user_version = 0')" && EXPERIMENT_LAB_DATA=~/old-q q "SELECT count(*) AS files FROM files"
+upgrading lab.db to version 1 of 1
 upgraded lab.db from version 0 to 1; its copy from before is FOLDER/home/old-q/lab.db.v0
 2
 exit 0

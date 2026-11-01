@@ -83,8 +83,9 @@ def backup(data: Path, found: int) -> Path:
 def upgrade(db: sqlite3.Connection, data: Path) -> None:
     """Brings the data folder's lab.db, open as db, to VERSION. A new one gets
     the tables of schema.sql. An older one is copied (backup), then the steps
-    it lacks run in one transaction, and stderr says where the copy is. A newer
-    one is refused."""
+    it lacks run in order in one transaction, stderr naming the version each
+    brings it to and, after the commit, where the copy is. A newer one is
+    refused."""
     if version(db) == VERSION:
         return
     if not db.execute("SELECT 1 FROM sqlite_master WHERE type = 'table'").fetchone():
@@ -98,7 +99,8 @@ def upgrade(db: sqlite3.Connection, data: Path) -> None:
         if found == VERSION:  # another process upgraded it
             return
         copy = backup(data, found)
-        for step in STEPS[found:]:
+        for to, step in enumerate(STEPS[found:], found + 1):
+            print(f"upgrading lab.db to version {to} of {VERSION}", file=sys.stderr)
             step(db, data)
         db.execute(f"PRAGMA user_version = {VERSION}")
     print(f"upgraded lab.db from version {found} to {VERSION}; its copy from before is {copy}", file=sys.stderr)

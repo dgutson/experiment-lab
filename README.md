@@ -152,8 +152,10 @@ In a terminal, in this order:
 
 Some updates change the tables of `lab.db`. The first program of the new code to open `lab.db`
 upgrades it: rec, q, a logging script, or the server when it starts. It copies `lab.db` to
-`lab.db.v<N>` in the data folder, where N is the version before, then changes the tables in one
-transaction and prints where the copy is. Delete the copy once the new version works. The version
+`lab.db.v<N>` in the data folder, where N is the version before, then brings it up one version at a
+time, printing `upgrading lab.db to version …` for each, and at the end prints where the copy is.
+All the versions are one transaction: if one fails, `lab.db` stays at version N. Delete the copy
+once the new version works. The version
 is SQLite's `PRAGMA user_version`. A `lab.db` of a newer version than the code knows is refused
 until experiment-lab is updated.
 
