@@ -141,9 +141,19 @@ def worktrees(folder: Path) -> list[Path]:
             if line.startswith("worktree ")]
 
 
-def top_folder() -> Path:
-    """The main worktree of the current git repository, else the current folder."""
-    return (worktrees(Path.cwd()) or [Path.cwd().resolve()])[0]
+def top_folder(projects: Iterable[Project]) -> Path:
+    """A new project's folder: the main worktree of the current git
+    repository, else the current folder; but the current folder, at its place
+    in the main worktree, when the main worktree holds one of the projects'
+    folders, since a project there would hold that project too."""
+    folders = working_folders()
+    top = (worktrees(Path.cwd()) or folders)[0]
+    return folders[-1] if any(Path(folder).is_relative_to(top) for _, folder in projects) else top
+
+
+def all_projects(db: sqlite3.Connection) -> list[Project]:
+    """Every project's name and folder."""
+    return [Project(*row) for row in db.execute("SELECT name, folder FROM experiments WHERE parent IS NULL")]
 
 
 def working_folders() -> list[Path]:
@@ -192,13 +202,12 @@ def latest(rows: list[RunRow], keys: Keys) -> list[RunRow]:
     return [r for r in rows if r.id in last]
 
 
-def defaults(name: str, changes: dict[str, str | None]) -> dict[str, str | None]:
+def defaults(name: str, changes: dict[str, str | None], projects: Iterable[Project]) -> dict[str, str | None]:
     """The changes that make a new project: it needs a description; its folder
-    is by default the main worktree of the current git repository, else the
-    current folder, and its files folder its folder."""
+    is by default top_folder's, and its files folder its folder."""
     if not changes["description"]:
         raise ValueError(f"a new project needs a description: {name}")
-    folder = changes["folder"] or str(top_folder())
+    folder = changes["folder"] or str(top_folder(projects))
     return {**changes, "folder": folder, "files": changes["files"] or folder}
 
 
@@ -314,18 +323,18 @@ class Lab:
     @cached_property
     def current(self) -> str | None:
         """The project the lab works in (working_project); None if none."""
-        return working_project([Project(*row) for row in self.db.execute("SELECT name, folder FROM experiments"
-                                                                          " WHERE parent IS NULL")], self.named)
+        return working_project(all_projects(self.db), self.named)
 
     def project(self, name: str, description: str | None = None, *, folder: StrPath | None = None,
                 files: StrPath | None = None, views: Sequence[StrPath] | None = None, replace: bool = False) -> None:
         """Makes the project, an experiment with no parent, if there is none of
         that name, or changes what is given; a description other than its own
         only with replace. A new project needs a description (one line: what
-        the project is). Its folder is by default the main worktree of the
-        current git repository, else the current folder; files, the folder its
-        files page shows, is by default its folder; views lists its view
-        files."""
+        the project is). Its folder is by default top_folder's: the main
+        worktree of the current git repository, else the current folder, but
+        the current folder when the main worktree holds another project's
+        folder; files, the folder its files page shows, is by default its
+        folder; views lists its view files."""
         changes = {"description": description or None, "folder": absolute(folder) if folder else None,
                    "files": absolute(files) if files else None,
                    "views": None if views is None else "; ".join(map(absolute, views))}
@@ -333,7 +342,7 @@ class Lab:
             found = db.execute("SELECT parent, folder, description FROM experiments WHERE name = ?",
                                (name,)).fetchone()
             if found is None:
-                changes = defaults(name, changes)
+                changes = defaults(name, changes, all_projects(db))
             elif found[0] is not None:
                 raise ValueError(f"{name} is an experiment below {found[0]}, not a project")
             else:
@@ -388,9 +397,9 @@ class Lab:
         """The project the lab works in; a ValueError naming the ways to give
         one if there is none."""
         if self.current is None:
-            folder = top_folder()
+            folder = top_folder(all_projects(self.db))
             raise ValueError(f'no project holds {folder}: run in a project\'s folder, name one (rec --project P,'
-                             f' Lab(project="P")), or make one: rec project {folder.name}'
+                             f' Lab(project="P")), or make this folder a project: rec project {folder.name}'
                              ' --text "what the project is, in one line"')
         return self.current
 

@@ -106,7 +106,8 @@ session. A terminal command also runs from Claude Code's prompt with `!` before 
    It prints `project my-project, folder ~/src/my-project, files ~/src/my-project, views none`.
    Inside a git repository, the project's folder is the repository's top folder, from whatever
    folder inside it you run the command; with `git worktree`, it is the main worktree's. Outside
-   git, it is the current folder. To change the description, run the same command with the new
+   git, or when the repository's top folder holds another project's folder, it is the current
+   folder. To change the description, run the same command with the new
    `--text` and `--replace`.
 
 Then work in Claude Code in that folder as usual. It uses the skill when a task is about
@@ -164,7 +165,8 @@ than the code knows is refused until experiment-lab is updated.
 
 A project is an experiment with no parent. `rec project NAME --text "what the project is"`, run
 once in the project's folder, makes it; its folder is the main worktree of the current git
-repository, else the current folder (`--folder` sets another, `--folder .` the current folder). The
+repository, else the current folder, but the current folder when the main worktree holds another
+project's folder (`--folder` sets another, `--folder .` the current folder). The
 project of the current folder is the one whose folder holds it, or holds the folder at the same
 place in the main worktree of its git repository, so that every worktree of a repository works in
 the same projects. rec, q and `lab.py` work in that project, or in the one

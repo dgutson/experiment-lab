@@ -29,7 +29,8 @@ as lab.py takes them too. The database is lab.db in $EXPERIMENT_LAB_DATA,
 else ~/lab-data.
 
 project NAME makes a project, once, from its folder, --folder (by default the
-current git repository's main worktree, else the current folder), with --text,
+current git repository's main worktree, else the current folder, but the
+current folder when the main worktree holds another project's), with --text,
 a one-line description; given again, it changes what is given. --files is the
 folder its files page shows (its folder unless given), --views its view files,
 run after lab.sql in that order (--views alone clears them). A description

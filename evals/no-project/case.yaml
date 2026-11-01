@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: no-project
-description: In a folder no project holds, the agent makes the project once, then the experiment.
+description: In a folder no project holds, the agent makes the project with one call of rec project, then the experiment.
 context:
   scaffold_script: setup.sh
 execution:
@@ -15,7 +15,7 @@ graders:
     type: tool_used
     tool: Skill
     input_match: experiment-db
-  - name: project-made-once
+  - name: rec-project-called-once
     type: tool_used
     tool: Bash
     input_match: rec project
@@ -24,7 +24,7 @@ graders:
   - name: project-made
     type: regex
     target: trace
-    pattern: 'project \S+, folder '
+    pattern: 'project \S+, folder ~/cwd, '
   - name: experiment-below-project
     type: regex
     target: trace

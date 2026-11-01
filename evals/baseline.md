@@ -27,8 +27,8 @@ turns in one run.
 | all cases, one run each | | | $1.06 | $1.75 | | |
 
 Below 1.00 with the plugin: in new-line, one run put the new idea, unrelated to the earlier
-experiments, below one of them with `--in`; in no-project, one run made the project with
-`rec project` twice.
+experiments, below one of them with `--in`; in no-project, one run called `rec project` twice, which
+a `rec project --help` before the call that makes the project counts as.
 
 The scores without the plugin vary from one full run to the next, since 3 runs are few; the costs
 and turns vary less. The whole run is also recorded in the lab, in the experiment-lab project's
