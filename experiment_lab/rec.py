@@ -315,9 +315,9 @@ def command(sub: Commands, name: str, *parents: argparse.ArgumentParser) -> argp
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.set_defaults(project=None)
+    p.add_argument("--project", metavar="P")
     named = argparse.ArgumentParser(add_help=False)  # the options of every command but project
-    named.add_argument("--project", metavar="P")
+    named.add_argument("--project", metavar="P", default=argparse.SUPPRESS)  # no default: one before the command stays
     replace = argparse.ArgumentParser(add_help=False)  # the options of project and experiment
     replace.add_argument("--replace", action="store_true")
     quiet = argparse.ArgumentParser(add_help=False)  # the options of add and set
