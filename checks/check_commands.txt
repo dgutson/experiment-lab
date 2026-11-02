@@ -1,5 +1,5 @@
 $ rec --help
-usage: rec [-h] {project,experiment,tree,add,set,open,run,end} ...
+usage: rec [-h] [--project P] {project,experiment,tree,add,set,open,run,end} ...
 
 Adds or changes a project, an experiment or a record (a decision, finding,
 protocol rule or question) in the lab's database, starts or ends a run, or
@@ -97,6 +97,7 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
+  --project P
 exit 0
 
 $ rec add --help
@@ -1056,6 +1057,12 @@ open in vision (1):
 exit 0
 
 $ rec tree --project vision
+vision  (~/vision)
+  blur detector
+    sharpness
+exit 0
+
+$ rec --project vision tree
 vision  (~/vision)
   blur detector
     sharpness

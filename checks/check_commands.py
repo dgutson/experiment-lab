@@ -164,6 +164,7 @@ rec experiment sharpness --in "blur detector" --text "Scores sharpness by edges.
 rec add question "Do edges score sharpness?" --in sharpness --text "Not measured yet." --project vision
 rec open --project vision
 rec tree --project vision
+rec --project vision tree
 rec add finding "Named elsewhere" --in bitrate --text "x" --project vision
 rec open --project nosuch
 python -c "from experiment_lab.lab import Lab; lab = Lab(); [lab.run('bitrate', f'batch {i}').end() for i in range(21)]" && rec add finding "Cites a long query" --in bitrate --text "x" --evidence "sql:SELECT run FROM runs WHERE name LIKE 'batch %'" && q "SELECT evidence FROM records WHERE id = 'cites-a-long-query'"

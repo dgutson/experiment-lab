@@ -1,0 +1,34 @@
+schema_version: "1.1"
+name: name-project
+description: In a folder no project holds, the agent files a finding in an existing project's experiment, naming the project where rec takes it.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    This folder is a second clone of the audio-codec code, where I tried the noise gate on real
+    recordings. Record in the lab, in the audio-codec project's noise gate experiment, a finding:
+    at -40 dB the gate cuts the first 20 ms of each note. Run the lab's commands here, in this
+    folder. Only record it; don't run anything else.
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  - name: finding-filed
+    type: regex
+    target: trace
+    pattern: ': finding, closed: '
+  - name: no-rejected-flag
+    type: regex
+    target: trace
+    match: not_contains
+    pattern: 'invalid choice'
+  - name: no-help-read
+    type: tool_used
+    tool: Bash
+    input_match: 'rec\b[^|;&]*--help|rec\b[^|;&]* -h\b'
+    min: 0
+    max: 0
