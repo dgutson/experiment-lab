@@ -207,18 +207,18 @@ worktree), or of --project; a
 statement of a view file that fails is printed on stderr and skipped. lab.sql's
 views hold that project's rows only; with --all, they hold every project's and
 no view file runs. From a folder no project holds, q needs --project or --all.
-Several statements may be given; the last one's rows are printed, at most
---max of them (40), with cells cut at 80 characters unless --full. A result of
-one row prints a line "column: value" per column, and one of one row and one
-column that cell alone, whole and with its line breaks, as in
+Several statements may be given; the rows of each SELECT (DESCRIBE, SHOW,
+SUMMARIZE and FROM too) and of the last statement are printed, each result
+after a line "-- statement N" when there are several, at most --max rows of
+each (40), with cells cut at 80 characters unless --full. A result of one row
+prints a line "column: value" per column, and one of one row and one column
+that cell alone, whole and with its line breaks, as in
 q "SELECT text FROM records WHERE id = '...'". An error about a column
 that is not found names the views that have it; one about the table params,
 tags or metrics, the map column of runs; one about a view that was renamed,
 its new name; one about text in params or tags, a cast; a list of candidate
-functions is cut to three. Earlier statements of type SELECT, whose rows are
-not printed, are named on stderr. .keys lists each key of the tags, params
-and metrics of the runs in the view runs, with the number of runs that have
-it.
+functions is cut to three. .keys lists each key of the tags, params and
+metrics of the runs in the view runs, with the number of runs that have it.
 
 positional arguments:
   sql
@@ -772,8 +772,15 @@ b | run 6
 (2 rows)
 exit 0
 
-$ q "SELECT 1 AS x; SET threads = 1; FROM runs LIMIT 1; SELECT 2 AS y"
-The rows of statements 1, 3 are not shown; only the last statement's are.
+$ q "SELECT 1 AS x; SET threads = 1; SELECT name FROM runs ORDER BY name LIMIT 2; SELECT 2 AS y"
+-- statement 1
+1
+-- statement 3
+name
+dither none
+dither tpdf
+(2 rows)
+-- statement 4
 2
 exit 0
 

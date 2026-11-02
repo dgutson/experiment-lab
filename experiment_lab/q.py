@@ -15,18 +15,18 @@ worktree), or of --project; a
 statement of a view file that fails is printed on stderr and skipped. lab.sql's
 views hold that project's rows only; with --all, they hold every project's and
 no view file runs. From a folder no project holds, q needs --project or --all.
-Several statements may be given; the last one's rows are printed, at most
---max of them (40), with cells cut at 80 characters unless --full. A result of
-one row prints a line "column: value" per column, and one of one row and one
-column that cell alone, whole and with its line breaks, as in
+Several statements may be given; the rows of each SELECT (DESCRIBE, SHOW,
+SUMMARIZE and FROM too) and of the last statement are printed, each result
+after a line "-- statement N" when there are several, at most --max rows of
+each (40), with cells cut at 80 characters unless --full. A result of one row
+prints a line "column: value" per column, and one of one row and one column
+that cell alone, whole and with its line breaks, as in
 q "SELECT text FROM records WHERE id = '...'". An error about a column
 that is not found names the views that have it; one about the table params,
 tags or metrics, the map column of runs; one about a view that was renamed,
 its new name; one about text in params or tags, a cast; a list of candidate
-functions is cut to three. Earlier statements of type SELECT, whose rows are
-not printed, are named on stderr. .keys lists each key of the tags, params
-and metrics of the runs in the view runs, with the number of runs that have
-it.
+functions is cut to three. .keys lists each key of the tags, params and
+metrics of the runs in the view runs, with the number of runs that have it.
 """
 import argparse
 import re
@@ -117,33 +117,39 @@ def explained(con: DuckDBPyConnection, sql: str, error: duckdb.Error) -> str:
     return text + views_with(con, error)
 
 
-def sql_result(con: DuckDBPyConnection, sql: str) -> DuckDBPyConnection | None:
-    """The result of sql's last statement, None if it returns no rows; prints
-    on stderr which earlier statements' rows are left out."""
+def print_result(result: DuckDBPyConnection, limit: int, cut: int | None, ordered: bool) -> None:
+    """A result's rows; one cell alone, whole."""
+    t = query.table(result, limit)
+    if len(t["columns"]) == 1 and len(t["rows"]) == 1 and not t["more"]:
+        print(t["rows"][0][0], end="" if t["rows"][0][0].endswith("\n") else "\n")
+    else:
+        show(t, cut, ordered)
+
+
+def print_results(con: DuckDBPyConnection, sql: str, limit: int, cut: int | None) -> None:
+    """The rows of each statement of sql that query.run_each gives, after a
+    line naming the statement when there are several; ok if none."""
+    printed = False
     try:
-        last = query.run(con, sql)
+        for statement in query.run_each(con, sql):
+            if statement.several:
+                print(f"-- statement {statement.number}")
+            print_result(statement.result, limit, cut, ordered=False)
+            printed = True
     except (duckdb.BinderException, duckdb.CatalogException) as e:
         raise ValueError(explained(con, sql, e)) from e
-    if last.hidden_note:
-        print(last.hidden_note, file=sys.stderr)
-    return last.result
+    if not printed:
+        print("ok")
 
 
 def answer(con: DuckDBPyConnection, sql: str, limit: int, cut: int | None) -> None:
     if sql.strip() == ".views":
         for name, columns in query.view_columns(con):
             print(f"{name}: {columns}")
-        return
-    asks_keys = sql.strip() == ".keys"
-    result = con.execute(KEYS) if asks_keys else sql_result(con, sql)
-    if result is None:
-        print("ok")
-        return
-    t = query.table(result, limit)
-    if len(t["columns"]) == 1 and len(t["rows"]) == 1 and not t["more"]:
-        print(t["rows"][0][0], end="" if t["rows"][0][0].endswith("\n") else "\n")
+    elif sql.strip() == ".keys":
+        print_result(con.execute(KEYS), limit, cut, ordered=True)
     else:
-        show(t, cut, ordered=asks_keys)
+        print_results(con, sql, limit, cut)
 
 
 def main() -> None:

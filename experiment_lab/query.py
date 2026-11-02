@@ -26,6 +26,7 @@ from experiment_lab.settings import database
 LAB_SQL = Path(__file__).with_name("lab.sql")
 # the statements that would act outside the transaction that trial rolls back
 REFUSED = (duckdb.StatementType.TRANSACTION, duckdb.StatementType.ATTACH, duckdb.StatementType.DETACH)
+PRINTED = (duckdb.StatementType.SELECT, duckdb.StatementType.EXPLAIN)  # q prints their rows, also before the last
 
 type Row = list[str]
 
@@ -61,6 +62,14 @@ class LastResult(NamedTuple):
         if self.result is None:
             raise ValueError("the statement returns no rows")
         return self.result
+
+
+class Printed(NamedTuple):
+    """A statement's result that q prints: its number among the statements,
+    from 1, and whether q prints another statement's result too."""
+    number: int
+    result: DuckDBPyConnection
+    several: bool
 
 
 class View(NamedTuple):
@@ -171,6 +180,21 @@ def run(con: DuckDBPyConnection, sql: str) -> LastResult:
     note = (f"The rows of statement{'s' if len(hidden) > 1 else ''} {', '.join(hidden)} are not shown;"
             " only the last statement's are.") if hidden else ""
     return LastResult(result if result.description else None, note)
+
+
+def run_each(con: DuckDBPyConnection, sql: str) -> Iterator[Printed]:
+    """Runs the statements of sql, giving the result of each SELECT or EXPLAIN
+    and of the last statement, each before the next statement runs, which ends
+    it. A SET or CREATE returns rows too, so only those types count before the
+    last."""
+    statements = con.extract_statements(sql)
+    if not statements:
+        raise ValueError("no statement")
+    printed = [i for i, s in enumerate(statements, 1) if s.type in PRINTED or i == len(statements)]
+    for i, statement in enumerate(statements, 1):
+        result = con.execute(statement)
+        if i in printed and result.description:
+            yield Printed(i, result, len(printed) > 1)
 
 
 def lock(con: DuckDBPyConnection) -> None:

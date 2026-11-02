@@ -28,11 +28,11 @@ An experiment, in order:
   `q` is not on the PATH, ask the owner where experiment-lab is.
 - `q "SQL"` runs DuckDB SQL over the project's views (the table below, then the project's view
   files; `--project P` for another project's, `--all` for every project's) on `lab.db`, attached
-  read-only as the catalog `lab`, and prints the last statement's rows, at most 40 (`--max N`,
-  `--full` for long cells); one cell prints whole, as stored
-  (`q "SELECT text FROM records WHERE id = '...'"`). `q .views` lists the views and their columns,
-  and `q .keys` the keys of the project's runs' tags, params and metrics, with how many runs have
-  each; a key no run has gives NULL, with no error. The tables `lab.experiments`, `lab.runs`,
+  read-only as the catalog `lab`, and prints the rows of each SELECT, at most 40 (`--max N`,
+  `--full` for long cells), after `-- statement N` when there are several; one cell prints whole,
+  as stored (`q "SELECT text FROM records WHERE id = '...'"`). `q .views` lists the views and their
+  columns, and `q .keys` the keys of the project's runs' tags, params and metrics, with how many runs
+  have each; a key no run has gives NULL, with no error. The tables `lab.experiments`, `lab.runs`,
   `lab.params`, `lab.tags`, `lab.metrics`, `lab.files` and `lab.records` hold every project's rows,
   only as stored: query them for what the views leave out, such as every value logged of a metric,
   with its `step` and `time` (`lab.metrics`).
