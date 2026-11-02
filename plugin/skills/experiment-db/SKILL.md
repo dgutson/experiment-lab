@@ -24,9 +24,8 @@ An experiment, in order:
    `--answers <question id>` when step 3 wrote one.
 6. If the idea failed, `rec experiment NAME --dead-end`, and the finding says why.
 
-- `q`, `rec` and `lab.py` come from the clone at `~/experiment-lab`; if `q` is not on the PATH, ask
-  the owner where it is. They work in the project whose folder holds the current folder; when none
-  does, rec's error gives the command that makes one.
+- Run `q`, `rec` and `lab.py` in the project's folder or one below it; they work in that project. If
+  `q` is not on the PATH, ask the owner where experiment-lab is.
 - `q "SQL"` runs DuckDB SQL over the project's views (the table below, then the project's view
   files; `--project P` for another project's, `--all` for every project's) on `lab.db`, attached
   read-only as the catalog `lab`, and prints the last statement's rows, at most 40 (`--max N`,

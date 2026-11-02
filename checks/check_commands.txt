@@ -551,7 +551,7 @@ project ws-a, folder ~/ws/a, files ~/ws/a, views none
 exit 0
 
 $ cd ~/ws/b && rec tree
-error: no project holds FOLDER/home/ws/b: run in a project's folder, name one (rec --project P, Lab(project="P")), or make this folder a project: rec project b --text "what the project is, in one line"
+error: no project holds FOLDER/home/ws/b: run in a project's folder (audio-codec: FOLDER/home/audio-codec, inner: FOLDER/home/mono/sub, mono: FOLDER/home/mono, speech: FOLDER/home/speech, vision: FOLDER/home/vision, ws-a: FOLDER/home/ws/a), name one (rec --project P, Lab(project="P")), or make this folder a project: rec project NAME --text "what the project is, in one line"
 exit 1
 
 $ cd ~/ws/b && rec project ws-b --text "Another subfolder of the same repository."
@@ -686,7 +686,7 @@ q: error: argument --project: not allowed with argument --all
 exit 2
 
 $ cd ~ && q "SELECT DISTINCT project FROM runs"
-error: no project holds this folder; --project P names one, --all reads every project
+error: no project holds this folder: run in a project's folder (audio-codec: FOLDER/home/audio-codec, inner: FOLDER/home/mono/sub, mono: FOLDER/home/mono, speech: FOLDER/home/speech, vision: FOLDER/home/vision, ws-a: FOLDER/home/ws/a, ws-b: FOLDER/home/ws/b), --project P names one, --all reads every project
 exit 1
 
 $ q .keys
@@ -718,7 +718,7 @@ params | dither | 2
 exit 0
 
 $ cd ~ && q .keys
-error: no project holds this folder; --project P names one, --all reads every project
+error: no project holds this folder: run in a project's folder (audio-codec: FOLDER/home/audio-codec, inner: FOLDER/home/mono/sub, mono: FOLDER/home/mono, speech: FOLDER/home/speech, vision: FOLDER/home/vision, ws-a: FOLDER/home/ws/a, ws-b: FOLDER/home/ws/b), --project P names one, --all reads every project
 exit 1
 
 $ q --max 2 "SELECT name FROM runs ORDER BY name"
@@ -1003,27 +1003,27 @@ out.txt | 2
 exit 0
 
 $ cd ~ && rec add finding "From home" --in bitrate --text "x"
-error: no project holds FOLDER/home: run in a project's folder, name one (rec --project P, Lab(project="P")), or make this folder a project: rec project home --text "what the project is, in one line"
+error: no project holds FOLDER/home: run in a project's folder (audio-codec: FOLDER/home/audio-codec, inner: FOLDER/home/mono/sub, mono: FOLDER/home/mono, speech: FOLDER/home/speech, vision: FOLDER/home/vision, ws-a: FOLDER/home/ws/a, ws-b: FOLDER/home/ws/b), name one (rec --project P, Lab(project="P")), or make this folder a project: rec project NAME --text "what the project is, in one line"
 exit 1
 
 $ cd ~ && rec experiment "home test" --in bitrate --text "x"
-error: no project holds FOLDER/home: run in a project's folder, name one (rec --project P, Lab(project="P")), or make this folder a project: rec project home --text "what the project is, in one line"
+error: no project holds FOLDER/home: run in a project's folder (audio-codec: FOLDER/home/audio-codec, inner: FOLDER/home/mono/sub, mono: FOLDER/home/mono, speech: FOLDER/home/speech, vision: FOLDER/home/vision, ws-a: FOLDER/home/ws/a, ws-b: FOLDER/home/ws/b), name one (rec --project P, Lab(project="P")), or make this folder a project: rec project NAME --text "what the project is, in one line"
 exit 1
 
 $ cd ~ && rec experiment bitrate --dead-end
-error: no project holds FOLDER/home: run in a project's folder, name one (rec --project P, Lab(project="P")), or make this folder a project: rec project home --text "what the project is, in one line"
+error: no project holds FOLDER/home: run in a project's folder (audio-codec: FOLDER/home/audio-codec, inner: FOLDER/home/mono/sub, mono: FOLDER/home/mono, speech: FOLDER/home/speech, vision: FOLDER/home/vision, ws-a: FOLDER/home/ws/a, ws-b: FOLDER/home/ws/b), name one (rec --project P, Lab(project="P")), or make this folder a project: rec project NAME --text "what the project is, in one line"
 exit 1
 
 $ cd ~ && rec set keep-48-khz status=closed
-error: no project holds FOLDER/home: run in a project's folder, name one (rec --project P, Lab(project="P")), or make this folder a project: rec project home --text "what the project is, in one line"
+error: no project holds FOLDER/home: run in a project's folder (audio-codec: FOLDER/home/audio-codec, inner: FOLDER/home/mono/sub, mono: FOLDER/home/mono, speech: FOLDER/home/speech, vision: FOLDER/home/vision, ws-a: FOLDER/home/ws/a, ws-b: FOLDER/home/ws/b), name one (rec --project P, Lab(project="P")), or make this folder a project: rec project NAME --text "what the project is, in one line"
 exit 1
 
 $ cd ~ && rec run bitrate "from home"
-error: no project holds FOLDER/home: run in a project's folder, name one (rec --project P, Lab(project="P")), or make this folder a project: rec project home --text "what the project is, in one line"
+error: no project holds FOLDER/home: run in a project's folder (audio-codec: FOLDER/home/audio-codec, inner: FOLDER/home/mono/sub, mono: FOLDER/home/mono, speech: FOLDER/home/speech, vision: FOLDER/home/vision, ws-a: FOLDER/home/ws/a, ws-b: FOLDER/home/ws/b), name one (rec --project P, Lab(project="P")), or make this folder a project: rec project NAME --text "what the project is, in one line"
 exit 1
 
 $ cd ~ && python -c "from experiment_lab.lab import Lab; Lab().run('bitrate', 'from a script')"
-Traceback: ValueError: no project holds FOLDER/home: run in a project's folder, name one (rec --project P, Lab(project="P")), or make this folder a project: rec project home --text "what the project is, in one line"
+Traceback: ValueError: no project holds FOLDER/home: run in a project's folder (audio-codec: FOLDER/home/audio-codec, inner: FOLDER/home/mono/sub, mono: FOLDER/home/mono, speech: FOLDER/home/speech, vision: FOLDER/home/vision, ws-a: FOLDER/home/ws/a, ws-b: FOLDER/home/ws/b), name one (rec --project P, Lab(project="P")), or make this folder a project: rec project NAME --text "what the project is, in one line"
 exit 1
 
 $ cd ~ && rec add finding "From home, named" --in bitrate --text "x" --project audio-codec

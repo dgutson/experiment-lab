@@ -151,6 +151,11 @@ def top_folder(projects: Iterable[Project]) -> Path:
     return folders[-1] if any(Path(folder).is_relative_to(top) for _, folder in projects) else top
 
 
+def listed(projects: Sequence[Project]) -> str:
+    """' (a: /x/a, b: /x/b)', the projects and their folders; '' if none."""
+    return f" ({', '.join(f'{name}: {folder}' for name, folder in sorted(projects))})" if projects else ""
+
+
 def all_projects(db: sqlite3.Connection) -> list[Project]:
     """Every project's name and folder."""
     return [Project(*row) for row in db.execute("SELECT name, folder FROM experiments WHERE parent IS NULL")]
@@ -397,10 +402,11 @@ class Lab:
         """The project the lab works in; a ValueError naming the ways to give
         one if there is none."""
         if self.current is None:
-            folder = top_folder(all_projects(self.db))
-            raise ValueError(f'no project holds {folder}: run in a project\'s folder, name one (rec --project P,'
-                             f' Lab(project="P")), or make this folder a project: rec project {folder.name}'
-                             ' --text "what the project is, in one line"')
+            projects = all_projects(self.db)
+            folder = top_folder(projects)
+            raise ValueError(f'no project holds {folder}: run in a project\'s folder{listed(projects)}, name one'
+                             ' (rec --project P, Lab(project="P")), or make this folder a project:'
+                             ' rec project NAME --text "what the project is, in one line"')
         return self.current
 
     def path(self, name: str | None) -> list[str]:
