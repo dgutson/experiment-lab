@@ -7,7 +7,7 @@ plugin VERSION; experiment-lab VERSION; Claude Code 2.1.316; claude-sonnet-5-5
 
 ## The lab in this session
 
-12 lab commands of 16 tool calls: 6 rec, 5 q, 1 other; 4 failed; they printed 4.9 kB, about 1,234 tokens.
+12 lab commands of 18 tool calls: 6 rec, 5 q, 1 other; 4 failed; they printed 4.9 kB, about 1,234 tokens.
 
 ## Lab commands that failed
 
@@ -34,7 +34,7 @@ plugin VERSION; experiment-lab VERSION; Claude Code 2.1.316; claude-sonnet-5-5
 - `rec experiment --help`
 [exit 0]
 $ draft --session 0f0f0f0f-0000-4000-8000-000000000000 --plugin ROOT/plugin --real
-FOLDER/lab-data/feedback/TIME-2.md
+FOLDER/lab-data/feedback/TIME.md
 
 ## Versions
 
@@ -42,7 +42,7 @@ plugin VERSION; experiment-lab VERSION; Claude Code 2.1.316; claude-sonnet-5-5
 
 ## The lab in this session
 
-12 lab commands of 16 tool calls: 6 rec, 5 q, 1 other; 4 failed; they printed 4.9 kB, about 1,234 tokens.
+12 lab commands of 18 tool calls: 6 rec, 5 q, 1 other; 4 failed; they printed 4.9 kB, about 1,234 tokens.
 
 ## Lab commands that failed
 

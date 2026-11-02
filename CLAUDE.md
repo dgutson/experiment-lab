@@ -178,7 +178,7 @@ Change these together:
   is what an agent using the lab reads, with its `references/`, which SKILL.md names for what an
   agent seldom needs (runs outside Python, the owner's pages, view files).
 - The transcript of a Claude Code session (`<config folder>/projects/*/<session id>.jsonl`, its tool
-  calls and results), which `feedback.py` reads: `feedback.read` and the transcript
+  calls and results), which `feedback.py` reads: `feedback.read_transcript` and the transcript
   `checks/check_feedback.py` makes.
 - The Mermaid file name, `experiment_lab/static/mermaid-<version>.min.js`, in
   `templates/lab/base.html`; its version must match the one mermaid-cli uses.

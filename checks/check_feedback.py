@@ -31,7 +31,7 @@ esac
 """
 
 
-class Entry(NamedTuple):
+class ToolCall(NamedTuple):
     """A tool call: the tool, its command, path or skill, what it printed, and
     whether it failed."""
     tool: str
@@ -40,11 +40,11 @@ class Entry(NamedTuple):
     failed: bool
 
 
-def calls(home: Path) -> list[Entry]:
+def session_calls(home: Path) -> list[ToolCall]:
     """The session's tool calls."""
     codec = home / "audio-codec"
     failed_run = f"Exit code 1\nerror: no run {RUN_ID}: rec run prints a run's id"
-    return [Entry(*entry) for entry in [
+    return [ToolCall(*entry) for entry in [
         ("Skill", "experiment-lab:experiment-db", "Launching skill: experiment-lab:experiment-db", False),
         ("Bash", f"cd {codec} && rec tree", "audio-codec  (~/audio-codec)\n  sample rate sweep", False),
         ("Bash", f'rec add finding "Dither helps" --in "16-bit output" --text "Better at 44100 Hz."'
@@ -68,12 +68,14 @@ def calls(home: Path) -> list[Entry]:
          "Traceback (most recent call last):\n  File \"<stdin>\", line 2\nKeyError: 'snr'", False),
         ("Bash", "q \"SELECT id FROM records WHERE kind = 'question'\"", "id\n(0 rows)", False),
         ("Bash", "ls", "bench.py", False),
+        ("Bash", "xset q", "Exit code 1\nxset:  unable to open display", True),
+        ("Bash", "git commit -q -F - <<'EOF'\nMake rec add print the id\nEOF", "", False),
         ("Bash", "PYTHONPATH=~/experiment-lab python3 -m experiment_lab.feedback draft --session x",
          "the draft", False),
     ]]
 
 
-def transcript(entries: list[Entry]) -> str:
+def transcript_text(entries: list[ToolCall]) -> str:
     """A Claude Code transcript of the tool calls, one assistant message each."""
     lines = []
     for i, (tool, text, output, failed) in enumerate(entries):
@@ -86,17 +88,18 @@ def transcript(entries: list[Entry]) -> str:
     return "".join(json.dumps(line) + "\n" for line in lines)
 
 
-def run(command: list[str], env: dict[str, str]) -> str:
+def run_module(command: list[str], env: dict[str, str]) -> str:
     done = subprocess.run(command, capture_output=True, text=True, env=env, cwd=ROOT, check=False)
     return f"$ {' '.join(command[3:])}\n{done.stdout}{done.stderr}[exit {done.returncode}]\n"
 
 
-def even(text: str, folder: Path) -> str:
+def mask_changes(text: str, folder: Path) -> str:
     """text, with what changes from run to run made fixed: the folder, the
-    clone's folder, the draft's time, the plugin's version and
-    experiment-lab's version and commit."""
+    clone's folder, the draft's time (and the -2 of a second draft in the
+    same second), the plugin's version and experiment-lab's version and
+    commit."""
     text = text.replace(str(folder), "FOLDER").replace(str(ROOT), "ROOT")
-    text = re.sub(r"\d{4}-\d\d-\d\dT\d\d-\d\d-\d\dZ", "TIME", text)
+    text = re.sub(r"\d{4}-\d\d-\d\dT\d\d-\d\d-\d\dZ(?:-\d+)?", "TIME", text)
     return re.sub(r"plugin [\w.]+; experiment-lab [^;]+;", "plugin VERSION; experiment-lab VERSION;", text)
 
 
@@ -108,9 +111,9 @@ def main() -> str:
         home = folder / "home"
         projects = folder / "claude" / "projects" / "-home-audio-codec"
         (projects / SESSION / "subagents").mkdir(parents=True)
-        (projects / f"{SESSION}.jsonl").write_text(transcript(calls(home)))
-        (projects / SESSION / "subagents" / "agent-1.jsonl").write_text(transcript(
-            [Entry("Bash", 'q "SELECT * FROM runz"', "error: Catalog Error: Table with name runz does not exist!",
+        (projects / f"{SESSION}.jsonl").write_text(transcript_text(session_calls(home)))
+        (projects / SESSION / "subagents" / "agent-1.jsonl").write_text(transcript_text(
+            [ToolCall("Bash", 'q "SELECT * FROM runz"', "error: Catalog Error: Table with name runz does not exist!",
                    True)]))
         gh = folder / "gh"
         gh.mkdir()
@@ -120,14 +123,14 @@ def main() -> str:
                "EXPERIMENT_LAB_DATA": str(folder / "lab-data"), "PYTHONPATH": str(ROOT)}
         module = [sys.executable, "-m", "experiment_lab.feedback"]
         draft = [*module, "draft", "--session", SESSION, "--plugin", str(ROOT / "plugin")]
-        text = run(draft, env)
+        text = run_module(draft, env)
         report = next((folder / "lab-data" / "feedback").glob("*.md"))
-        text += run([*draft, "--real"], env)
-        text += run([*module, "draft", "--session", "none"], env)
+        text += run_module([*draft, "--real"], env)
+        text += run_module([*module, "draft", "--session", "none"], env)
         send = [*module, "send", str(report), "--title", "Agent report: a check"]
-        text += run(send, {**env, "PATH": f"{gh}:{env['PATH']}"})
-        text += run(send, {**env, "PATH": str(Path(sys.executable).parent)})
-        return even(text, folder)
+        text += run_module(send, {**env, "PATH": f"{gh}:{env['PATH']}"})
+        text += run_module(send, {**env, "PATH": str(Path(sys.executable).parent)})
+        return mask_changes(text, folder)
 
 
 if __name__ == "__main__":
