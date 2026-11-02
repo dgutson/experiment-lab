@@ -175,8 +175,7 @@ the same projects. rec, q and `lab.py` work in that project, or in the one
 named by `--project P` (`Lab(project="P")` in a script): q's views hold only its rows (`--all` reads
 every project's), and rec and `lab.py` refuse another project's experiments, runs and records. A
 script works in the project of its working folder, not of the folder the script is in. With no
-project, q needs `--project` or `--all`, and rec and `lab.py` write nothing; their error lists the
-projects and their folders, at most 10.
+project, q needs `--project` or `--all`, and rec and `lab.py` write nothing.
 
 `rec experiment NAME --text "what it measures and why"` makes an experiment directly below the
 project, or below an earlier experiment with `--in PARENT`; given again, `--in` moves it with the

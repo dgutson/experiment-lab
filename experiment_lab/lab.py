@@ -151,19 +151,9 @@ def top_folder(projects: Iterable[Project]) -> Path:
     return folders[-1] if any(Path(folder).is_relative_to(top) for _, folder in projects) else top
 
 
-def tilde(path: StrPath) -> str:
-    """path as ~/... under the home folder."""
-    return "~/" + str(Path(path).relative_to(Path.home())) if Path(path).is_relative_to(Path.home()) else str(path)
-
-
 def listed(projects: Sequence[Project]) -> str:
-    """The projects and their folders, for an error that says to run in a
-    project's folder: ' (a: ~/a, b: ~/b)', at most LISTED; '' if none."""
-    if not projects:
-        return ""
-    shown = [f"{name}: {tilde(folder)}" for name, folder in sorted(projects)[:LISTED]]
-    more = f", and {len(projects) - LISTED} more" if len(projects) > LISTED else ""
-    return f" ({', '.join(shown)}{more})"
+    """' (a: /x/a, b: /x/b)', the projects and their folders; '' if none."""
+    return f" ({', '.join(f'{name}: {folder}' for name, folder in sorted(projects))})" if projects else ""
 
 
 def all_projects(db: sqlite3.Connection) -> list[Project]:
@@ -235,7 +225,6 @@ def check_folder(db: sqlite3.Connection, name: str, folder: str | None) -> None:
                          " project another folder, such as --folder . for the current one")
 
 
-LISTED = 10  # projects an error lists
 LONGEST_NAME = 32  # of a new experiment, which every q filter, --in and sql: item retypes
 
 
@@ -417,7 +406,7 @@ class Lab:
             folder = top_folder(projects)
             raise ValueError(f'no project holds {folder}: run in a project\'s folder{listed(projects)}, name one'
                              ' (rec --project P, Lab(project="P")), or make this folder a project:'
-                             f' rec project {folder.name} --text "what the project is, in one line"')
+                             ' rec project NAME --text "what the project is, in one line"')
         return self.current
 
     def path(self, name: str | None) -> list[str]:
