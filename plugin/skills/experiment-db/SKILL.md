@@ -14,7 +14,8 @@ An experiment, in order:
 1. `rec tree` prints the project's experiments, one per line, each indented below the one it came from
    (`rec tree EXPERIMENT`, only those below EXPERIMENT), then the protocol rules the experiment follows.
 2. `rec experiment NAME --text DESCRIPTION`, with `--in PARENT` when it follows from the result of
-   PARENT, an experiment of `rec tree`; without it for an idea unrelated to the earlier ones.
+   PARENT, an experiment of `rec tree`; without it for an idea unrelated to the earlier ones, even
+   one that uses their files or code.
 3. When a protocol rule asks for a prediction, `rec add question "Will ...?" --in NAME --text
    "the outcome expected, and why"` before the first run.
 4. The work, inside `with lab.run(...)` (below), so that the lab measures how long each run took.
