@@ -11,6 +11,8 @@ records.py      adding and changing records (standard library only)
 query.py        DuckDB SQL over lab.db and the views of lab.sql and a project's view files
 q.py, rec.py    the commands q and rec
 pages.py        the /lab pages and the command lab-server
+feedback.py     the report on how the lab served a Claude Code session, which the plugin's skill
+                feedback sends (standard library only)
 
 This file imports nothing, so that lab.py and records.py stay importable
 without the package's dependencies.

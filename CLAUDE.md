@@ -51,6 +51,9 @@ kind, a diagram, an audio file and an image. The checks:
   and compares what they print and their exit statuses with `checks/check_commands.txt`. When a change
   to what they print is meant, `--update` rewrites the file, and its diff shows the change. It
   passes under Python 3.12 and 3.14: where their argparse messages differ, it evens them out.
+- `uv run python checks/check_feedback.py`: runs `python3 -m experiment_lab.feedback` on a transcript it
+  makes, with a new lab of `make_scratch.py`, and compares what it prints with
+  `checks/check_feedback.txt`; `--update` rewrites the file.
 - `uv run python checks/check_reader.py`: on a new lab of `make_scratch.py`, `Lab.runs` and
   `Lab.file` read what the views `runs` and `files` and the macro `latest_runs` give.
 - `uv run --script checks/check_pages.py [URL]`: every page of a running server, and its diagrams,
@@ -174,5 +177,8 @@ Change these together:
   of `q.py`, `rec.py` and `lab.py`, `README.md`, and `plugin/skills/experiment-db/SKILL.md`, which
   is what an agent using the lab reads, with its `references/`, which SKILL.md names for what an
   agent seldom needs (runs outside Python, the owner's pages, view files).
+- The transcript of a Claude Code session (`<config folder>/projects/*/<session id>.jsonl`, its tool
+  calls and results), which `feedback.py` reads: `feedback.read_transcript` and the transcript
+  `checks/check_feedback.py` makes.
 - The Mermaid file name, `experiment_lab/static/mermaid-<version>.min.js`, in
   `templates/lab/base.html`; its version must match the one mermaid-cli uses.

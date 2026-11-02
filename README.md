@@ -27,9 +27,11 @@ computers share nothing. There are two parts, and Claude Code needs both:
 - The package gives three commands. `rec` writes projects, experiments and records; `q` answers
   questions about them with an SQL query; `lab-server` serves the pages at
   http://127.0.0.1:5000/lab. Claude Code runs `rec` and `q`; you read the pages.
-- The Claude Code plugin gives one skill, `experiment-lab:experiment-db`: instructions that tell
-  Claude Code when and how to run `rec` and `q`. Without it, Claude Code does not know about them.
-  It does not install them.
+- The Claude Code plugin gives two skills. `experiment-lab:experiment-db` holds the instructions
+  that tell Claude Code when and how to run `rec` and `q`; without it, Claude Code does not know
+  about them. `/experiment-lab:feedback`, which only you run, has Claude Code report how the lab
+  served a session (see [Reporting how the lab served a session](#reporting-how-the-lab-served-a-session)).
+  The plugin does not install the commands.
 
 Requirements:
 
@@ -269,10 +271,11 @@ a record a text; `rec`, `lab.py` and `records.py` refuse one without. A run's no
 | `checks/check_pages.py` | opens every page of a running server and checks it |
 | `checks/check_views.py`, `checks/sqlite_filter_bug.py` | checks to run before changing the DuckDB version |
 | `checks/check_commands.py` | runs the commands on a new lab and compares what they print with `checks/check_commands.txt` |
+| `checks/check_feedback.py` | runs the feedback module on a transcript it makes and compares what it prints with `checks/check_feedback.txt` |
 | `checks/check_upgrades.py`, `checks/schema-0.0.0.sql` | checks that the upgrades of `lab.db` make the tables of `schema.sql` from those of version 0.0.0 |
 | `checks/make_scratch.py` | makes a lab with data in it, for the checks and for trying changes |
 | `evals/` | the skill's eval cases, and `run.sh`, which runs them |
-| `plugin/` | a Claude Code plugin holding the skill `experiment-db`, which tells the agent how to use q, rec and `lab.py` |
+| `plugin/` | a Claude Code plugin holding the skill `experiment-db`, which tells the agent how to use q, rec and `lab.py`, and the skill `feedback`, which the person runs to send a report on how the lab served a session |
 
 ```mermaid
 flowchart LR
@@ -339,6 +342,29 @@ DuckDB reads `lab.db` through its own copy of SQLite, which it downloads once as
 see each other's locks (https://www.sqlite.org/howtocorrupt.html, section 2.2.1), so no process
 opens `lab.db` with both: the writers use only Python's sqlite3, and q and the pages only DuckDB.
 That is why lab-server makes a missing `lab.db` in a child process.
+
+## Reporting how the lab served a session
+
+In a Claude Code session that used the lab, type `/experiment-lab:feedback`. Claude Code writes a
+report from that session:
+- the frictions, each with its command, the error it printed, what fixed it and the turns it took;
+- the tokens spent for little;
+- the work it did by hand that the lab could do;
+- whether `q` found the old results and `rec` recorded the new ones;
+- what the lab lacks.
+
+When the session went well, Claude Code says so in one line and sends nothing. Project names, paths
+and values in the report are replaced with neutral ones, unless your words after the command allow
+real ones (`/experiment-lab:feedback keep the real names`). Claude Code shows the whole report and
+asks you whether to send it. With your yes, it opens a public issue in this repository, labelled `agent-feedback`, with `gh`. Without a
+`gh` login, it saves the report in the data folder's `feedback/` folder and gives you the link to
+open the issue by hand. A session that does not run the command has nothing more in its context.
+
+`experiment_lab/feedback.py` writes most of the report: it reads the session's transcript, lists
+each lab command that failed, ran more than once or printed much, and each search that found nothing
+and was run again, and makes the names neutral. The
+agent adds only what it alone knows, such as what the work was and what the lab lacked, so the
+report costs it few tokens.
 
 ## The skill's evals
 
