@@ -102,6 +102,12 @@ changes, not for evals, checks or CI. After the change is on `main`:
 `claude plugin update experiment-lab@experiment-lab-marketplace`; a running session loads it with
 `/reload-plugins`.
 
+experiment-lab's own version, in `pyproject.toml`, is what the pages' About and the feedback
+reports show. Raise it when what `q`, `rec`, `lab-server` or `lab.py` do changes (the minor number
+for a new or changed behavior, the patch number for a fix), and with every change to the tables
+(below). `lab.db`'s version is the highest upgrade's in `db_upgrades.py` (`latest()`), not this
+one, so raising it alone changes nothing in `lab.db`.
+
 ## Architecture
 
 - Projects are the rows of `lab.experiments` with no parent; only they have `folder`, `files` and

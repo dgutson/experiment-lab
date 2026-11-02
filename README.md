@@ -142,8 +142,6 @@ In a terminal, in this order:
    claude plugin update experiment-lab@experiment-lab-marketplace
    ```
 
-   A Claude Code session that is running gets the new version after `/reload-plugins`.
-
 3. Restart the server, which still runs the old code:
 
    ```sh
@@ -152,6 +150,14 @@ In a terminal, in this order:
 
    It stops the server on port `$EXPERIMENT_LAB_PORT` (default 5000), waits for it to end, and
    runs `start.sh`, which prints `running at …`.
+
+4. In each Claude Code session that is running, type `/reload-plugins`. A session that has already
+   used the lab keeps the old skill's text, so tell it:
+
+   ```
+   experiment-lab was updated. Invoke the experiment-db skill again and follow its new text
+   instead of the version you read earlier in this session.
+   ```
 
 Some updates change the tables of `lab.db`. The first program of the new code to open `lab.db`
 upgrades it: rec, q, a logging script, or the server when it starts. `lab.db`'s version is the
