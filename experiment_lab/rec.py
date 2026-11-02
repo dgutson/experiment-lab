@@ -100,7 +100,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from experiment_lab import records
-from experiment_lab.lab import Lab, ms, now
+from experiment_lab.lab import Lab, ms, now, tilde
 
 # rec's field names for the columns of records that differ
 COLUMNS = {"by": "author", "experiment": "label"}
@@ -146,11 +146,6 @@ def show(r: records.Record) -> None:
     print(f"{r['id']}: {r['kind']}, {r['status']}: {r['title']}")
 
 
-def shown(path: str) -> str:
-    """path as ~/... under the home folder."""
-    return "~/" + str(Path(path).relative_to(Path.home())) if Path(path).is_relative_to(Path.home()) else path
-
-
 def show_open(lab: Lab) -> None:
     rows = records.open_records(lab, lab.current)
     print(f"open{' in ' + lab.current if lab.current else ''} ({len(rows)}):")
@@ -181,7 +176,7 @@ def run_project(lab: Lab, a: argparse.Namespace) -> None:
     lab.project(a.name, a.text, folder=a.folder, files=a.files, views=a.views, replace=a.replace)
     folder, files, views = lab.db.execute("SELECT folder, files, views FROM experiments WHERE name = ?",
                                           (a.name,)).fetchone()
-    print(f"project {a.name}, folder {shown(folder)}, files {shown(files)}, views {views or 'none'}")
+    print(f"project {a.name}, folder {tilde(folder)}, files {tilde(files)}, views {views or 'none'}")
 
 
 def run_experiment(lab: Lab, a: argparse.Namespace) -> None:
@@ -193,7 +188,7 @@ def run_tree(lab: Lab, a: argparse.Namespace) -> None:
     top = a.top or lab.here()
     path = lab.path(top)
     folder = lab.db.execute("SELECT folder FROM experiments WHERE name = ?", (top,)).fetchone()[0]
-    print(f"{top}  ({shown(folder)})" if folder else " › ".join(path))
+    print(f"{top}  ({tilde(folder)})" if folder else " › ".join(path))
 
     def walk(name: str, depth: int) -> None:
         for child, dead_end in lab.db.execute("SELECT name, dead_end FROM experiments WHERE parent = ?"
