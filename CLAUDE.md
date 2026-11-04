@@ -55,7 +55,8 @@ kind, a diagram, an audio file and an image. The checks:
   makes, with a new lab of `make_scratch.py`, and compares what it prints with
   `checks/check_feedback.txt`; `--update` rewrites the file.
 - `uv run python checks/check_reader.py`: on a new lab of `make_scratch.py`, `Lab.runs` and
-  `Lab.file` read what the views `runs` and `files` and the macro `latest_runs` give.
+  `Lab.file` read what the views `runs` and `files` and the macro `latest_runs` give, and `Lab.file`
+  names on stderr the records that cite a run as the view `records` has them.
 - `uv run --script checks/check_pages.py [URL]`: every page of a running server, and its diagrams,
   audio players and images in Chrome, light and dark.
 - `evals/run.sh [--case NAME] [--model sonnet]`: the skill's eval cases, run by agents with and

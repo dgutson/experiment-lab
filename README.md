@@ -450,7 +450,9 @@ latest value, as the view `runs` has them. Its keywords, all optional, narrow th
 for any status; `params=` and `tags=`, for each key a value or a tuple of the values allowed;
 `has_metric=`, a metric the run logged; and `latest_by=`, a param or a list of them, which keeps
 the latest run for each combination of their values, as `latest_runs` does. `lab.file(run_id,
-name)` is the path of a file the run logged, and `lab.json(run_id, name)` its JSON, parsed:
+name)` is the path of a file the run logged, and `lab.json(run_id, name)` its JSON, parsed. Both
+print on stderr the records whose evidence cites the run, each record once per `Lab`, since one of
+them may correct what the file holds, which stays as it was logged:
 
 ```python
 for run in lab.runs("rate test", tags={"outcome": "pass"}, latest_by="rate"):
