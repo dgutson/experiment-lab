@@ -1,0 +1,25 @@
+schema_version: "1.1"
+name: corrected-file
+description: A script reads a run's logged file, one value of which a later finding corrects.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    Write kinds.py, which prints the mean score of the speech clips and of the music clips that the
+    listening test's panel 1 run logged. Run it.
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  - name: corrected-means
+    type: llm
+    focus: trace
+    criteria: |
+      PASS if kinds.py's last run printed a mean of 4.1 for speech and 3.2 for music, counting clip c4 as
+      speech, as the finding "Clip c4 is speech, not music" corrects the logged file, or the final answer gives
+      those means as the right ones. FAIL if the only means given are those of the logged file as it is,
+      speech 4.0 and music 3.6, or the script's last run failed.
