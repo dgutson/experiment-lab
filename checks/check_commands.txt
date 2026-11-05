@@ -209,12 +209,14 @@ statement of a view file that fails is printed on stderr and skipped. lab.sql's
 views hold that project's rows only; with --all, they hold every project's and
 no view file runs. From a folder no project holds, q needs --project or --all.
 Several statements may be given; the rows of each SELECT (DESCRIBE, SHOW,
-SUMMARIZE and FROM too) and of the last statement are printed, each result
-after a line "-- statement N" when there are several, at most --max rows of
-each (40), with cells cut at 80 characters unless --full. A result of one row
-prints a line "column: value" per column, and one of one row and one column
-that cell alone, whole and with its line breaks, as in
-q "SELECT text FROM records WHERE id = '...'". An error about a column
+SUMMARIZE and FROM too) and of the last statement unless it is a COPY are
+printed, each result after a line "-- statement N" when there are several, the
+same way at any number of rows: a line of column names, at most --max rows
+(40), with cells cut at 80 characters unless --full, and a line of their
+count. The cell of a result of one row and one column prints whole, with its
+line breaks, as in q "SELECT text FROM records WHERE id = '...'". A COPY prints
+only what it writes, and when nothing prints, "ok" goes on stderr, so that
+COPY (...) TO '/dev/stdout' gives a script the rows alone. An error about a column
 that is not found names the views that have it; one about the table params,
 tags or metrics, the map column of runs; one about a view that was renamed,
 its new name; one about text in params or tags, a cast; a list of candidate
@@ -376,9 +378,11 @@ exit 0
 
 $ rec add finding "From stdin" --in bitrate --text - <<< $'48 kHz kept "every" word; `rate=48000`, not $RATE.\n\n- one\n' && q "SELECT text FROM records WHERE id = 'from-stdin'"
 from-stdin: finding, closed: From stdin
+text
 48 kHz kept "every" word; `rate=48000`, not $RATE.
 
 - one
+(1 rows)
 exit 0
 
 $ rec add finding "Empty stdin" --in bitrate --text - < /dev/null
@@ -387,8 +391,8 @@ exit 1
 
 $ rec set from-stdin "title=Set from stdin" text=- <<< $'Kept "every" word; `rate=48000`, not $RATE.\n' && q "SELECT title, text FROM records WHERE id = 'from-stdin'"
 from-stdin: finding, closed: Set from stdin
-title: Set from stdin
-text: Kept "every" word; `rate=48000`, not $RATE.
+title | text
+Set from stdin | Kept "every" word; `rate=48000`, not $RATE.
 (1 rows)
 exit 0
 
@@ -404,9 +408,11 @@ $ rec add finding "Pneumonoultramicroscopicsilicovolcanoconiosis checked" --in b
 pneumonoultramicroscopicsilicovolcanocon: finding, closed: Pneumonoultramicroscopicsilicovolcanoconiosis checked
 exit 0
 
-$ rec add finding "Cites a run" --in bitrate --text "x" --evidence "run:$(q "SELECT run FROM runs WHERE name = 'rate 48000, listened to'")" record:keep-48-khz && q "SELECT evidence FROM records WHERE id = 'cites-a-run'"
+$ rec add finding "Cites a run" --in bitrate --text "x" --evidence "run:$(q "SELECT run FROM runs WHERE name = 'rate 48000, listened to'" | sed -n 2p)" record:keep-48-khz && q "SELECT evidence FROM records WHERE id = 'cites-a-run'"
 cites-a-run: finding, closed: Cites a run
+evidence
 run:RUN; record:keep-48-khz
+(1 rows)
 exit 0
 
 $ rec add finding "Cites no run" --in bitrate --text "x" --evidence run:nosuch
@@ -417,7 +423,7 @@ $ rec set cites-a-run "evidence=record:nosuch"
 error: evidence 'record:nosuch': there is no record nosuch
 exit 1
 
-$ rec add finding "Names a run" --in bitrate --text "Run $(q "SELECT run FROM runs WHERE name = 'rate 48000, listened to'") and checksum RUN." --evidence record:keep-48-khz
+$ rec add finding "Names a run" --in bitrate --text "Run $(q "SELECT run FROM runs WHERE name = 'rate 48000, listened to'" | sed -n 2p) and checksum RUN." --evidence record:keep-48-khz
 warning: the text names run RUN, which the evidence does not cite
 warning: the text names RUN, which is no run's id
 names-a-run: finding, closed: Names a run
@@ -444,7 +450,9 @@ exit 1
 
 $ rec add finding "Cites a query" --in bitrate --text "x" --evidence "sql:SELECT run, name FROM runs WHERE experiment = 'sample rate sweep'" && q "SELECT evidence FROM records WHERE id = 'cites-a-query'"
 cites-a-query: finding, closed: Cites a query
+evidence
 sql:SELECT run, name FROM runs WHERE experiment = 'sample rate sweep'; run:RUN; run:RUN; run:RUN; run:RUN; run:RUN
+(1 rows)
 exit 0
 
 $ rec add finding "From a worktree" --in bitrate --text "x" --evidence file:~/results-b/out.json file:~/results/out.json
@@ -475,7 +483,9 @@ exit 0
 
 $ rec experiment bitrate --text "Lowers the bitrate until accuracy drops." --replace && q "SELECT description FROM experiments WHERE name = 'bitrate'"
 experiment audio-codec › sample rate sweep › bitrate
+description
 Lowers the bitrate until accuracy drops.
+(1 rows)
 exit 0
 
 $ rec project audio-codec --text "A new project."
@@ -574,15 +584,21 @@ upgraded lab.db from version 0.0.0 to 0.4.0; its copy from before is FOLDER/home
 files
 lab.db
 lab.db.v0.0.0
+files
 2
+(1 rows)
+files
 2
+(1 rows)
 exit 0
 
 $ cp -r "$EXPERIMENT_LAB_DATA" ~/old-q && python -c "import sqlite3; db = sqlite3.connect('$HOME/old-q/lab.db', isolation_level=None); db.executescript('DROP TABLE files; ALTER TABLE runs DROP COLUMN host; ALTER TABLE runs DROP COLUMN pid; PRAGMA user_version = 0')" && EXPERIMENT_LAB_DATA=~/old-q q "SELECT count(*) AS files FROM files"
 upgrading lab.db to version 0.3.0 (1 of 2)
 upgrading lab.db to version 0.4.0 (2 of 2)
 upgraded lab.db from version 0.0.0 to 0.4.0; its copy from before is FOLDER/home/old-q/lab.db.v0.0.0
+files
 2
+(1 rows)
 exit 0
 
 $ cp -r "$EXPERIMENT_LAB_DATA" ~/newer && python -c "import sqlite3; sqlite3.connect('$HOME/newer/lab.db', isolation_level=None).execute('PRAGMA user_version = 9000000')" && EXPERIMENT_LAB_DATA=~/newer rec open
@@ -611,10 +627,8 @@ record | which-rate-do-we-keep | sample rate sweep | Which rate do we keep?
 exit 0
 
 $ q "SELECT id, kind, status, title FROM records WHERE holds_words(title || ' ' || text, 'gate  hold') ORDER BY id"
-id: does-the-gate-need-a-hold-time
-kind: question
-status: closed
-title: Does the gate need a hold time?
+id | kind | status | title
+does-the-gate-need-a-hold-time | question | closed | Does the gate need a hold time?
 (1 rows)
 exit 0
 
@@ -659,11 +673,15 @@ harbour.jpg | 0.41
 exit 0
 
 $ q "SELECT DISTINCT project FROM runs"
+project
 audio-codec
+(1 rows)
 exit 0
 
 $ q --project vision "SELECT DISTINCT project FROM runs"
+project
 vision
+(1 rows)
 exit 0
 
 $ q --all "SELECT DISTINCT project FROM runs ORDER BY project"
@@ -730,16 +748,19 @@ dither tpdf
 exit 0
 
 $ q "SELECT id, text FROM records WHERE id = '48-khz-is-the-most-accurate-rate'"
-id: 48-khz-is-the-most-accurate-rate
-text: 48 kHz reached an accuracy of 0.93, against 0.88 at 44.1 kHz; the 96 kHz run ra…
+id | text
+48-khz-is-the-most-accurate-rate | 48 kHz reached an accuracy of 0.93, against 0.88 at 44.1 kHz; the 96 kHz run ra…
 (1 rows)
 exit 0
 
 $ q --full "SELECT text FROM records WHERE id = '48-khz-is-the-most-accurate-rate'"
+text
 48 kHz reached an accuracy of 0.93, against 0.88 at 44.1 kHz; the 96 kHz run ran out of memory. Next: keep 48 kHz and lower the bitrate, to find where accuracy starts to drop.
+(1 rows)
 exit 0
 
 $ q "SELECT text FROM records WHERE id = 'keep-48-khz'"
+text
 48 kHz stays: it was the most accurate rate, and `FOLDER/home/audio-codec/tone.wav` sounds right.
 
 ```mermaid
@@ -748,10 +769,13 @@ flowchart LR
 ```
 
 The rates were timed with FOLDER/home/audio-codec/bench.py.
+(1 rows)
 exit 0
 
 $ echo "SELECT count(*) AS runs FROM runs" | q
+runs
 8
+(1 rows)
 exit 0
 
 $ q "SELECT experiment, name, bytes FROM files ORDER BY name"
@@ -761,7 +785,7 @@ sample rate sweep | tone.wav | 16044
 (2 rows)
 exit 0
 
-$ q "SELECT string_agg(path, chr(10) ORDER BY name) FROM files" | while read -r p; do test -f "$p" && echo "exists $p" || echo "missing $p"; done
+$ q --full "SELECT path FROM files ORDER BY name" | sed '1d;$d' | while read -r p; do test -f "$p" && echo "exists $p" || echo "missing $p"; done
 exists FOLDER/lab-data/files/RUN/plot.png
 exists FOLDER/lab-data/files/RUN/tone.wav
 exit 0
@@ -775,18 +799,24 @@ exit 0
 
 $ q "SELECT 1 AS x; SET threads = 1; SELECT name FROM runs ORDER BY name LIMIT 2; SELECT 2 AS y"
 -- statement 1
+x
 1
+(1 rows)
 -- statement 3
 name
 dither none
 dither tpdf
 (2 rows)
 -- statement 4
+y
 2
+(1 rows)
 exit 0
 
 $ q "CREATE TABLE t AS SELECT 1 AS x; SELECT x FROM t"
+x
 1
+(1 rows)
 exit 0
 
 $ q "CREATE TABLE t (x INT)"
@@ -794,8 +824,16 @@ Count
 (0 rows)
 exit 0
 
+$ q "COPY (SELECT name FROM runs ORDER BY name LIMIT 2) TO '/dev/stdout' (FORMAT csv, HEADER false)" | while read -r n; do echo "read $n"; done
+read dither none
+read dither tpdf
+ok
+exit 0
+
 $ q "SET TimeZone = 'UTC'; SELECT TIMESTAMPTZ '2026-01-01 00:00:00+00' AS t"
+t
 2026-01-01 00:00:00+00:00
+(1 rows)
 exit 0
 
 $ q --project nosuch .views
@@ -886,12 +924,8 @@ exit 1
 $ id=$(rec run bitrate "background job" --note "Ran in a background job." --start "2026-09-10 12:00") && echo "$id" && rec end "$id" --at "2026-09-10 12:58" && q "SELECT name, status, started, ended, minutes, note FROM runs WHERE run = '$id'"
 RUN
 run background job in bitrate: FINISHED, 58.0 min
-name: background job
-status: FINISHED
-started: 2026-09-10 12:00
-ended: 2026-09-10 12:58
-minutes: 58
-note: Ran in a background job.
+name | status | started | ended | minutes | note
+background job | FINISHED | 2026-09-10 12:00 | 2026-09-10 12:58 | 58 | Ran in a background job.
 (1 rows)
 exit 0
 
@@ -907,11 +941,11 @@ $ rec end nosuch
 error: no run nosuch
 exit 1
 
-$ rec end "$(q --project vision "SELECT run FROM runs ORDER BY name LIMIT 1")"
+$ rec end "$(q --project vision "SELECT run FROM runs ORDER BY name LIMIT 1" | sed -n 2p)"
 error: 'blur detector' is in the project vision, not in audio-codec, whose folder this is
 exit 1
 
-$ rec end "$(q "SELECT run FROM runs WHERE name = 'background job'")"
+$ rec end "$(q "SELECT run FROM runs WHERE name = 'background job'" | sed -n 2p)"
 error: run background job in bitrate has ended, FINISHED
 exit 1
 
@@ -937,33 +971,31 @@ exit 2
 
 $ id=$(rec run bitrate "utc job" --start 2026-09-10T10:00Z) && rec end "$id" --at 2026-09-10T12:30+02:00 && q "SET TimeZone = 'UTC'; SELECT started, ended FROM runs WHERE run = '$id'"
 run utc job in bitrate: FINISHED, 30.0 min
-started: 2026-09-10 10:00
-ended: 2026-09-10 10:30
+started | ended
+2026-09-10 10:00 | 2026-09-10 10:30
 (1 rows)
 exit 0
 
 $ python -c "import datetime; from experiment_lab.lab import Lab; r = Lab().run('bitrate', 'python times', start='2026-09-10T10:00Z'); r.log_metrics({'x': 1}, at='2026-09-10 10:10+00:00'); r.end(at=datetime.datetime(2026, 9, 10, 10, 30, tzinfo=datetime.UTC))" && q "SET TimeZone = 'UTC'; SELECT r.started, r.ended, local_time(m.time) AS measured FROM runs r JOIN lab.metrics m ON m.run = r.run WHERE r.name = 'python times'"
-started: 2026-09-10 10:00
-ended: 2026-09-10 10:30
-measured: 2026-09-10 10:10
+started | ended | measured
+2026-09-10 10:00 | 2026-09-10 10:30 | 2026-09-10 10:10
 (1 rows)
 exit 0
 
 $ python -c "import os, signal; from experiment_lab.lab import Lab; Lab().run('bitrate', 'stopped').__enter__(); os.kill(os.getpid(), signal.SIGTERM)"; echo "exit $?"; q "SELECT name, status, ended IS NOT NULL AS ended FROM runs WHERE name = 'stopped'"
 Terminated
 exit 143
-name: stopped
-status: KILLED
-ended: true
+name | status | ended
+stopped | KILLED | true
 (1 rows)
 exit 0
 
 $ python -c "from experiment_lab.lab import Lab; Lab().run('bitrate', 'lost', start='2026-09-10 12:00').__enter__().log_metrics({'x': 1}, at='2026-09-10 12:30')" && q "SELECT status FROM runs WHERE name = 'lost'" && rec tree > /dev/null && q "SELECT name, status, started, ended FROM runs WHERE name = 'lost'"
+status
 RUNNING
-name: lost
-status: KILLED
-started: 2026-09-10 12:00
-ended: 2026-09-10 12:30
+(1 rows)
+name | status | started | ended
+lost | KILLED | 2026-09-10 12:00 | 2026-09-10 12:30
 (1 rows)
 exit 0
 
@@ -977,8 +1009,8 @@ usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT]
                [--file PATH[=NAME] [PATH[=NAME] ...]]
                RUN
 rec end: error: argument --file: no file FOLDER/home/missing.txt
-status: RUNNING
-metrics:
+status | metrics
+RUNNING |
 (1 rows)
 exit 0
 
@@ -998,11 +1030,10 @@ usage: rec end [-h] [--project P] [--status {FINISHED,FAILED,KILLED}] [--at AT]
 rec end: error: argument --tag: not KEY=VALUE: outcome
 exit 2
 
-$ id=$(q "SELECT run FROM runs WHERE name = 'shell job'") && rec end "$id" --at "2026-09-10 12:30" --metric accuracy=0.93 loss=nan --tag outcome=pass --file ~/out.txt ~/out.txt=logs/b.txt && q "SELECT status, tags, metrics FROM runs WHERE run = '$id'" && q "SELECT name, bytes FROM files WHERE run = '$id' ORDER BY name"
+$ id=$(q "SELECT run FROM runs WHERE name = 'shell job'" | sed -n 2p) && rec end "$id" --at "2026-09-10 12:30" --metric accuracy=0.93 loss=nan --tag outcome=pass --file ~/out.txt ~/out.txt=logs/b.txt && q "SELECT status, tags, metrics FROM runs WHERE run = '$id'" && q "SELECT name, bytes FROM files WHERE run = '$id' ORDER BY name"
 run shell job in bitrate: FINISHED, 30.0 min
-status: FINISHED
-tags: {"outcome": "pass"}
-metrics: {"accuracy": 0.93, "loss": null}
+status | tags | metrics
+FINISHED | {"outcome": "pass"} | {"accuracy": 0.93, "loss": null}
 (1 rows)
 name | bytes
 logs/b.txt | 2
@@ -1079,7 +1110,9 @@ exit 1
 $ python -c "from experiment_lab.lab import Lab; lab = Lab(); [lab.run('bitrate', f'batch {i}').end() for i in range(21)]" && rec add finding "Cites a long query" --in bitrate --text "x" --evidence "sql:SELECT run FROM runs WHERE name LIKE 'batch %'" && q "SELECT evidence FROM records WHERE id = 'cites-a-long-query'"
 warning: sql:SELECT run FROM runs WHERE name LIKE 'batch %' returns 21 runs, too many to cite each as run:<id>, so a later run may change what it returns
 cites-a-long-query: finding, closed: Cites a long query
+evidence
 sql:SELECT run FROM runs WHERE name LIKE 'batch %'
+(1 rows)
 exit 0
 
 $ EXPERIMENT_LAB_PORT=abc lab-server

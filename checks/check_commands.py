@@ -55,10 +55,10 @@ rec set from-stdin "title=Set from stdin" text=- <<< $'Kept "every" word; `rate=
 rec set from-stdin text=- title=- < /dev/null
 rec add finding "Dither noise is heard below 16 bits on headphones" --in "16-bit output" --text "x"
 rec add finding "Pneumonoultramicroscopicsilicovolcanoconiosis checked" --in bitrate --text "x"
-rec add finding "Cites a run" --in bitrate --text "x" --evidence "run:$(q "SELECT run FROM runs WHERE name = 'rate 48000, listened to'")" record:keep-48-khz && q "SELECT evidence FROM records WHERE id = 'cites-a-run'"
+rec add finding "Cites a run" --in bitrate --text "x" --evidence "run:$(q "SELECT run FROM runs WHERE name = 'rate 48000, listened to'" | sed -n 2p)" record:keep-48-khz && q "SELECT evidence FROM records WHERE id = 'cites-a-run'"
 rec add finding "Cites no run" --in bitrate --text "x" --evidence run:nosuch
 rec set cites-a-run "evidence=record:nosuch"
-rec add finding "Names a run" --in bitrate --text "Run $(q "SELECT run FROM runs WHERE name = 'rate 48000, listened to'") and checksum d41d8cd98f00b204e9800998ecf8427e." --evidence record:keep-48-khz
+rec add finding "Names a run" --in bitrate --text "Run $(q "SELECT run FROM runs WHERE name = 'rate 48000, listened to'" | sed -n 2p) and checksum d41d8cd98f00b204e9800998ecf8427e." --evidence record:keep-48-khz
 rec add finding "Fails a query" --in bitrate --text "x" --evidence "sql:SELECT nosuch FROM runs"
 rec add finding "Reads a file in a query" --in bitrate --text "x" --evidence "sql:FROM read_csv('/etc/hostname')"
 rec add finding "Cites no file" --in bitrate --text "x" --evidence file:~/nosuch.txt
@@ -117,11 +117,12 @@ q --full "SELECT text FROM records WHERE id = '48-khz-is-the-most-accurate-rate'
 q "SELECT text FROM records WHERE id = 'keep-48-khz'"
 echo "SELECT count(*) AS runs FROM runs" | q
 q "SELECT experiment, name, bytes FROM files ORDER BY name"
-q "SELECT string_agg(path, chr(10) ORDER BY name) FROM files" | while read -r p; do test -f "$p" && echo "exists $p" || echo "missing $p"; done
+q --full "SELECT path FROM files ORDER BY name" | sed '1d;$d' | while read -r p; do test -f "$p" && echo "exists $p" || echo "missing $p"; done
 echo '[{"judge": "a", "preferred": "run 7"}, {"judge": "b", "preferred": "run 6"}]' > ~/tally.json && python -c "from experiment_lab.lab import Lab; r = Lab().run('bitrate', 'judged'); r.log_file('$HOME/tally.json'); r.end()" && q "SET VARIABLE f = (SELECT path FROM files WHERE name = 'tally.json'); FROM read_json(getvariable('f'))"
 q "SELECT 1 AS x; SET threads = 1; SELECT name FROM runs ORDER BY name LIMIT 2; SELECT 2 AS y"
 q "CREATE TABLE t AS SELECT 1 AS x; SELECT x FROM t"
 q "CREATE TABLE t (x INT)"
+q "COPY (SELECT name FROM runs ORDER BY name LIMIT 2) TO '/dev/stdout' (FORMAT csv, HEADER false)" | while read -r n; do echo "read $n"; done
 q "SET TimeZone = 'UTC'; SELECT TIMESTAMPTZ '2026-01-01 00:00:00+00' AS t"
 q --project nosuch .views
 q "SELECT nosuch FROM runs"
@@ -138,8 +139,8 @@ id=$(rec run bitrate "background job" --note "Ran in a background job." --start 
 rec run nowhere "a run"
 rec run "blur detector" "a run"
 rec end nosuch
-rec end "$(q --project vision "SELECT run FROM runs ORDER BY name LIMIT 1")"
-rec end "$(q "SELECT run FROM runs WHERE name = 'background job'")"
+rec end "$(q --project vision "SELECT run FROM runs ORDER BY name LIMIT 1" | sed -n 2p)"
+rec end "$(q "SELECT run FROM runs WHERE name = 'background job'" | sed -n 2p)"
 id=$(rec run bitrate "late job" --start 2026-09-10T12:00) && rec end "$id" --at 2026-09-10T11:00
 rec end x --status RUNNING
 rec end x --at yesterday
@@ -151,7 +152,7 @@ python -c "import os, signal, time; from experiment_lab.lab import Lab; lab = La
 echo a > ~/out.txt && id=$(rec run bitrate "shell job" --start "2026-09-10 12:00") && { rec end "$id" --metric accuracy=0.93 --file ~/out.txt ~/missing.txt; q "SELECT status, metrics FROM runs WHERE run = '$id'"; }
 rec end x --metric accuracy=high
 rec end x --tag outcome
-id=$(q "SELECT run FROM runs WHERE name = 'shell job'") && rec end "$id" --at "2026-09-10 12:30" --metric accuracy=0.93 loss=nan --tag outcome=pass --file ~/out.txt ~/out.txt=logs/b.txt && q "SELECT status, tags, metrics FROM runs WHERE run = '$id'" && q "SELECT name, bytes FROM files WHERE run = '$id' ORDER BY name"
+id=$(q "SELECT run FROM runs WHERE name = 'shell job'" | sed -n 2p) && rec end "$id" --at "2026-09-10 12:30" --metric accuracy=0.93 loss=nan --tag outcome=pass --file ~/out.txt ~/out.txt=logs/b.txt && q "SELECT status, tags, metrics FROM runs WHERE run = '$id'" && q "SELECT name, bytes FROM files WHERE run = '$id' ORDER BY name"
 cd ~ && rec add finding "From home" --in bitrate --text "x"
 cd ~ && rec experiment "home test" --in bitrate --text "x"
 cd ~ && rec experiment bitrate --dead-end
