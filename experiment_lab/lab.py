@@ -40,7 +40,9 @@ minute for another's to end.
 lab.runs reads an experiment's FINISHED runs back, oldest first; its keywords
 keep those with the params, tags or metric given, and the latest for each
 combination of the values of the params latest_by names, as q's latest_runs.
-lab.file and lab.json read a file that a run logged.
+lab.file and lab.json read a file that a run logged, and name on stderr the
+records whose evidence cites the run, each once, since one may correct what the
+file holds.
 """
 import contextlib
 import datetime
@@ -69,6 +71,8 @@ BELOW = ("WITH RECURSIVE below(name) AS (SELECT ? UNION ALL"
          " SELECT e.name FROM experiments e JOIN below ON e.parent = below.name)")
 
 RUNS, *READ = Path(__file__).with_name("read.sql").read_text().split(";")[:4]  # the runs; their params, tags, metrics
+# the records whose evidence holds the item that the parameter matches as '%; run:<id>; %'
+CITING = "SELECT id, kind, title FROM records WHERE '; ' || evidence || '; ' LIKE ? ORDER BY time, id"
 
 type StrPath = str | Path
 type Values = dict[str, Any]  # a run's params, tags or metrics, by key
@@ -260,6 +264,7 @@ class Lab:
         whose process is gone (end_lost). The lab works in project, else in
         the project of the current folder."""
         self.named = project
+        self.told: set[str] = set()  # the records tell_citing has printed
         self.data = Path(data) if data else data_folder()
         self.data.mkdir(parents=True, exist_ok=True)
         self.db = self.connect()
@@ -483,8 +488,20 @@ class Lab:
 
     def file(self, rid: str, name: str) -> Path:
         """The copy of the file that the run logged as name: files/<run id>/<name>
-        in the data folder."""
+        in the data folder. Names on stderr the records that cite the run, any
+        of which may correct what the file holds (tell_citing)."""
+        self.tell_citing(rid)
         return self.data / "files" / rid / name
+
+    def tell_citing(self, rid: str) -> None:
+        """Prints on stderr the records whose evidence cites the run, leaving
+        out those this Lab has printed already."""
+        found = self.db.execute("SELECT name FROM runs WHERE id = ?", (rid,)).fetchone()
+        records = [r for r in self.db.execute(CITING, (f"%; run:{rid}; %",)) if r[0] not in self.told]
+        if found and records:
+            self.told.update(r[0] for r in records)
+            listed = "; ".join(f"{rec_id} ({kind}) {title}" for rec_id, kind, title in records)
+            print(f"records citing run {found[0]}: {listed}", file=sys.stderr)
 
     def json(self, rid: str, name: str) -> Any:  # noqa: ANN401, a JSON value as json.loads gives it
         """The value of the JSON file that the run logged as name."""

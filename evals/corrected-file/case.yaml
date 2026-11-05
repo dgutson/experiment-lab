@@ -1,0 +1,25 @@
+schema_version: "1.1"
+name: corrected-file
+description: A script reads a run's logged file, one value of which a later finding corrects.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    Write kinds.py, which prints the mean score of the speech clips and of the music clips that the
+    listening test's panel 1 run logged. Run it.
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  # the means with clip c4 counted as speech, as the finding corrects the file: alone, or beside
+  # those of the file as it is (speech 4.0, music 3.6)
+  - name: corrected-speech
+    type: regex
+    pattern: '\b4\.10?\b'
+  - name: corrected-music
+    type: regex
+    pattern: '\b3\.20?\b'

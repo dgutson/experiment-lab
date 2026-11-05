@@ -4,10 +4,14 @@ steps, the lower one later, and twice at the same step and time, once as NaN,
 and whose JSON file, logged by log_json, Lab.json reads back. For each
 experiment: every run with the view runs; the latest runs for each param, for
 all of them and for none with the macro latest_runs; the filters of Lab.runs
-with a WHERE; the runs' files with the view files.
+with a WHERE; the runs' files with the view files. And that Lab.file names
+on stderr, once, the records that cite a run, as the view records has them,
+and nothing for a run no record cites.
 
 usage: uv run python checks/check_reader.py
 """
+import contextlib
+import io
 import subprocess
 import sys
 import tempfile
@@ -68,8 +72,9 @@ def read_lab(lab: Lab, names: list[str], plans: list[Latest]) -> Read:
     runs = [(n, r) for n in names for r in lab.runs(n, status=None)]
     latest = [f"{p}: {' '.join(r.id for r in lab.runs(p.experiment, latest_by=p.keys))}" for p in plans]
     ids = {r.id for _, r in runs}
-    files = sorted(f"{rid} {name} {lab.file(rid, name)}" for rid, name in lab.db.execute("SELECT run, name FROM files")
-                   if rid in ids)
+    with contextlib.redirect_stderr(io.StringIO()):  # the records citing each run, which check_citing checks
+        files = sorted(f"{rid} {name} {lab.file(rid, name)}" for rid, name in lab.db.execute("SELECT run, name FROM files")
+                       if rid in ids)
     return Read([f"{n}: {r}" for n, r in runs], latest, filtered(lab) if SWEEP in names else [], files)
 
 
@@ -102,6 +107,27 @@ def compare(project: str, mine: Read, views: Read) -> bool:
     return mine == views
 
 
+def check_citing(data: Path) -> bool:
+    """Lab.file of a run that records cite, twice, then of a run none cites."""
+    citing = "list_contains(string_split(c.evidence, '; '), 'run:' || r.run)"
+    con, _ = query.connect(data, "audio-codec")
+    [(rid, name, records)] = con.execute(
+        f"SELECT r.run, r.name, string_agg(c.id || ' (' || c.kind || ') ' || c.title, '; ' ORDER BY c.time_ms, c.id)"
+        f" FROM runs r JOIN records c ON {citing} GROUP BY ALL ORDER BY r.run LIMIT 1").fetchall()
+    [(uncited,)] = con.execute(
+        f"SELECT run FROM runs r WHERE NOT EXISTS (FROM records c WHERE {citing}) ORDER BY run LIMIT 1").fetchall()
+    con.close()
+    lab = Lab(data, project="audio-codec")
+    told = io.StringIO()
+    with contextlib.redirect_stderr(told):
+        for run in (rid, rid, uncited):
+            lab.file(run, "a.json")
+    lab.close()
+    same = told.getvalue() == f"records citing run {name}: {records}\n"
+    print(f"{'audio-codec':12} {'citing':9} {records.count('; ') + 1:3}  {'same' if same else 'DIFFERENT'}")
+    return same
+
+
 def main() -> None:
     folder = Path(tempfile.mkdtemp()) / "lab"
     # in a process of its own, whose sqlite3 connections are closed before DuckDB opens lab.db (query.py)
@@ -117,6 +143,7 @@ def main() -> None:
         mine = read_lab(lab, names, plans)
         lab.close()
         same &= compare(project, mine, read_views(data, project, names, plans))
+    same &= check_citing(data)
     if not same:
         sys.exit("Lab.runs, Lab.file or Lab.json and the views differ")
     print("Lab.runs, Lab.file and Lab.json agree with the views")
