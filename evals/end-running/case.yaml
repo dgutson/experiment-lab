@@ -1,0 +1,36 @@
+schema_version: "1.1"
+name: end-running
+description: A shell script ends an experiment's RUNNING runs, in one experiment with three and in one with one.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    The cluster jobs of the runs still RUNNING in the experiments night batch and noon batch were
+    stopped. Write end_running.sh, which takes an experiment's name and ends each of its RUNNING runs
+    as KILLED with rec end. Run it for both experiments.
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  # rec end prints "run NAME in EXPERIMENT: KILLED, N min" for each run it ends
+  - name: night-ended
+    type: regex
+    target: trace
+    pattern: '^(?=[\s\S]*run night 3 in night batch: KILLED)(?=[\s\S]*run night 4 in night batch: KILLED)(?=[\s\S]*run night 5 in night batch: KILLED)'
+  - name: noon-ended
+    type: regex
+    target: trace
+    pattern: 'run noon 3 in noon batch: KILLED'
+  - name: script-ends-both
+    type: llm
+    focus: trace
+    criteria: |
+      night batch has three RUNNING runs (night 3, 4 and 5) and noon batch one (noon 3). PASS if the
+      last version of end_running.sh that the agent ran ended, with rec end, every RUNNING run of the
+      experiment it was given, for both experiments. FAIL if the agent ended any of those runs by hand
+      or with another command, or if a run of the script for an experiment with RUNNING runs ended none
+      of them.
