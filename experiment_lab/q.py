@@ -16,12 +16,14 @@ statement of a view file that fails is printed on stderr and skipped. lab.sql's
 views hold that project's rows only; with --all, they hold every project's and
 no view file runs. From a folder no project holds, q needs --project or --all.
 Several statements may be given; the rows of each SELECT (DESCRIBE, SHOW,
-SUMMARIZE and FROM too) and of the last statement are printed, each result
-after a line "-- statement N" when there are several, at most --max rows of
-each (40), with cells cut at 80 characters unless --full. A result of one row
-prints a line "column: value" per column, and one of one row and one column
-that cell alone, whole and with its line breaks, as in
-q "SELECT text FROM records WHERE id = '...'". An error about a column
+SUMMARIZE and FROM too) and of the last statement unless it is a COPY are
+printed, each result after a line "-- statement N" when there are several, the
+same way at any number of rows: a line of column names, at most --max rows
+(40), with cells cut at 80 characters unless --full, and a line of their
+count. The cell of a result of one row and one column prints whole, with its
+line breaks, as in q "SELECT text FROM records WHERE id = '...'". A COPY prints
+only what it writes, and when nothing prints, "ok" goes on stderr, so that
+COPY (...) TO '/dev/stdout' gives a script the rows alone. An error about a column
 that is not found names the views that have it; one about the table params,
 tags or metrics, the map column of runs; one about a view that was renamed,
 its new name; one about text in params or tags, a cast; a list of candidate
@@ -49,14 +51,15 @@ RENAMED = {"texts": "experiments_runs_records"}
 
 
 def show(t: query.Table, cut: int | None, ordered: bool) -> None:
-    """The table with its cells cut at cut characters (None: whole), each on one
-    line; ordered: the query's ORDER BY gives every row its place."""
-    rows = [[v.replace("\n", " ") for v in query.shorten(r, cut)] for r in t["rows"]]
-    if len(rows) == 1 and not t["more"]:
-        lines = [f"{c}: {v}" for c, v in zip(t["columns"], rows[0])]
+    """The table, a line of column names, then a line per row, at any number of
+    rows, its cells cut at cut characters (None: whole) and each on one line,
+    but for one row of one column, whose cell is whole, with its line breaks;
+    ordered: the query's ORDER BY gives every row its place."""
+    if len(t["columns"]) == 1 and len(t["rows"]) == 1 and not t["more"]:
+        rows = t["rows"]
     else:
-        lines = [" | ".join(r) for r in [t["columns"], *rows]]
-    for line in lines:
+        rows = [[v.replace("\n", " ") for v in query.shorten(r, cut)] for r in t["rows"]]
+    for line in [" | ".join(r) for r in [t["columns"], *rows]]:
         print(line.rstrip())
     unordered = "" if ordered else "; without ORDER BY, other rows may come first"
     print(f"({len(rows)} rows{f', more not shown (--max N shows more{unordered})' if t['more'] else ''})")
@@ -117,29 +120,22 @@ def explained(con: DuckDBPyConnection, sql: str, error: duckdb.Error) -> str:
     return text + views_with(con, error)
 
 
-def print_result(result: DuckDBPyConnection, limit: int, cut: int | None, ordered: bool) -> None:
-    """A result's rows; one cell alone, whole."""
-    t = query.table(result, limit)
-    if len(t["columns"]) == 1 and len(t["rows"]) == 1 and not t["more"]:
-        print(t["rows"][0][0], end="" if t["rows"][0][0].endswith("\n") else "\n")
-    else:
-        show(t, cut, ordered)
-
-
 def print_results(con: DuckDBPyConnection, sql: str, limit: int, cut: int | None) -> None:
     """The rows of each statement of sql that query.run_each gives, after a
-    line naming the statement when there are several; ok if none."""
+    line naming the statement when there are several; ok on stderr if none,
+    so that a COPY ... TO '/dev/stdout' prints only what it writes."""
     printed = False
     try:
         for statement in query.run_each(con, sql):
             if statement.several:
                 print(f"-- statement {statement.number}")
-            print_result(statement.result, limit, cut, ordered=False)
+            show(query.table(statement.result, limit), cut, ordered=False)
+            sys.stdout.flush()  # a later COPY TO '/dev/stdout' writes past Python's buffer
             printed = True
     except (duckdb.BinderException, duckdb.CatalogException) as e:
         raise ValueError(explained(con, sql, e)) from e
     if not printed:
-        print("ok")
+        print("ok", file=sys.stderr)
 
 
 def answer(con: DuckDBPyConnection, sql: str, limit: int, cut: int | None) -> None:
@@ -147,7 +143,7 @@ def answer(con: DuckDBPyConnection, sql: str, limit: int, cut: int | None) -> No
         for name, columns in query.view_columns(con):
             print(f"{name}: {columns}")
     elif sql.strip() == ".keys":
-        print_result(con.execute(KEYS), limit, cut, ordered=True)
+        show(query.table(con.execute(KEYS), limit), cut, ordered=True)
     else:
         print_results(con, sql, limit, cut)
 
