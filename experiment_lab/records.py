@@ -165,16 +165,18 @@ def add(lab: Lab, experiment: str, kind: str, title: str, *, text: str, label: s
         author: str = "agent", status: str | None = None, answers: str = "", evidence: Iterable[str] = (),
         rid: str | None = None, time: int | None = None) -> list[Record]:
     """Adds a record to an existing experiment; returns it, and the question
-    it closed if any. text (Markdown) may not be empty."""
+    it closed if any. text (Markdown) may not be empty. The id is chosen in
+    the write, so that another writer cannot take it before the record is
+    saved, which would replace that writer's record."""
     lab.check_experiment(experiment)
-    rid = free_id(lab, rid, title)
-    question = answered(lab, answers)
-    r = Record(id=rid, experiment=experiment, label=label or experiment, kind=kind, title=title, text=text,
-               author=author, status=status or ("open" if kind == "question" else "closed"), answers=answers,
-               evidence=list(evidence), time=time or now())
-    check(lab, r)
-    changed = [r]
     with lab.write() as db:
+        question = answered(lab, answers)
+        r = Record(id=free_id(lab, rid, title), experiment=experiment, label=label or experiment, kind=kind,
+                   title=title, text=text, author=author,
+                   status=status or ("open" if kind == "question" else "closed"), answers=answers,
+                   evidence=list(evidence), time=time or now())
+        check(lab, r)
+        changed = [r]
         save(db, r)
         if question and question["status"] == "open":
             question["status"] = "closed"
@@ -186,13 +188,14 @@ def add(lab: Lab, experiment: str, kind: str, title: str, *, text: str, label: s
 def change(lab: Lab, rid: str, **fields: str | Evidence) -> Record:
     """Sets fields of the record, which must be in the project the lab works
     in (columns of records; evidence a list), and checks them, not the fields
-    it keeps; returns it."""
-    r = get(lab, rid)
-    if r is None:
-        raise ValueError(f"no record {rid}")
-    lab.check_experiment(r["experiment"])
-    r = as_record({**r, **fields})
-    check(lab, r, fields)
+    it keeps; returns it. The record is read in the write, so that a change
+    by another writer is kept."""
     with lab.write() as db:
+        r = get(lab, rid)
+        if r is None:
+            raise ValueError(f"no record {rid}")
+        lab.check_experiment(r["experiment"])
+        r = as_record({**r, **fields})
+        check(lab, r, fields)
         save(db, r)
     return r

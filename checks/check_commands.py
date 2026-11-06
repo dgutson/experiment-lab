@@ -5,18 +5,91 @@ bash in the folder of the project audio-codec, with this clone's commands first
 on PATH. With --update, it writes checks/check_commands.txt instead; read its diff
 before committing it.
 
+It also fails when a call of experiment_lab reads a table outside a write
+transaction and then writes that table in one, unless SAFE lists it: another
+process may write between the two, so the write can rest on what is no longer
+true (two records given one id). Every SQL statement the commands run is logged
+through checks/sql_trace/sitecustomize.py.
+
 usage: uv run python checks/check_commands.py [--update]
 """
 import difflib
+import json
 import os
 import re
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import NamedTuple
 
 ROOT = Path(__file__).resolve().parents[1]
 SAVED = ROOT / "checks" / "check_commands.txt"
+# Each call that reads a table outside a write and then writes it, with why that is safe.
+SAFE = {
+    ("rec.py:run_add", "records"): "it reads records only to print how many are open",
+    ("rec.py:run_set", "records"): "it reads records only to print how many are open",
+    ("lab.py:Lab.end_lost", "runs"): "its UPDATE repeats the status = 'RUNNING' test of its read",
+}
+WRITE = re.compile(r"\s*(?:INSERT(?:\s+OR\s+\w+)?\s+INTO|UPDATE|DELETE\s+FROM)\s+(\w+)", re.I)
+READ = re.compile(r"\b(?:FROM|JOIN)\s+(\w+)", re.I)
+type Place = tuple[str, str]  # a call and a table
+type Calls = dict[int, str]  # frame id: name
+type Opened = tuple[int, int]  # process id, connection id
+
+
+class Read(NamedTuple):
+    table: str
+    calls: Calls
+
+
+class Connection:
+    """The tables one connection read, with the calls each read ran inside,
+    since its last transaction ended, and whether one is open."""
+
+    def __init__(self) -> None:
+        self.writing = False
+        self.reads: list[Read] = []
+
+    def run(self, sql: str, calls: Calls) -> set[Place]:
+        """Takes the next statement, which ran inside calls; returns what stale
+        finds in it."""
+        word = (sql.split(maxsplit=1) or [""])[0].upper()
+        if word == "BEGIN":
+            self.writing = True
+        elif word in ("COMMIT", "ROLLBACK", "END"):
+            self.writing, self.reads = False, []
+        elif self.writing:
+            return self.stale(WRITE.match(sql), calls)
+        elif word in ("SELECT", "WITH"):
+            self.reads += [Read(table.lower(), calls) for table in READ.findall(sql)]
+        return set()
+
+    def stale(self, write: re.Match[str] | None, calls: Calls) -> set[Place]:
+        """For a statement of a transaction, which ran inside calls, that
+        writes a table: for each earlier read of that table, the innermost
+        call that held both."""
+        return {(call, read.table) for read in self.reads
+                if write and read.table == write[1].lower() and (call := shared(read.calls, calls))}
+
+
+def shared(read: Calls, calls: Calls) -> str:
+    """The innermost call of read that calls holds too; '' if none."""
+    return next((name for frame, name in read.items() if calls.get(frame) == name), "")
+
+
+def read_then_written(trace: Path) -> set[Place]:
+    """Each call that, in the log of sitecustomize.py, reads a table outside a
+    write transaction and then writes it in one."""
+    connections: dict[Opened, Connection] = {}
+    found: set[Place] = set()
+    for line in trace.read_text().splitlines():
+        e = json.loads(line)
+        found |= connections.setdefault((e["pid"], e["con"]), Connection()).run(
+            e["sql"], {frame: name for frame, name in e["calls"]})
+    return found
+
+
 COMMANDS = """
 rec --help
 rec add --help
@@ -178,13 +251,16 @@ with tempfile.TemporaryDirectory() as folder:
     subprocess.run([sys.executable, ROOT / "checks" / "make_scratch.py", folder], check=True)
     env = dict(os.environ, HOME=f"{folder}/home", EXPERIMENT_LAB_DATA=f"{folder}/lab-data",
                PATH=f"{Path(sys.executable).parent}:{os.environ['PATH']}",
-               PYTHONUNBUFFERED="1", COLUMNS="100", NO_COLOR="1", LC_ALL="C.UTF-8")  # the same output anywhere
+               PYTHONUNBUFFERED="1", COLUMNS="100", NO_COLOR="1", LC_ALL="C.UTF-8",  # the same output anywhere
+               PYTHONPATH=os.pathsep.join([str(ROOT / "checks" / "sql_trace"), *os.environ.get("PYTHONPATH", "").split(
+                   os.pathsep)]).rstrip(os.pathsep), SQL_TRACE=f"{folder}/sql.jsonl")
     out = []
     for command in COMMANDS:
         done = subprocess.run(["bash", "-c", command], cwd=f"{folder}/home/audio-codec", env=env, text=True,
                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         out += [f"$ {command}", *done.stdout.splitlines(), f"exit {done.returncode}", ""]
     text = "\n".join(out).replace(str(Path(folder).resolve()), "FOLDER").replace(folder, "FOLDER")
+    found = read_then_written(Path(folder) / "sql.jsonl")
 text = re.sub(r"Traceback \(most recent call last\):\n(?:[ \t].*\n)*", "Traceback: ", text)
 text = re.sub(r"\b[0-9a-f]{32}\b", "RUN", text)
 # argparse quotes the choices it lists in some Python versions and not in others
@@ -199,3 +275,11 @@ elif text != SAVED.read_text():
     sys.exit("the commands print something else; --update writes it to check_commands.txt")
 else:
     print(f"the {len(COMMANDS)} commands print what check_commands.txt holds")
+problems = [f"{call} reads {table} outside a write and then writes it, so another process may write between"
+            " the two: read inside lab.write(), or list it in SAFE with why it is safe"
+            for call, table in sorted(found - SAFE.keys())]
+problems += [f"SAFE lists {call} and {table}, which no command runs now: remove it"
+             for call, table in sorted(SAFE.keys() - found)]
+if problems:
+    sys.exit("\n".join(problems))
+print(f"no call reads a table outside a write and then writes it, but the {len(SAFE)} that SAFE lists")

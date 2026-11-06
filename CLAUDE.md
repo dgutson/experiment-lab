@@ -51,6 +51,9 @@ kind, a diagram, an audio file and an image. The checks:
   and compares what they print and their exit statuses with `checks/check_commands.txt`. When a change
   to what they print is meant, `--update` rewrites the file, and its diff shows the change. It
   passes under Python 3.12 and 3.14: where their argparse messages differ, it evens them out.
+  It also logs every SQL statement the commands run (`checks/sql_trace/sitecustomize.py`) and
+  fails when a call reads a table outside `Lab.write` and then writes that table, since another
+  process may write between the two; a call where that is safe goes in its `SAFE`, with why.
 - `uv run python checks/check_feedback.py`: runs `python3 -m experiment_lab.feedback` on a transcript it
   makes, with a new lab of `make_scratch.py`, and compares what it prints with
   `checks/check_feedback.txt`; `--update` rewrites the file.
