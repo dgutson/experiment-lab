@@ -20,7 +20,8 @@ PYTHONPATH=<clone of experiment-lab>.
 The experiments form a tree whose roots are the projects. A Lab works in the
 project it is given (Lab(project="my-project")), else in the project of the
 current folder: the one whose folder holds it, or holds the folder at the same
-place in its git repository's main worktree. A new experiment goes directly below that project unless a
+place in its git repository's main worktree, else in another clone of that
+repository. A new experiment goes directly below that project unless a
 parent is given, and only that project's experiments, runs and records are
 used; with no project, they are refused.
 
@@ -183,13 +184,41 @@ def holding(projects: Iterable[Project], folders: Iterable[Path]) -> str | None:
     return max(found)[1] if found else None
 
 
+def first_commits(folder: Path) -> frozenset[str]:
+    """The commits with no parent of the git repository that holds folder,
+    which every clone of it has; none without git, outside a repository or
+    before its first commit."""
+    try:
+        git = subprocess.run(["git", "-C", str(folder), "rev-list", "--max-parents=0", "HEAD"],
+                             capture_output=True, text=True, check=True)
+    except (OSError, subprocess.CalledProcessError):
+        return frozenset()
+    return frozenset(git.stdout.split())
+
+
+def cloned_project(projects: Sequence[Project]) -> str | None:
+    """The project whose folder holds the current folder's place in another
+    clone of its git repository, one with the same first commits; None if no
+    project's folder does, or if those of several projects do."""
+    trees = worktrees(Path.cwd())
+    first = first_commits(Path.cwd()) if trees else frozenset()
+    if not first:
+        return None
+    place = working_folders()[-1].relative_to(trees[0])
+    found = {holding(projects, [theirs[0] / place]) for _, folder in projects
+             if (theirs := worktrees(Path(folder))) and theirs[0] != trees[0] and first_commits(theirs[0]) == first}
+    found.discard(None)
+    return found.pop() if len(found) == 1 else None
+
+
 def working_project(projects: Sequence[Project], named: str | None) -> str | None:
     """named, which must be one of the projects, else the project of the
     current folder or of the folder at the same place in its repository's main
-    worktree (holding); None if neither."""
+    worktree (holding), else in another clone of the repository
+    (cloned_project); None if none."""
     if named and named not in [p.name for p in projects]:
         raise ValueError(f"no project {named}")
-    return named or holding(projects, working_folders())
+    return named or holding(projects, working_folders()) or cloned_project(projects)
 
 
 def absolute(path: StrPath) -> str:
