@@ -157,7 +157,7 @@ git -c init.defaultBranch=main init -q ~/mono && git -C ~/mono -c user.name=x -c
 cd ~/mono/sub && rec project inner --text "The project of a subfolder."
 cd ~/mono/sub && rec project inner --text "The project of a subfolder." --folder . && rec experiment "subfolder test" --text "x"
 git -C ~/mono worktree add -q ~/mono-b && mkdir ~/mono-b/sub && cd ~/mono-b/sub && rec tree && cd .. && rec tree
-git -c init.defaultBranch=main init -q ~/ws && git -C ~/ws -c user.name=x -c user.email=x commit -q --allow-empty -m x && mkdir ~/ws/a ~/ws/b && cd ~/ws/a && rec project ws-a --folder . --text "A project in a subfolder of a repository."
+git -c init.defaultBranch=main init -q ~/ws && git -C ~/ws -c user.name=x -c user.email=x commit -q --allow-empty -m ws && mkdir ~/ws/a ~/ws/b && cd ~/ws/a && rec project ws-a --folder . --text "A project in a subfolder of a repository."
 cd ~/ws/b && rec tree
 cd ~/ws/b && rec project ws-b --text "Another subfolder of the same repository."
 EXPERIMENT_LAB_DATA=~/missing/lab-data rec open
@@ -245,6 +245,9 @@ python -c "from experiment_lab.lab import Lab; lab = Lab(); [lab.run('bitrate', 
 EXPERIMENT_LAB_PORT=abc lab-server
 EXPERIMENT_LAB_PORT=70000 lab-server
 EXPERIMENT_LAB_DATA=/proc/lab-data lab-server
+cd ~ && git -C audio-codec -c init.defaultBranch=main init -q && git -C audio-codec add -A && git -C audio-codec -c user.name=t -c user.email=t@t commit -qm x && git clone -q audio-codec codec-clone && cd codec-clone && rec tree | sed -n 1p && q "SELECT count(*) AS runs FROM runs" | sed -n 2p
+cd ~/codec-clone && rec project codec-fork --text "Work of its own." && rec tree
+cd ~ && git clone -q audio-codec third-clone && cd third-clone && rec tree
 """.strip().splitlines()
 
 with tempfile.TemporaryDirectory() as folder:

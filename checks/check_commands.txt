@@ -557,7 +557,7 @@ inner  (~/mono/sub)
 mono  (~/mono)
 exit 0
 
-$ git -c init.defaultBranch=main init -q ~/ws && git -C ~/ws -c user.name=x -c user.email=x commit -q --allow-empty -m x && mkdir ~/ws/a ~/ws/b && cd ~/ws/a && rec project ws-a --folder . --text "A project in a subfolder of a repository."
+$ git -c init.defaultBranch=main init -q ~/ws && git -C ~/ws -c user.name=x -c user.email=x commit -q --allow-empty -m ws && mkdir ~/ws/a ~/ws/b && cd ~/ws/a && rec project ws-a --folder . --text "A project in a subfolder of a repository."
 project ws-a, folder ~/ws/a, files ~/ws/a, views none
 exit 0
 
@@ -1125,4 +1125,18 @@ exit 1
 
 $ EXPERIMENT_LAB_DATA=/proc/lab-data lab-server
 error: [Errno 2] No such file or directory: '/proc/lab-data'
+exit 1
+
+$ cd ~ && git -C audio-codec -c init.defaultBranch=main init -q && git -C audio-codec add -A && git -C audio-codec -c user.name=t -c user.email=t@t commit -qm x && git clone -q audio-codec codec-clone && cd codec-clone && rec tree | sed -n 1p && q "SELECT count(*) AS runs FROM runs" | sed -n 2p
+audio-codec  (~/audio-codec)
+39
+exit 0
+
+$ cd ~/codec-clone && rec project codec-fork --text "Work of its own." && rec tree
+project codec-fork, folder ~/codec-clone, files ~/codec-clone, views none
+codec-fork  (~/codec-clone)
+exit 0
+
+$ cd ~ && git clone -q audio-codec third-clone && cd third-clone && rec tree
+error: no project holds FOLDER/home/third-clone: run in a project's folder (audio-codec: FOLDER/home/audio-codec, codec-fork: FOLDER/home/codec-clone, inner: FOLDER/home/mono/sub, mono: FOLDER/home/mono, speech: FOLDER/home/speech, vision: FOLDER/home/vision, ws-a: FOLDER/home/ws/a, ws-b: FOLDER/home/ws/b), name one (rec --project P, Lab(project="P")), or make this folder a project: rec project NAME --text "what the project is, in one line"
 exit 1

@@ -116,7 +116,8 @@ one, so raising it alone changes nothing in `lab.db`.
 
 - Projects are the rows of `lab.experiments` with no parent; only they have `folder`, `files` and
   `views` (a CHECK in `schema.sql`). `lab.working_project` gives the project named (`--project`,
-  `Lab(project=)`), else the project of the current folder (`lab.holding`), for `Lab.current` and q.
+  `Lab(project=)`), else the project of the current folder (`lab.holding`), else of its place in
+  another clone of its git repository (`lab.cloned_project`), for `Lab.current` and q.
 - Writers: `lab.py` (projects, experiments and runs) and `records.py` (records) use only the
   standard library and Python's sqlite3, so a logging script imports them with `PYTHONPATH` alone.
   `lab.py` reads runs back the same way (`Lab.runs`, `Lab.file`, `Lab.json`), for a report script.
