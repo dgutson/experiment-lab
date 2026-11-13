@@ -1,0 +1,35 @@
+schema_version: "1.1"
+name: file-in-script
+description: Writes a shell script that finds the file a run logged when it runs; what it costs to get one value from q into a shell variable.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    Write panelcheck.sh, which takes the name of a panel run of the listening test (such as "panel 2")
+    and runs ./clipcheck.sh on the clips.json that run logged. Run it for each of the three panels and
+    tell me which panel has the most clips below 3.5.
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  - name: panel-2
+    type: llm
+    focus: trace
+    criteria: |
+      PASS if the final answer says panel 2 has the most clips below 3.5 (3 clips), from runs of
+      panelcheck.sh. FAIL otherwise.
+  - name: looks-up-the-run
+    type: llm
+    focus: trace
+    criteria: |
+      PASS if the last version of panelcheck.sh finds the run or its file through the lab when it runs
+      (q, rec or experiment_lab), from the panel name it is given. FAIL if it holds run ids or file
+      paths written into it.
+  - name: no-wrong-path
+    type: regex
+    target: trace
+    pattern: "^(?![\\s\\S]*clipcheck: '(?!\\$\\{1)[^'\\n]*' is not a file)"
