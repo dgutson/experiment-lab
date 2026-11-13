@@ -30,7 +30,9 @@ An experiment, in order:
 - `q "SQL"` runs DuckDB SQL over the project's views (the table below, then the project's view
   files; `--project P` for another project's, `--all` for every project's) on `lab.db`, attached
   read-only as the catalog `lab`, and prints the rows of each SELECT, at most 40 (`--max N`,
-  `--full` for long cells), after `-- statement N` when there are several; one cell prints whole,
+  `--full` for long cells), after `-- statement N` when there are several: a line of column names,
+  a line per row and a line of their count, with no line between, so line 2 is the first row
+  (`P=$(q --full "SELECT path FROM files WHERE ..." | sed -n 2p)`); one cell prints whole,
   as stored (`q "SELECT text FROM records WHERE id = '...'"`). `q .views` lists the views and their
   columns, and `q .keys` the keys of the project's runs' tags, params and metrics, with how many runs
   have each; a key no run has gives NULL, with no error. The tables `lab.experiments`, `lab.runs`,
