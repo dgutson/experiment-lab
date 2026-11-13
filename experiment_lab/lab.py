@@ -225,6 +225,11 @@ def absolute(path: StrPath) -> str:
     return str(Path(path).expanduser().resolve())
 
 
+def shown(path: StrPath) -> str:
+    """path as ~/... under the home folder."""
+    return "~/" + str(Path(path).relative_to(Path.home())) if Path(path).is_relative_to(Path.home()) else str(path)
+
+
 def matches(values: Mapping[str, str], wanted: Mapping[str, object] | None) -> bool:
     """Whether values has each key of wanted with its value, or one of them if
     it is a tuple, list or set, compared as the text it is logged as."""

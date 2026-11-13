@@ -310,9 +310,12 @@ def run_sql(con: DuckDBPyConnection, sql: str, limit: int = ROWS, cut: int | Non
 
 
 def roots(con: DuckDBPyConnection) -> list[Path]:
-    """The folders whose files /lab/file serves: each project's folder and files folder."""
-    return [Path(f).resolve() for row in con.execute("SELECT folder, files FROM lab.experiments"
-                                                     " WHERE parent IS NULL").fetchall() for f in row]
+    """The folders whose files /lab/file serves: each project's folder and files folder, and
+    the data folder's copies of the files that records cite (records.COPIES)."""
+    ((data,),) = con.execute("SELECT data_folder()").fetchall()
+    copies = Path(data) / records.COPIES
+    return [*(Path(f).resolve() for row in con.execute("SELECT folder, files FROM lab.experiments"
+                                                       " WHERE parent IS NULL").fetchall() for f in row), copies]
 
 
 def holder(con: DuckDBPyConnection, target: Path) -> str | None:

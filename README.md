@@ -210,7 +210,7 @@ its folder and the number of experiments below it and of their runs and records.
 asks first, in a dialog whose default button is Cancel, then deletes from `lab.db` the project, the
 experiments below it and their runs, with their params, tags, metrics and files, and records, and
 removes the runs' folders from `files/` in the data folder. The project's folder, files folder and
-view files are not touched, and nothing can bring the project back. lab-server runs the delete in
+view files are not touched, nor the copies in `evidence/`, which another project's records may cite, and nothing can bring the project back. lab-server runs the delete in
 a child process, since it reads `lab.db` only through DuckDB, and refuses it unless the request
 comes from its own page: the `Host` must be `127.0.0.1` or `localhost` and the `Origin` that same
 address, since a page of any website can post a form to `127.0.0.1`.
@@ -224,9 +224,10 @@ answers, and its evidence: items `run:<run id>`, `file:<path>`, `sql:<query over
 `record:<id>`, joined by `; `, the run, record or file existing. A `sql:` item runs as the record's
 page runs it and is refused if it fails, and each run it returns in a column `run` is added as a
 `run:` item, so that the record keeps the runs it relied on (none from an item that returns more
-than 20). rec warns about a `file:` item in a linked git worktree, where a later checkout can change
-the file (such a file is logged in a run and cited as `run:<run id>`), and about a run id in the
-text that the evidence does not cite. A
+than 20). The file or folder of a `file:` item is copied into the data folder, as
+`evidence/<the first 16 hex digits of the SHA-256 of its content>/<its name>`, and the record cites the
+copy, so that it shows later what it cited; one over 100 MB is cited where it is, with a warning. rec
+warns about a run id in the text that the evidence does not cite. A
 new question is open and any other record closed unless a status is given, and a record that answers
 an open question closes it. A prediction, the outcome expected before an experiment's first run, is
 written as a question, which the finding that checks it answers, so that it stays open until
@@ -466,7 +467,7 @@ does.
 ## The data folder and a project's settings
 
 The lab's files are in the data folder, `$EXPERIMENT_LAB_DATA` (default `~/lab-data`): `lab.db`,
-the runs' files in `files/`, start.sh's `server.log`, and the copy `lab.db.v<version>` that an upgrade
+the runs' files in `files/`, the copies of the files that records cite in `evidence/`, start.sh's `server.log`, and the copy `lab.db.v<version>` that an upgrade
 leaves (Updating). start.sh serves the pages on port
 `$EXPERIMENT_LAB_PORT` (default 5000) and exits at once if a server already answers there;
 restart.sh restarts the server on that port. There is no stop command: kill the `lab-server`
@@ -518,7 +519,7 @@ To change the version, take `package/dist/mermaid.min.js` and `package/LICENSE` 
 ## Files
 
 `/lab/file?path=P` shows the file or folder P, a `~/` or absolute path, when it is under a project's
-folder or files folder, and answers 404 for anything else. A folder is shown as a list of its files,
+folder or files folder or the data folder's `evidence/`, and answers 404 for anything else. A folder is shown as a list of its files,
 a `.md` file as Markdown (`&raw=1` for its text), an HTML file with scripts off, a text file as plain
 text, and any other file as it is. The pages link to `/lab/file` each `file:` item of a record,
 each `~/` or absolute path in a Markdown text, also one that is all of a code span, and each table
