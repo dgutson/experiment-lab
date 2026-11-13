@@ -63,9 +63,11 @@ items are run:<run id>, file:<path>, sql:<query over the views> or
 record:<id>, the run, record or file existing. A sql: item runs as the record
 page runs it and is refused if it fails; each run it returns in a column run
 is added as a run: item, so that the record keeps the runs it relied on (none
-from an item that returns more than 20). A file: item in a linked git
-worktree, where a later checkout can change the file, is warned about, and so
-is a run id in the text that the evidence does not cite. --id gives the
+from an item that returns more than 20). A file: item's file or folder is
+copied into the data folder, as evidence/<digest of its content>/<its name>,
+and the record cites the copy, so that it shows later what it cited; one over
+100 MB is cited where it is, with a warning. A run id in the text that the
+evidence does not cite is warned about. --id gives the
 record's id (lower-case letters, digits and dashes), else rec makes one from
 the title's first words; --time its time, now unless given. add prints the
 records it adds or closes, then, if it changed how many of the project's
@@ -117,9 +119,11 @@ items are run:<run id>, file:<path>, sql:<query over the views> or
 record:<id>, the run, record or file existing. A sql: item runs as the record
 page runs it and is refused if it fails; each run it returns in a column run
 is added as a run: item, so that the record keeps the runs it relied on (none
-from an item that returns more than 20). A file: item in a linked git
-worktree, where a later checkout can change the file, is warned about, and so
-is a run id in the text that the evidence does not cite. --id gives the
+from an item that returns more than 20). A file: item's file or folder is
+copied into the data folder, as evidence/<digest of its content>/<its name>,
+and the record cites the copy, so that it shows later what it cited; one over
+100 MB is cited where it is, with a warning. A run id in the text that the
+evidence does not cite is warned about. --id gives the
 record's id (lower-case letters, digits and dashes), else rec makes one from
 the title's first words; --time its time, now unless given. add prints the
 records it adds or closes, then, if it changed how many of the project's
@@ -373,7 +377,7 @@ $ rec set keep-48-khz status=maybe
 error: status 'maybe' is not one of open, closed, superseded
 exit 1
 
-$ git -c init.defaultBranch=main init -q ~/results && git -C ~/results -c user.name=x -c user.email=x commit -q --allow-empty -m x && git -C ~/results worktree add -q ~/results-b && mkdir ~/results-b/new && touch ~/results-b/out.json ~/results-b/new/out.json ~/results/out.json
+$ mkdir ~/plots && echo one > ~/notes.md && echo a > ~/plots/a.txt && truncate -s 101M ~/big.bin
 exit 0
 
 $ rec add finding "From stdin" --in bitrate --text - <<< $'48 kHz kept "every" word; `rate=48000`, not $RATE.\n\n- one\n' && q "SELECT text FROM records WHERE id = 'from-stdin'"
@@ -455,14 +459,28 @@ sql:SELECT run, name FROM runs WHERE experiment = 'sample rate sweep'; run:RUN; 
 (1 rows)
 exit 0
 
-$ rec add finding "From a worktree" --in bitrate --text "x" --evidence file:~/results-b/out.json file:~/results/out.json
-warning: file:~/results-b/out.json is in a linked git worktree, where a later checkout can change it; log the file with run.log_file and cite run:<run id>
-from-a-worktree: finding, closed: From a worktree
+$ rec add finding "Cites files" --in bitrate --text "x" --evidence file:~/notes.md file:~/plots && echo two > ~/notes.md && rec add finding "Cites a changed file" --in bitrate --text "x" --evidence file:~/notes.md && q --full "SELECT id, evidence FROM records WHERE id LIKE 'cites-%file%'" && cd "$EXPERIMENT_LAB_DATA" && grep -rI . evidence | sort
+cites-files: finding, closed: Cites files
+cites-a-changed-file: finding, closed: Cites a changed file
+id | evidence
+cites-a-changed-file | file:FOLDER/lab-data/evidence/05a212bd1a649553/notes.md
+cites-files | file:FOLDER/lab-data/evidence/9c544e28e646f66f/notes.md; file:FOLDER/lab-data/evidence/cc3b40cc62fabd70/plots
+(2 rows)
+evidence/05a212bd1a649553/notes.md:two
+evidence/9c544e28e646f66f/notes.md:one
+evidence/cc3b40cc62fabd70/plots/a.txt:a
 exit 0
 
-$ rec set from-a-worktree "evidence=file:~/results-b/new/out.json; file:~/audio-codec/tone.wav"
-warning: file:~/results-b/new/out.json is in a linked git worktree, where a later checkout can change it; log the file with run.log_file and cite run:<run id>
-from-a-worktree: finding, closed: From a worktree
+$ rec set cites-files "evidence=$(q --full "SELECT evidence FROM records WHERE id = 'cites-files'" | sed -n 2p); file:~/notes.md" && q "SELECT evidence FROM records WHERE id = 'cites-files'"
+cites-files: finding, closed: Cites files
+evidence
+file:FOLDER/lab-data/evidence/9c544e28e646f66f/notes.md; file:FOLDER/lab-data/evidence/cc3b40cc62fabd70/plots; file:FOLDER/lab-data/evidence/05a212bd1a649553/notes.md
+(1 rows)
+exit 0
+
+$ rec add finding "Cites a large file" --in bitrate --text "x" --evidence file:~/big.bin
+warning: file:~/big.bin is over 100 MB, so the record cites it where it is, not a copy, and a later change to it changes the evidence
+cites-a-large-file: finding, closed: Cites a large file
 exit 0
 
 $ rec experiment "blur detector" --text "x"
@@ -581,6 +599,7 @@ $ cp -r "$EXPERIMENT_LAB_DATA" ~/old && python -c "import sqlite3; db = sqlite3.
 upgrading lab.db to version 0.3.0 (1 of 2)
 upgrading lab.db to version 0.4.0 (2 of 2)
 upgraded lab.db from version 0.0.0 to 0.4.0; its copy from before is FOLDER/home/old/lab.db.v0.0.0
+evidence
 files
 lab.db
 lab.db.v0.0.0

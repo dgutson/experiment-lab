@@ -121,7 +121,7 @@ rec add finding "Elsewhere" --in "blur detector" --text "x"
 rec set no-such-record status=closed
 rec set keep-48-khz color=red
 rec set keep-48-khz status=maybe
-git -c init.defaultBranch=main init -q ~/results && git -C ~/results -c user.name=x -c user.email=x commit -q --allow-empty -m x && git -C ~/results worktree add -q ~/results-b && mkdir ~/results-b/new && touch ~/results-b/out.json ~/results-b/new/out.json ~/results/out.json
+mkdir ~/plots && echo one > ~/notes.md && echo a > ~/plots/a.txt && truncate -s 101M ~/big.bin
 rec add finding "From stdin" --in bitrate --text - <<< $'48 kHz kept "every" word; `rate=48000`, not $RATE.\\n\\n- one\\n' && q "SELECT text FROM records WHERE id = 'from-stdin'"
 rec add finding "Empty stdin" --in bitrate --text - < /dev/null
 rec set from-stdin "title=Set from stdin" text=- <<< $'Kept "every" word; `rate=48000`, not $RATE.\\n' && q "SELECT title, text FROM records WHERE id = 'from-stdin'"
@@ -136,8 +136,9 @@ rec add finding "Fails a query" --in bitrate --text "x" --evidence "sql:SELECT n
 rec add finding "Reads a file in a query" --in bitrate --text "x" --evidence "sql:FROM read_csv('/etc/hostname')"
 rec add finding "Cites no file" --in bitrate --text "x" --evidence file:~/nosuch.txt
 rec add finding "Cites a query" --in bitrate --text "x" --evidence "sql:SELECT run, name FROM runs WHERE experiment = 'sample rate sweep'" && q "SELECT evidence FROM records WHERE id = 'cites-a-query'"
-rec add finding "From a worktree" --in bitrate --text "x" --evidence file:~/results-b/out.json file:~/results/out.json
-rec set from-a-worktree "evidence=file:~/results-b/new/out.json; file:~/audio-codec/tone.wav"
+rec add finding "Cites files" --in bitrate --text "x" --evidence file:~/notes.md file:~/plots && echo two > ~/notes.md && rec add finding "Cites a changed file" --in bitrate --text "x" --evidence file:~/notes.md && q --full "SELECT id, evidence FROM records WHERE id LIKE 'cites-%file%'" && cd "$EXPERIMENT_LAB_DATA" && grep -rI . evidence | sort
+rec set cites-files "evidence=$(q --full "SELECT evidence FROM records WHERE id = 'cites-files'" | sed -n 2p); file:~/notes.md" && q "SELECT evidence FROM records WHERE id = 'cites-files'"
+rec add finding "Cites a large file" --in bitrate --text "x" --evidence file:~/big.bin
 rec experiment "blur detector" --text "x"
 rec experiment "noise shaping" --text "A new idea."
 rec experiment "a name of thirty-three characters" --text "x"

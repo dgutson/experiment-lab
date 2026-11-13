@@ -60,9 +60,11 @@ items are run:<run id>, file:<path>, sql:<query over the views> or
 record:<id>, the run, record or file existing. A sql: item runs as the record
 page runs it and is refused if it fails; each run it returns in a column run
 is added as a run: item, so that the record keeps the runs it relied on (none
-from an item that returns more than 20). A file: item in a linked git
-worktree, where a later checkout can change the file, is warned about, and so
-is a run id in the text that the evidence does not cite. --id gives the
+from an item that returns more than 20). A file: item's file or folder is
+copied into the data folder, as evidence/<digest of its content>/<its name>,
+and the record cites the copy, so that it shows later what it cited; one over
+100 MB is cited where it is, with a warning. A run id in the text that the
+evidence does not cite is warned about. --id gives the
 record's id (lower-case letters, digits and dashes), else rec makes one from
 the title's first words; --time its time, now unless given. add prints the
 records it adds or closes, then, if it changed how many of the project's
@@ -100,7 +102,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from experiment_lab import records
-from experiment_lab.lab import Lab, ms, now
+from experiment_lab.lab import Lab, ms, now, shown
 
 # rec's field names for the columns of records that differ
 COLUMNS = {"by": "author", "experiment": "label"}
@@ -144,11 +146,6 @@ def file_item(item: str) -> tuple[str, str]:
 
 def show(r: records.Record) -> None:
     print(f"{r['id']}: {r['kind']}, {r['status']}: {r['title']}")
-
-
-def shown(path: str) -> str:
-    """path as ~/... under the home folder."""
-    return "~/" + str(Path(path).relative_to(Path.home())) if Path(path).is_relative_to(Path.home()) else path
 
 
 def show_open(lab: Lab) -> None:
@@ -209,10 +206,10 @@ def run_tree(lab: Lab, a: argparse.Namespace) -> None:
         print(f"  {rid} [{label}] {title}\n{textwrap.indent(text, '    ')}")
 
 
-def warn_overwritable(evidence: Iterable[str]) -> None:
-    for item in records.in_linked_worktree(evidence):
-        print(f"warning: {item} is in a linked git worktree, where a later checkout can change it;"
-              " log the file with run.log_file and cite run:<run id>", file=sys.stderr)
+def warn_uncopied(lab: Lab, evidence: Iterable[str]) -> None:
+    for item in records.uncopied(lab, evidence):
+        print(f"warning: {item} is over {records.LARGEST_COPY // 2**20} MB, so the record cites it where it is,"
+              " not a copy, and a later change to it changes the evidence", file=sys.stderr)
 
 
 def with_returned_runs(lab: Lab, evidence: list[str]) -> list[str]:
@@ -256,7 +253,7 @@ def run_add(lab: Lab, a: argparse.Namespace) -> None:
     added = records.add(lab, a.container, a.kind, a.title, label=a.experiment, text=a.text, author=a.by,
                         status=a.status, answers=a.answers, evidence=with_returned_runs(lab, a.evidence),
                         rid=a.id, time=ms(a.time))
-    warn_overwritable(a.evidence)
+    warn_uncopied(lab, added[0]["evidence"])
     warn_uncited(lab, added[0])
     show_changed(lab, added, before, a.quiet)
 
@@ -274,7 +271,8 @@ def run_set(lab: Lab, a: argparse.Namespace) -> None:
                                              if field == "evidence" else value)
     before = open_count(lab)
     changed = records.change(lab, a.id, **fields)
-    warn_overwritable(fields.get("evidence", []))
+    if "evidence" in fields:
+        warn_uncopied(lab, changed["evidence"])
     if {"text", "evidence"} & fields.keys():
         warn_uncited(lab, changed)
     show_changed(lab, [changed], before, a.quiet)

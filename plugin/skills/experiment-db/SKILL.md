@@ -58,9 +58,9 @@ An experiment, in order:
   The whole new text.
   EOF
   ```
-- Evidence must show later what it showed when the record was written. Log a file that a later run
-  or checkout can overwrite, and numbers, in a run (`run.log_file`, below) and cite `run:<run id>`;
-  `file:` is for a file that stays as it is, such as one committed to git.
+- Evidence must show later what it showed when the record was written: rec copies the file or
+  folder of a `file:` item (up to 100 MB) into the lab and cites the copy, and numbers go in a run
+  (below), cited as `run:<run id>`.
 - To log runs, use the module `experiment_lab.lab` (standard library only):
   `PYTHONPATH=~/experiment-lab python3 script.py`, with
 
