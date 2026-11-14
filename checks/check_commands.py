@@ -236,6 +236,11 @@ cd ~ && python -c "from experiment_lab.lab import Lab; Lab().run('bitrate', 'fro
 cd ~ && rec add finding "From home, named" --in bitrate --text "x" --project audio-codec
 cd ~ && python -c "from experiment_lab.lab import Lab; print(Lab(project='audio-codec').run('bitrate', 'from a script').id)"
 rec experiment sharpness --in "blur detector" --text "Scores sharpness by edges." --project vision
+rec experiment "noise gate" --in vision
+rec experiment "noise gate" --in vision --project vision
+rec experiment "noise gate" --move
+rec experiment vision --in audio-codec --move
+rec experiment "noise gate" --in sharpness --move && rec tree --project vision && q --project vision "SELECT name FROM runs WHERE experiment = 'noise gate'" && rec experiment "noise gate" --in audio-codec --move --project vision && rec tree | grep -n "noise gate"
 rec add question "Do edges score sharpness?" --in sharpness --text "Not measured yet." --project vision
 rec open --project vision
 rec tree --project vision
