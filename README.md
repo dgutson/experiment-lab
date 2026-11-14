@@ -441,7 +441,9 @@ then ends it. It refuses a wrong item before it writes anything, a run that has 
 before the run's start. A result that needs computing, a param or a metric of several steps is
 logged by a script through `lab.run_by_id(run_id)`, which refuses an id that is no run of the lab's
 project, and the script calls `run.end()`. `run.end(at=...)` and `--at` give an end earlier than
-now.
+now. A run id given to `lab.run_by_id`, `lab.file`, `lab.json`, `rec end`, `rec stop` or a `run:`
+item may be its first 8 characters or more, when they start no other run's id; a record keeps the
+whole id.
 
 A time, in rec (`rec add --time`, `rec run --start`, `rec end --at`) and in `lab.py` (`lab.run(start=)`,
 `run.log_metrics(at=)`, `run.end(at=)`), is ISO 8601 text, as `"2026-09-10 12:00"` or

@@ -130,6 +130,8 @@ rec add finding "Dither noise is heard below 16 bits on headphones" --in "16-bit
 rec add finding "Pneumonoultramicroscopicsilicovolcanoconiosis checked" --in bitrate --text "x"
 rec add finding "Cites a run" --in bitrate --text "x" --evidence "run:$(q "SELECT run FROM runs WHERE name = 'rate 48000, listened to'" | sed -n 2p)" record:keep-48-khz && q "SELECT evidence FROM records WHERE id = 'cites-a-run'"
 rec add finding "Cites no run" --in bitrate --text "x" --evidence run:nosuch
+rec add finding "Cites a run by its start" --in bitrate --text "x" --evidence "run:$(q "SELECT substr(run, 1, 8) FROM runs WHERE name = 'rate 48000, listened to'" | sed -n 2p)" && q "SELECT evidence FROM records WHERE id = 'cites-a-run-by-its-start'"
+rec add finding "Cites an empty run id" --in bitrate --text "x" --evidence run:
 rec set cites-a-run "evidence=record:nosuch"
 rec add finding "Names a run" --in bitrate --text "Run $(q "SELECT run FROM runs WHERE name = 'rate 48000, listened to'" | sed -n 2p) and checksum d41d8cd98f00b204e9800998ecf8427e." --evidence record:keep-48-khz
 rec add finding "Fails a query" --in bitrate --text "x" --evidence "sql:SELECT nosuch FROM runs"
@@ -213,6 +215,11 @@ id=$(rec run bitrate "background job" --note "Ran in a background job." --start 
 rec run nowhere "a run"
 rec run "blur detector" "a run"
 rec end nosuch
+rec end ""
+rec end 00000000
+id=$(rec run bitrate "short id job") && rec end "${id:0:8}"
+python -c "import uuid; from unittest import mock; from experiment_lab.lab import Lab; ids = iter(['abcdef01' + '0' * 24, 'abcdef01' + '1' * 24]); mock.patch.object(uuid, 'uuid4', lambda: mock.Mock(hex=next(ids))).start(); [Lab().run('bitrate', f'twin {i}').end() for i in (1, 2)]" && rec end abcdef01
+python -c "from experiment_lab.lab import Lab; lab = Lab(); rid = lab.runs('sample rate sweep')[0].id; print(lab.file(rid[:8], 'a.json') == lab.file(rid, 'a.json'), lab.run_by_id(rid[:10]).id == rid)"
 rec end "$(q --project vision "SELECT run FROM runs ORDER BY name LIMIT 1" | sed -n 2p)"
 rec end "$(q "SELECT run FROM runs WHERE name = 'background job'" | sed -n 2p)"
 id=$(rec run bitrate "late job" --start 2026-09-10T12:00) && rec end "$id" --at 2026-09-10T11:00
@@ -229,7 +236,7 @@ rec end x --tag outcome
 id=$(q "SELECT run FROM runs WHERE name = 'shell job'" | sed -n 2p) && rec end "$id" --at "2026-09-10 12:30" --metric accuracy=0.93 loss=nan --tag outcome=pass --file ~/out.txt ~/out.txt=logs/b.txt && q "SELECT status, tags, metrics FROM runs WHERE run = '$id'" && q "SELECT name, bytes FROM files WHERE run = '$id' ORDER BY name"
 python -c "import subprocess, time; from experiment_lab.lab import Lab; r = Lab().run('bitrate', 'to stop').__enter__(); c = subprocess.Popen(['sleep', '60']); print(r.id, c.pid, flush=True); time.sleep(60)" > ~/stop.id & until [ -s ~/stop.id ]; do sleep 0.1; done; read id child < ~/stop.id; rec stop "$id" && rec stop "$id" && q "SELECT status FROM runs WHERE name = 'to stop'"; for i in $(seq 50); do kill -0 "$child" 2>/dev/null || break; sleep 0.1; done; kill -0 "$child" 2>/dev/null && echo "its child is left running" || echo "its child is stopped"
 python -c "import time; from experiment_lab.lab import Lab; lab = Lab(); r = lab.run('bitrate', 'closed lab').__enter__(); lab.close(); print(r.id, flush=True); time.sleep(60)" > ~/closed.id & until [ -s ~/closed.id ]; do sleep 0.1; done; id=$(cat ~/closed.id); { rec stop "$id" 2>&1; echo "exit $?"; } | sed "s/$id/<id>/; s/process [0-9]*/process <pid>/"; kill %1
-id=$(rec run bitrate "no process") && { rec stop "$id" 2>&1; echo "exit $?"; } | sed "s/$id/<id>/" && rec end "$id" --status KILLED > /dev/null
+id=$(rec run bitrate "no process") && { rec stop "${id:0:8}" 2>&1; echo "exit $?"; } | sed "s/$id/<id>/" && rec end "$id" --status KILLED > /dev/null
 cd ~ && rec add finding "From home" --in bitrate --text "x"
 cd ~ && rec experiment "home test" --in bitrate --text "x"
 cd ~ && rec experiment bitrate --dead-end
