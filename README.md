@@ -185,8 +185,12 @@ script works in the project of its working folder, not of the folder the script 
 project, q needs `--project` or `--all`, and rec and `lab.py` write nothing.
 
 `rec experiment NAME --text "what it measures and why"` makes an experiment directly below the
-project, or below an earlier experiment with `--in PARENT`; given again, `--in` moves it with the
-experiments below it. `--dead-end` marks an idea that failed, which keeps its runs and records so
+project, or below an earlier experiment with `--in PARENT`; given again, `--in` moves it with its
+runs and records and the experiments below it. `--move` lets PARENT, and NAME, be in another project
+than the one rec works in, so that an experiment filed in the wrong project moves to PARENT's
+(`move=True` of `lab.experiment`); rec then prints how many runs, records and experiments moved.
+Records filed in the old project itself stay there, and its view files no longer see the experiment.
+`--dead-end` marks an idea that failed, which keeps its runs and records so
 the reason can be found (a finding says why); `--no-dead-end` clears the mark. `rec tree` prints
 the project's experiments, one indented line each, with `[dead end]` after those marked so
 (`rec tree EXPERIMENT`, only those below EXPERIMENT), then the project's protocol rules, its protocol

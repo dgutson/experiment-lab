@@ -23,7 +23,9 @@ current folder: the one whose folder holds it, or holds the folder at the same
 place in its git repository's main worktree, else in another clone of that
 repository. A new experiment goes directly below that project unless a
 parent is given, and only that project's experiments, runs and records are
-used; with no project, they are refused.
+used; with no project, they are refused. lab.experiment(name, parent=...,
+move=True) moves an experiment, with its runs and records, to the parent's
+project.
 
 A run ends FINISHED when its with block ends, FAILED on an exception, KILLED
 on Ctrl-C or SIGTERM; without a with block, call end(). A run whose with
@@ -72,6 +74,8 @@ BELOW = ("WITH RECURSIVE below(name) AS (SELECT ? UNION ALL"
          " SELECT e.name FROM experiments e JOIN below ON e.parent = below.name)")
 
 RUNS, *READ = Path(__file__).with_name("read.sql").read_text().split(";")[:4]  # the runs; their params, tags, metrics
+# how an experiment moves to another project, named where a move to one is refused
+MOVE = "; --move (Lab.experiment's move=True) moves {} to another project, with its runs and records"
 # the records whose evidence holds the item that the parameter matches as '%; run:<id>; %'
 CITING = "SELECT id, kind, title FROM records WHERE '; ' || evidence || '; ' LIKE ? ORDER BY time, id"
 
@@ -399,15 +403,17 @@ class Lab:
         self.__dict__.pop("current", None)
 
     def experiment(self, name: str, description: str | None = None, *, parent: str | None = None,
-                   dead_end: bool | None = None, replace: bool = False) -> list[str]:
+                   dead_end: bool | None = None, replace: bool = False, move: bool = False) -> list[str]:
         """Makes the experiment if there is none of that name, below parent (by
         default the project of the current folder), or changes what is given:
         its description (Markdown: what it measures and why, which a new
         experiment needs and a search finds), other than its own only with
-        replace; its parent (moving it with the experiments below it); whether
-        it is a dead end (an idea that failed). A new experiment's name is at
-        most LONGEST_NAME characters. Returns the names from its project down
-        to it."""
+        replace; its parent (moving it with the experiments below it, their
+        runs and records); whether it is a dead end (an idea that failed). The
+        experiment and parent are in the project the lab works in, or with
+        move in any project, so that an existing experiment, given a parent,
+        may move to another. A new experiment's name is at most LONGEST_NAME characters.
+        Returns the names from its project down to it."""
         with self.write() as db:
             found = db.execute("SELECT parent, description FROM experiments WHERE name = ?", (name,)).fetchone()
             if found is None:
@@ -416,22 +422,36 @@ class Lab:
                 check_name(name)
                 parent = parent or self.here()
             else:
-                self.check_experiment(name, "; experiment names are unique across the lab, so a new experiment"
-                                            " needs another name")
-                check_description("experiment", name, " › ".join(self.path(name)), found[1], description, replace,
-                                  "; a script that logs runs in it as it is needs only lab.run")
+                self.check_change(name, found[1], description, replace=replace, parent=parent, move=move)
             if parent is not None:
-                self.check_parent(name, parent, is_project=found is not None and found[0] is None)
+                self.check_parent(name, parent, is_project=found is not None and found[0] is None, move=move)
             if found is None:
                 db.execute("INSERT INTO experiments (name, parent, created) VALUES (?, ?, ?)", (name, parent, now()))
             update(db, name, {"parent": parent, "description": description or None, "dead_end": dead_end})
         return self.path(name)
 
-    def check_parent(self, name: str, parent: str, is_project: bool) -> None:
-        """Refuses parent as the parent of the experiment name: it must exist in
-        the project the lab works in, name may not be a project, and parent may
-        not be name or below it."""
-        self.check_experiment(parent)
+    def check_change(self, name: str, old: str, description: str | None, *, replace: bool, parent: str | None,
+                     move: bool) -> None:
+        """Refuses a change to the existing experiment name, whose description
+        is old: a move with no parent, a change in another project than the
+        lab works in unless move, and a description other than old unless
+        replace."""
+        if move and parent is None:
+            raise ValueError(f"a move needs the parent to move {name} below (rec --in, Lab.experiment's parent)")
+        if not move:
+            self.check_experiment(name, "; experiment names are unique across the lab, so a new experiment needs"
+                                        " another name" + (MOVE.format(name) if parent else ""))
+        check_description("experiment", name, " › ".join(self.path(name)), old, description, replace,
+                          "; a script that logs runs in it as it is needs only lab.run")
+
+    def check_parent(self, name: str, parent: str, is_project: bool, move: bool) -> None:
+        """Refuses parent as the parent of the experiment name: it must exist,
+        in the project the lab works in unless move, name may not be a
+        project, and parent may not be name or below it."""
+        if move:
+            self.path(parent)
+        else:
+            self.check_experiment(parent, MOVE.format(name))
         if is_project:
             raise ValueError(f"{name} is a project, which has no parent")
         if name in self.path(parent):

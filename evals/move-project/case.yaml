@@ -1,0 +1,32 @@
+schema_version: "1.1"
+name: move-project
+description: An experiment filed in the wrong project is moved to the right one, with its run and finding.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    The experiment thumbnail blur was filed under audio-codec by mistake: it is vision's work. Move it there,
+    with its runs and records.
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  - name: no-sql-write
+    type: tool_used
+    tool: Bash
+    input_match: 'sqlite3|\b([Uu][Pp][Dd][Aa][Tt][Ee]\s+(experiments|runs|records)|[Ii][Nn][Ss][Ee][Rr][Tt]\s+[Ii][Nn][Tt][Oo]|[Dd][Ee][Ll][Ee][Tt][Ee]\s+[Ff][Rr][Oo][Mm])\b'
+    min: 0
+    max: 0
+  - name: moved
+    type: llm
+    focus: trace
+    criteria: |
+      PASS if, by the end, the experiment thumbnail blur is directly below the project vision with its run
+      "thumbnails 200 px" and its finding, both the ones it had (not made again), as an output of q or rec in the
+      trace shows, and no command printed an error that the agent left unresolved. FAIL if it is still in
+      audio-codec, its run or finding was made again instead of moved, lab.db was written by SQL of the agent's own
+      (sqlite3, or a script that opens lab.db), or the agent stopped without moving it.

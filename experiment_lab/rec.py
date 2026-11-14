@@ -4,7 +4,7 @@ prints the experiment tree. rec COMMAND --help prints COMMAND's paragraph
 below, and the one that applies to every command.
 
 usage: rec project NAME --text DESCRIPTION [--folder F] [--files F] [--views FILE ...] [--replace]
-       rec experiment NAME --text DESCRIPTION [--in PARENT] [--dead-end | --no-dead-end] [--replace]
+       rec experiment NAME --text DESCRIPTION [--in PARENT [--move]] [--dead-end | --no-dead-end] [--replace]
        rec tree [EXPERIMENT]
        rec add KIND "TITLE" --in EXPERIMENT --text T [--experiment LABEL] [--by WHO]
                             [--status S] [--answers ID] [--evidence ITEM ...] [--id ID] [--time T]
@@ -38,8 +38,11 @@ other than the project's own is refused unless --replace.
 
 experiment NAME makes an experiment directly below the project, or below --in
 PARENT, with --text, its description (Markdown: what it measures and why);
-given again, it moves it below --in, or marks it as a dead end with --dead-end
-(an idea that failed; a finding says why) or not with --no-dead-end. A
+given again, it moves it below --in, with its runs and records and the
+experiments below it, or marks it as a dead end with --dead-end (an idea that
+failed; a finding says why) or not with --no-dead-end. NAME and PARENT are in
+the project rec works in, or with --move in any project, so that NAME moves to
+PARENT's: rec then prints how many runs, records and experiments moved. A
 description other than an existing experiment's own is refused unless
 --replace, since a new experiment needs a name that no experiment of the lab
 has, of at most 32 characters.
@@ -102,7 +105,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from experiment_lab import records
-from experiment_lab.lab import Lab, ms, now, shown
+from experiment_lab.lab import BELOW, Lab, ms, now, shown
 
 # rec's field names for the columns of records that differ
 COLUMNS = {"by": "author", "experiment": "label"}
@@ -182,8 +185,15 @@ def run_project(lab: Lab, a: argparse.Namespace) -> None:
 
 
 def run_experiment(lab: Lab, a: argparse.Namespace) -> None:
+    """Prints the experiment's path; after --move, what moved with it."""
     print("experiment " + " › ".join(lab.experiment(a.name, a.text, parent=a.parent, dead_end=a.dead_end,
-                                                    replace=a.replace)))
+                                                    replace=a.replace, move=a.move)))
+    if a.move:
+        runs, records, below = lab.db.execute(
+            f"{BELOW} SELECT (SELECT count(*) FROM runs WHERE experiment IN below),"
+            " (SELECT count(*) FROM records WHERE experiment IN below), (SELECT count(*) - 1 FROM below)",
+            (a.name,)).fetchone()
+        print(f"moved with its runs ({runs}), records ({records}) and the experiments below it ({below})")
 
 
 def run_tree(lab: Lab, a: argparse.Namespace) -> None:
@@ -333,6 +343,7 @@ def parser() -> argparse.ArgumentParser:
     exp.add_argument("--text", type=given_text)
     exp.add_argument("--in", dest="parent", metavar="PARENT")
     exp.add_argument("--dead-end", action=argparse.BooleanOptionalAction)
+    exp.add_argument("--move", action="store_true")
     exp.set_defaults(run=run_experiment)
     tree = command(sub, "tree", named)
     tree.add_argument("top", nargs="?", metavar="EXPERIMENT")

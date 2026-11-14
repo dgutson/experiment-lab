@@ -7,7 +7,7 @@ prints the experiment tree. rec COMMAND --help prints COMMAND's paragraph
 below, and the one that applies to every command.
 
 usage: rec project NAME --text DESCRIPTION [--folder F] [--files F] [--views FILE ...] [--replace]
-       rec experiment NAME --text DESCRIPTION [--in PARENT] [--dead-end | --no-dead-end] [--replace]
+       rec experiment NAME --text DESCRIPTION [--in PARENT [--move]] [--dead-end | --no-dead-end] [--replace]
        rec tree [EXPERIMENT]
        rec add KIND "TITLE" --in EXPERIMENT --text T [--experiment LABEL] [--by WHO]
                             [--status S] [--answers ID] [--evidence ITEM ...] [--id ID] [--time T]
@@ -41,8 +41,11 @@ other than the project's own is refused unless --replace.
 
 experiment NAME makes an experiment directly below the project, or below --in
 PARENT, with --text, its description (Markdown: what it measures and why);
-given again, it moves it below --in, or marks it as a dead end with --dead-end
-(an idea that failed; a finding says why) or not with --no-dead-end. A
+given again, it moves it below --in, with its runs and records and the
+experiments below it, or marks it as a dead end with --dead-end (an idea that
+failed; a finding says why) or not with --no-dead-end. NAME and PARENT are in
+the project rec works in, or with --move in any project, so that NAME moves to
+PARENT's: rec then prints how many runs, records and experiments moved. A
 description other than an existing experiment's own is refused unless
 --replace, since a new experiment needs a name that no experiment of the lab
 has, of at most 32 characters.
@@ -1094,6 +1097,37 @@ exit 0
 
 $ rec experiment sharpness --in "blur detector" --text "Scores sharpness by edges." --project vision
 experiment vision › blur detector › sharpness
+exit 0
+
+$ rec experiment "noise gate" --in vision
+error: 'vision' is in the project vision, not in audio-codec, whose folder this is; --move (Lab.experiment's move=True) moves noise gate to another project, with its runs and records
+exit 1
+
+$ rec experiment "noise gate" --in vision --project vision
+error: 'noise gate' is in the project audio-codec, not in vision, the one named; experiment names are unique across the lab, so a new experiment needs another name; --move (Lab.experiment's move=True) moves noise gate to another project, with its runs and records
+exit 1
+
+$ rec experiment "noise gate" --move
+error: a move needs the parent to move noise gate below (rec --in, Lab.experiment's parent)
+exit 1
+
+$ rec experiment vision --in audio-codec --move
+error: vision is a project, which has no parent
+exit 1
+
+$ rec experiment "noise gate" --in sharpness --move && rec tree --project vision && q --project vision "SELECT name FROM runs WHERE experiment = 'noise gate'" && rec experiment "noise gate" --in audio-codec --move --project vision && rec tree | grep -n "noise gate"
+experiment vision › blur detector › sharpness › noise gate
+moved with its runs (1), records (3) and the experiments below it (0)
+vision  (~/vision)
+  blur detector
+    sharpness
+      noise gate  [dead end]
+name
+gate -50 dB
+(1 rows)
+experiment audio-codec › noise gate
+moved with its runs (1), records (3) and the experiments below it (0)
+6:  noise gate  [dead end]
 exit 0
 
 $ rec add question "Do edges score sharpness?" --in sharpness --text "Not measured yet." --project vision
