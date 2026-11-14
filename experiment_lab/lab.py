@@ -84,6 +84,7 @@ type Values = dict[str, Any]  # a run's params, tags or metrics, by key
 type Names = Sequence[str]
 type Keys = str | Names  # a param's name, or a list of them
 type Time = int | str | datetime.datetime  # milliseconds since 1970, or what ms reads
+type Pids = list[int]
 
 
 class Project(NamedTuple):
@@ -681,14 +682,14 @@ def stopped(signum: int, _: FrameType | None) -> None:
     signal.raise_signal(signum)
 
 
-def descendants(pid: int) -> list[int]:
+def descendants(pid: int) -> Pids:
     """The processes that pid started and those they started, by the parent
     pid of /proc/PID/stat; none where there is no /proc."""
-    children: dict[int, list[int]] = {}
+    children: dict[int, Pids] = {}
     for stat in Path("/proc").glob("[0-9]*/stat"):
         with contextlib.suppress(OSError, IndexError, ValueError):  # a process gone since the glob
             children.setdefault(int(stat.read_text().rsplit(")", 1)[1].split()[1]), []).append(int(stat.parent.name))
-    found: list[int] = []
+    found: Pids = []
     todo = [pid]
     while todo:
         below = children.get(todo.pop(), [])
