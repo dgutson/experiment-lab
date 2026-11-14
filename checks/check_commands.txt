@@ -1,5 +1,5 @@
 $ rec --help
-usage: rec [-h] [--project P] {project,experiment,tree,add,set,open,run,end} ...
+usage: rec [-h] [--project P] {project,experiment,tree,add,set,open,run,end,stop} ...
 
 Adds or changes a project, an experiment or a record (a decision, finding,
 protocol rule or question) in the lab's database, starts or ends a run, or
@@ -17,6 +17,7 @@ usage: rec project NAME --text DESCRIPTION [--folder F] [--files F] [--views FIL
        rec run EXPERIMENT NAME [--note T] [--start T]
        rec end RUN [--status FINISHED|FAILED|KILLED] [--at T] [--metric K=V ...] [--tag K=V ...]
                    [--file PATH[=NAME] ...]
+       rec stop RUN ...
        (each but project takes --project P)
 
 The experiments form a tree whose roots are the projects. rec works in the
@@ -97,8 +98,14 @@ items; --file items, each PATH, the file copied under its own name, or
 PATH=NAME (split at the last =), copied as NAME. A wrong item is refused
 before anything is written.
 
+stop RUN ... stops each RUNNING run whose process logs it in lab.py's with
+block, on this host: it sends the process SIGTERM, whose handler stops the
+processes it started and ends the run KILLED, waits until the runs have ended,
+at most a minute, and prints how each did. A run of rec run has no process that
+the lab knows: stop its work, then rec end it.
+
 positional arguments:
-  {project,experiment,tree,add,set,open,run,end}
+  {project,experiment,tree,add,set,open,run,end,stop}
 
 options:
   -h, --help            show this help message and exit
@@ -1063,6 +1070,25 @@ out.txt | 2
 (2 rows)
 exit 0
 
+$ python -c "import subprocess, time; from experiment_lab.lab import Lab; r = Lab().run('bitrate', 'to stop').__enter__(); c = subprocess.Popen(['sleep', '60']); print(r.id, c.pid, flush=True); time.sleep(60)" > ~/stop.id & until [ -s ~/stop.id ]; do sleep 0.1; done; read id child < ~/stop.id; rec stop "$id" && rec stop "$id" && q "SELECT status FROM runs WHERE name = 'to stop'"; for i in $(seq 50); do kill -0 "$child" 2>/dev/null || break; sleep 0.1; done; kill -0 "$child" 2>/dev/null && echo "its child is left running" || echo "its child is stopped"
+run to stop in bitrate: KILLED, 0.0 min
+run to stop in bitrate: KILLED, 0.0 min
+status
+KILLED
+(1 rows)
+its child is stopped
+exit 0
+
+$ python -c "import time; from experiment_lab.lab import Lab; lab = Lab(); r = lab.run('bitrate', 'closed lab').__enter__(); lab.close(); print(r.id, flush=True); time.sleep(60)" > ~/closed.id & until [ -s ~/closed.id ]; do sleep 0.1; done; id=$(cat ~/closed.id); { rec stop "$id" 2>&1; echo "exit $?"; } | sed "s/$id/<id>/; s/process [0-9]*/process <pid>/"; kill %1
+error: process <pid> of run closed lab in bitrate does not have this lab's lab.db open, as the process of a with block does, so it may be another process now: rec end <id> --status KILLED ends the run
+exit 1
+exit 0
+
+$ id=$(rec run bitrate "no process") && { rec stop "$id" 2>&1; echo "exit $?"; } | sed "s/$id/<id>/" && rec end "$id" --status KILLED > /dev/null
+error: run no process in bitrate has no process that the lab knows, as a run of rec run: stop its work, then rec end <id> --status KILLED
+exit 1
+exit 0
+
 $ cd ~ && rec add finding "From home" --in bitrate --text "x"
 error: no project holds FOLDER/home: run in a project's folder (audio-codec: FOLDER/home/audio-codec, inner: FOLDER/home/mono/sub, mono: FOLDER/home/mono, speech: FOLDER/home/speech, vision: FOLDER/home/vision, ws-a: FOLDER/home/ws/a, ws-b: FOLDER/home/ws/b), name one (rec --project P, Lab(project="P")), or make this folder a project: rec project NAME --text "what the project is, in one line"
 exit 1
@@ -1182,7 +1208,7 @@ exit 1
 
 $ cd ~ && git -C audio-codec -c init.defaultBranch=main init -q && git -C audio-codec add -A && git -C audio-codec -c user.name=t -c user.email=t@t commit -qm x && git clone -q audio-codec codec-clone && cd codec-clone && rec tree | sed -n 1p && q "SELECT count(*) AS runs FROM runs" | sed -n 2p
 audio-codec  (~/audio-codec)
-39
+42
 exit 0
 
 $ cd ~/codec-clone && rec project codec-fork --text "Work of its own." && rec tree

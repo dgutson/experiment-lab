@@ -14,6 +14,7 @@ usage: rec project NAME --text DESCRIPTION [--folder F] [--files F] [--views FIL
        rec run EXPERIMENT NAME [--note T] [--start T]
        rec end RUN [--status FINISHED|FAILED|KILLED] [--at T] [--metric K=V ...] [--tag K=V ...]
                    [--file PATH[=NAME] ...]
+       rec stop RUN ...
        (each but project takes --project P)
 
 The experiments form a tree whose roots are the projects. rec works in the
@@ -93,25 +94,35 @@ KEY=VALUE items, each a number, at step 0 and the end's time; --tag KEY=VALUE
 items; --file items, each PATH, the file copied under its own name, or
 PATH=NAME (split at the last =), copied as NAME. A wrong item is refused
 before anything is written.
+
+stop RUN ... stops each RUNNING run whose process logs it in lab.py's with
+block, on this host: it sends the process SIGTERM, whose handler stops the
+processes it started and ends the run KILLED, waits until the runs have ended,
+at most a minute, and prints how each did. A run of rec run has no process that
+the lab knows: stop its work, then rec end it.
 """
 import argparse
 import contextlib
 import datetime
+import os
 import re
+import signal
 import sqlite3
 import sys
 import textwrap
+import time
 from collections.abc import Iterable
 from pathlib import Path
 
 from experiment_lab import records
-from experiment_lab.lab import BELOW, Lab, ms, now, shown
+from experiment_lab.lab import BELOW, Lab, host, ms, now, shown
 
 # rec's field names for the columns of records that differ
 COLUMNS = {"by": "author", "experiment": "label"}
 SETTABLE = ("kind", "title", "text", "by", "status", "experiment", "answers", "evidence")
 RUN_ID = re.compile(r"\b[0-9a-f]{32}\b")  # as Lab.run makes it
 MOST_RUNS = 20  # the most runs that a sql: item adds to the evidence
+STOP_WAIT = 60  # seconds that rec stop waits for its runs to end, as long as a writer waits for lab.db
 type Commands = argparse._SubParsersAction[argparse.ArgumentParser]  # what add_subparsers returns
 
 
@@ -312,6 +323,72 @@ def run_end(lab: Lab, a: argparse.Namespace) -> None:
     print(f"run {name} in {experiment}: {a.status}, {(end - start) / 60000:.1f} min")
 
 
+def run_stop(lab: Lab, a: argparse.Namespace) -> None:
+    """Sends SIGTERM to the process of each RUNNING run given, whose handler
+    in lab.py stops the processes it started and ends the run KILLED, and
+    prints how each run ended (print_ended)."""
+    pids = {rid: stoppable(lab, rid) for rid in a.ids}
+    for pid in {pid for pid in pids.values() if pid is not None}:
+        os.kill(pid, signal.SIGTERM)
+    print_ended(lab, pids)
+
+
+def print_ended(lab: Lab, pids: dict[str, int | None]) -> None:
+    """Waits until every run of pids, by id, has ended, at most STOP_WAIT
+    seconds, and prints how each did; a ValueError for one still RUNNING."""
+    deadline = time.monotonic() + STOP_WAIT
+    while running(lab, pids) and time.monotonic() < deadline:
+        time.sleep(0.1)
+        lab.end_lost()  # a process that ended with no handler, as on SIGKILL
+    for rid, pid in pids.items():
+        name, experiment, status, start, end = lab.db.execute(
+            "SELECT name, experiment, status, start_time, end_time FROM runs WHERE id = ?", (rid,)).fetchone()
+        if status == "RUNNING":
+            raise ValueError(f"run {name} in {experiment} is still RUNNING {STOP_WAIT} s after SIGTERM to its process"
+                             f" {pid}, which a SIGTERM handler of the script's own may keep running: kill -KILL"
+                             f" {pid} ends it, and the next rec or Lab ends the run KILLED")
+        print(f"run {name} in {experiment}: {status}, {(end - start) / 60000:.1f} min")
+
+
+def stoppable(lab: Lab, rid: str) -> int | None:
+    """The pid of the run's process, to stop; None if the run has ended. A
+    ValueError if rec cannot stop it: a run with no process (rec run), one of
+    another host, or a pid whose process does not have this lab's lab.db open,
+    as a with block's does, so that it may be another process now."""
+    lab.run_by_id(rid)
+    name, experiment, status, where, pid = lab.db.execute(
+        "SELECT name, experiment, status, host, pid FROM runs WHERE id = ?", (rid,)).fetchone()
+    if status != "RUNNING":
+        return None
+    if pid is None:
+        raise ValueError(f"run {name} in {experiment} has no process that the lab knows, as a run of rec run: stop its"
+                         f" work, then rec end {rid} --status KILLED")
+    if where != host():
+        raise ValueError(f"the process of run {name} in {experiment} runs on {where}, not on this host: rec stop it"
+                         " there")
+    if not holds(pid, lab.data / "lab.db"):
+        raise ValueError(f"process {pid} of run {name} in {experiment} does not have this lab's lab.db open, as the"
+                         f" process of a with block does, so it may be another process now: rec end {rid} --status"
+                         " KILLED ends the run")
+    return int(pid)
+
+
+def holds(pid: int, path: Path) -> bool:
+    """Whether the process of that pid has the file open, by /proc; false
+    where there is no /proc."""
+    target = path.resolve()
+    try:
+        return any(fd.resolve() == target for fd in Path(f"/proc/{pid}/fd").iterdir())
+    except OSError:
+        return False
+
+
+def running(lab: Lab, ids: Iterable[str]) -> bool:
+    """Whether any of the runs is RUNNING."""
+    return any(lab.db.execute("SELECT status FROM runs WHERE id = ?", (rid,)).fetchone()[0] == "RUNNING"
+               for rid in ids)
+
+
 def command(sub: Commands, name: str, *parents: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """The parser of the command name, whose --help prints its paragraph of the
     docstring, then the one after usage, which applies to every command."""
@@ -380,6 +457,9 @@ def parser() -> argparse.ArgumentParser:
     end.add_argument("--tag", nargs="+", action="extend", default=[], type=pair, metavar="KEY=VALUE")
     end.add_argument("--file", nargs="+", action="extend", default=[], type=file_item, metavar="PATH[=NAME]")
     end.set_defaults(run=run_end)
+    stop = command(sub, "stop", named)
+    stop.add_argument("ids", nargs="+", metavar="RUN")
+    stop.set_defaults(run=run_stop)
     return p
 
 

@@ -227,6 +227,9 @@ echo a > ~/out.txt && id=$(rec run bitrate "shell job" --start "2026-09-10 12:00
 rec end x --metric accuracy=high
 rec end x --tag outcome
 id=$(q "SELECT run FROM runs WHERE name = 'shell job'" | sed -n 2p) && rec end "$id" --at "2026-09-10 12:30" --metric accuracy=0.93 loss=nan --tag outcome=pass --file ~/out.txt ~/out.txt=logs/b.txt && q "SELECT status, tags, metrics FROM runs WHERE run = '$id'" && q "SELECT name, bytes FROM files WHERE run = '$id' ORDER BY name"
+python -c "import subprocess, time; from experiment_lab.lab import Lab; r = Lab().run('bitrate', 'to stop').__enter__(); c = subprocess.Popen(['sleep', '60']); print(r.id, c.pid, flush=True); time.sleep(60)" > ~/stop.id & until [ -s ~/stop.id ]; do sleep 0.1; done; read id child < ~/stop.id; rec stop "$id" && rec stop "$id" && q "SELECT status FROM runs WHERE name = 'to stop'"; for i in $(seq 50); do kill -0 "$child" 2>/dev/null || break; sleep 0.1; done; kill -0 "$child" 2>/dev/null && echo "its child is left running" || echo "its child is stopped"
+python -c "import time; from experiment_lab.lab import Lab; lab = Lab(); r = lab.run('bitrate', 'closed lab').__enter__(); lab.close(); print(r.id, flush=True); time.sleep(60)" > ~/closed.id & until [ -s ~/closed.id ]; do sleep 0.1; done; id=$(cat ~/closed.id); { rec stop "$id" 2>&1; echo "exit $?"; } | sed "s/$id/<id>/; s/process [0-9]*/process <pid>/"; kill %1
+id=$(rec run bitrate "no process") && { rec stop "$id" 2>&1; echo "exit $?"; } | sed "s/$id/<id>/" && rec end "$id" --status KILLED > /dev/null
 cd ~ && rec add finding "From home" --in bitrate --text "x"
 cd ~ && rec experiment "home test" --in bitrate --text "x"
 cd ~ && rec experiment bitrate --dead-end
