@@ -60,18 +60,19 @@ add KIND TITLE files a record in the experiment that --in names, which must
 exist, or with --in PROJECT in the project itself. KIND is decision, finding,
 protocol or question; TITLE is its title, not its id. --text, its text
 (Markdown), may not be empty. --experiment gives the label it is shown under
-(the --in experiment unless given), --by its author (agent unless given). A new
-question is open and any other record closed, unless --status says otherwise
-(open, closed or superseded); --answers ID closes the question ID. --evidence
-items are run:<run id>, file:<path>, sql:<query over the views> or
-record:<id>, the run, record or file existing. A sql: item runs as the record
-page runs it and is refused if it fails; each run it returns in a column run
-is added as a run: item, so that the record keeps the runs it relied on (none
-from an item that returns more than 20). A file: item's file or folder is
-copied into the data folder, as evidence/<digest of its content>/<its name>,
-and the record cites the copy, so that it shows later what it cited; one over
-100 MB is cited where it is, with a warning. A run id in the text that the
-evidence does not cite is warned about. --id gives the
+(the --in experiment unless given), --by its author (agent unless given). A
+new question is open and any other record closed, unless --status says
+otherwise (open, closed or superseded); --answers ID closes the question ID.
+--evidence items are run:<run id>, file:<path>, sql:<query over the views> or
+record:<id>, the run, record or file existing. A run: item's id may be its
+first 8 characters or more; the record keeps the whole id. A sql: item runs as
+the record page runs it and is refused if it fails; each run it returns in a
+column run is added as a run: item, so that the record keeps the runs it
+relied on (none from an item that returns more than 20). A file: item's file
+or folder is copied into the data folder, as evidence/<digest of its
+content>/<its name>, and the record cites the copy, so that it shows later
+what it cited; one over 100 MB is cited where it is, with a warning. A run id
+in the text that the evidence does not cite is warned about. --id gives the
 record's id (lower-case letters, digits and dashes), else rec makes one from
 the title's first words; --time its time, now unless given. add prints the
 records it adds or closes, then, if it changed how many of the project's
@@ -90,19 +91,19 @@ run EXPERIMENT NAME starts a run, RUNNING, in an existing experiment, for work
 that runs outside the Python that logs it, and prints its id. --note is the
 run's note, and --start its start, now unless given.
 
-end RUN ends a RUNNING run, FINISHED unless --status says FAILED or KILLED, at
---at, now unless given, which may not be before the run's start. First it
-logs its results, as lab.py's log_metrics, set_tags and log_file do: --metric
-KEY=VALUE items, each a number, at step 0 and the end's time; --tag KEY=VALUE
-items; --file items, each PATH, the file copied under its own name, or
-PATH=NAME (split at the last =), copied as NAME. A wrong item is refused
-before anything is written.
+end RUN, a run's id or its first 8 characters or more, ends a RUNNING run,
+FINISHED unless --status says FAILED or KILLED, at --at, now unless given,
+which may not be before the run's start. First it logs its results, as
+lab.py's log_metrics, set_tags and log_file do: --metric KEY=VALUE items, each
+a number, at step 0 and the end's time; --tag KEY=VALUE items; --file items,
+each PATH, the file copied under its own name, or PATH=NAME (split at the last
+=), copied as NAME. A wrong item is refused before anything is written.
 
-stop RUN ... stops each RUNNING run whose process logs it in lab.py's with
-block, on this host: it sends the process SIGTERM, whose handler stops the
-processes it started and ends the run KILLED, waits until the runs have ended,
-at most a minute, and prints how each did. A run of rec run has no process that
-the lab knows: stop its work, then rec end it.
+stop RUN ... stops each RUNNING run, RUN as end takes it, whose process logs
+it in lab.py's with block, on this host: it sends the process SIGTERM, whose
+handler stops the processes it started and ends the run KILLED, waits until
+the runs have ended, at most a minute, and prints how each did. A run of rec
+run has no process that the lab knows: stop its work, then rec end it.
 
 positional arguments:
   {project,experiment,tree,add,set,open,run,end,stop}
@@ -122,18 +123,19 @@ add KIND TITLE files a record in the experiment that --in names, which must
 exist, or with --in PROJECT in the project itself. KIND is decision, finding,
 protocol or question; TITLE is its title, not its id. --text, its text
 (Markdown), may not be empty. --experiment gives the label it is shown under
-(the --in experiment unless given), --by its author (agent unless given). A new
-question is open and any other record closed, unless --status says otherwise
-(open, closed or superseded); --answers ID closes the question ID. --evidence
-items are run:<run id>, file:<path>, sql:<query over the views> or
-record:<id>, the run, record or file existing. A sql: item runs as the record
-page runs it and is refused if it fails; each run it returns in a column run
-is added as a run: item, so that the record keeps the runs it relied on (none
-from an item that returns more than 20). A file: item's file or folder is
-copied into the data folder, as evidence/<digest of its content>/<its name>,
-and the record cites the copy, so that it shows later what it cited; one over
-100 MB is cited where it is, with a warning. A run id in the text that the
-evidence does not cite is warned about. --id gives the
+(the --in experiment unless given), --by its author (agent unless given). A
+new question is open and any other record closed, unless --status says
+otherwise (open, closed or superseded); --answers ID closes the question ID.
+--evidence items are run:<run id>, file:<path>, sql:<query over the views> or
+record:<id>, the run, record or file existing. A run: item's id may be its
+first 8 characters or more; the record keeps the whole id. A sql: item runs as
+the record page runs it and is refused if it fails; each run it returns in a
+column run is added as a run: item, so that the record keeps the runs it
+relied on (none from an item that returns more than 20). A file: item's file
+or folder is copied into the data folder, as evidence/<digest of its
+content>/<its name>, and the record cites the copy, so that it shows later
+what it cited; one over 100 MB is cited where it is, with a warning. A run id
+in the text that the evidence does not cite is warned about. --id gives the
 record's id (lower-case letters, digits and dashes), else rec makes one from
 the title's first words; --time its time, now unless given. add prints the
 records it adds or closes, then, if it changed how many of the project's
@@ -430,7 +432,18 @@ run:RUN; record:keep-48-khz
 exit 0
 
 $ rec add finding "Cites no run" --in bitrate --text "x" --evidence run:nosuch
-error: evidence 'run:nosuch': there is no run nosuch
+error: evidence 'run:nosuch': run id nosuch is shorter than 8 characters
+exit 1
+
+$ rec add finding "Cites a run by its start" --in bitrate --text "x" --evidence "run:$(q "SELECT substr(run, 1, 8) FROM runs WHERE name = 'rate 48000, listened to'" | sed -n 2p)" && q "SELECT evidence FROM records WHERE id = 'cites-a-run-by-its-start'"
+cites-a-run-by-its-start: finding, closed: Cites a run by its start
+evidence
+run:RUN
+(1 rows)
+exit 0
+
+$ rec add finding "Cites an empty run id" --in bitrate --text "x" --evidence run:
+error: evidence 'run:': the run id is empty, as a shell variable is when the command that set it failed
 exit 1
 
 $ rec set cites-a-run "evidence=record:nosuch"
@@ -967,8 +980,29 @@ error: 'blur detector' is in the project vision, not in audio-codec, whose folde
 exit 1
 
 $ rec end nosuch
-error: no run nosuch
+error: run id nosuch is shorter than 8 characters
 exit 1
+
+$ rec end ""
+error: the run id is empty, as a shell variable is when the command that set it failed
+exit 1
+
+$ rec end 00000000
+error: no run 00000000
+exit 1
+
+$ id=$(rec run bitrate "short id job") && rec end "${id:0:8}"
+run short id job in bitrate: FINISHED, 0.0 min
+exit 0
+
+$ python -c "import uuid; from unittest import mock; from experiment_lab.lab import Lab; ids = iter(['abcdef01' + '0' * 24, 'abcdef01' + '1' * 24]); mock.patch.object(uuid, 'uuid4', lambda: mock.Mock(hex=next(ids))).start(); [Lab().run('bitrate', f'twin {i}').end() for i in (1, 2)]" && rec end abcdef01
+error: run id abcdef01 starts the ids of 2 runs: RUN (twin 1 in bitrate); RUN (twin 2 in bitrate)
+exit 1
+
+$ python -c "from experiment_lab.lab import Lab; lab = Lab(); rid = lab.runs('sample rate sweep')[0].id; print(lab.file(rid[:8], 'a.json') == lab.file(rid, 'a.json'), lab.run_by_id(rid[:10]).id == rid)"
+records citing run rate 16000: cites-a-query (finding) Cites a query
+True True
+exit 0
 
 $ rec end "$(q --project vision "SELECT run FROM runs ORDER BY name LIMIT 1" | sed -n 2p)"
 error: 'blur detector' is in the project vision, not in audio-codec, whose folder this is
@@ -1084,7 +1118,7 @@ error: process <pid> of run closed lab in bitrate does not have this lab's lab.d
 exit 1
 exit 0
 
-$ id=$(rec run bitrate "no process") && { rec stop "$id" 2>&1; echo "exit $?"; } | sed "s/$id/<id>/" && rec end "$id" --status KILLED > /dev/null
+$ id=$(rec run bitrate "no process") && { rec stop "${id:0:8}" 2>&1; echo "exit $?"; } | sed "s/$id/<id>/" && rec end "$id" --status KILLED > /dev/null
 error: run no process in bitrate has no process that the lab knows, as a run of rec run: stop its work, then rec end <id> --status KILLED
 exit 1
 exit 0
@@ -1208,7 +1242,7 @@ exit 1
 
 $ cd ~ && git -C audio-codec -c init.defaultBranch=main init -q && git -C audio-codec add -A && git -C audio-codec -c user.name=t -c user.email=t@t commit -qm x && git clone -q audio-codec codec-clone && cd codec-clone && rec tree | sed -n 1p && q "SELECT count(*) AS runs FROM runs" | sed -n 2p
 audio-codec  (~/audio-codec)
-42
+45
 exit 0
 
 $ cd ~/codec-clone && rec project codec-fork --text "Work of its own." && rec tree

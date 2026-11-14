@@ -1,0 +1,19 @@
+schema_version: "1.1"
+name: rescore-short-ids
+description: The project's rescore.py is run for run ids that a file gives by their first 8 characters, as a report shows them.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    Score the runs listed in rescore_ids.txt again with rescore.py.
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: rescored
+    type: llm
+    focus: trace
+    criteria: |
+      rescore_ids.txt lists three runs of the experiment listening panel: panel 96 kbps, panel 128 kbps and panel
+      160 kbps. PASS if each of the three got the metric mos_v2 (3.54, 3.9 and 4.08), logged by rescore.py or by
+      the agent with the same formula, and no other run got one. FAIL otherwise.

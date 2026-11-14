@@ -57,18 +57,19 @@ add KIND TITLE files a record in the experiment that --in names, which must
 exist, or with --in PROJECT in the project itself. KIND is decision, finding,
 protocol or question; TITLE is its title, not its id. --text, its text
 (Markdown), may not be empty. --experiment gives the label it is shown under
-(the --in experiment unless given), --by its author (agent unless given). A new
-question is open and any other record closed, unless --status says otherwise
-(open, closed or superseded); --answers ID closes the question ID. --evidence
-items are run:<run id>, file:<path>, sql:<query over the views> or
-record:<id>, the run, record or file existing. A sql: item runs as the record
-page runs it and is refused if it fails; each run it returns in a column run
-is added as a run: item, so that the record keeps the runs it relied on (none
-from an item that returns more than 20). A file: item's file or folder is
-copied into the data folder, as evidence/<digest of its content>/<its name>,
-and the record cites the copy, so that it shows later what it cited; one over
-100 MB is cited where it is, with a warning. A run id in the text that the
-evidence does not cite is warned about. --id gives the
+(the --in experiment unless given), --by its author (agent unless given). A
+new question is open and any other record closed, unless --status says
+otherwise (open, closed or superseded); --answers ID closes the question ID.
+--evidence items are run:<run id>, file:<path>, sql:<query over the views> or
+record:<id>, the run, record or file existing. A run: item's id may be its
+first 8 characters or more; the record keeps the whole id. A sql: item runs as
+the record page runs it and is refused if it fails; each run it returns in a
+column run is added as a run: item, so that the record keeps the runs it
+relied on (none from an item that returns more than 20). A file: item's file
+or folder is copied into the data folder, as evidence/<digest of its
+content>/<its name>, and the record cites the copy, so that it shows later
+what it cited; one over 100 MB is cited where it is, with a warning. A run id
+in the text that the evidence does not cite is warned about. --id gives the
 record's id (lower-case letters, digits and dashes), else rec makes one from
 the title's first words; --time its time, now unless given. add prints the
 records it adds or closes, then, if it changed how many of the project's
@@ -87,19 +88,19 @@ run EXPERIMENT NAME starts a run, RUNNING, in an existing experiment, for work
 that runs outside the Python that logs it, and prints its id. --note is the
 run's note, and --start its start, now unless given.
 
-end RUN ends a RUNNING run, FINISHED unless --status says FAILED or KILLED, at
---at, now unless given, which may not be before the run's start. First it
-logs its results, as lab.py's log_metrics, set_tags and log_file do: --metric
-KEY=VALUE items, each a number, at step 0 and the end's time; --tag KEY=VALUE
-items; --file items, each PATH, the file copied under its own name, or
-PATH=NAME (split at the last =), copied as NAME. A wrong item is refused
-before anything is written.
+end RUN, a run's id or its first 8 characters or more, ends a RUNNING run,
+FINISHED unless --status says FAILED or KILLED, at --at, now unless given,
+which may not be before the run's start. First it logs its results, as
+lab.py's log_metrics, set_tags and log_file do: --metric KEY=VALUE items, each
+a number, at step 0 and the end's time; --tag KEY=VALUE items; --file items,
+each PATH, the file copied under its own name, or PATH=NAME (split at the last
+=), copied as NAME. A wrong item is refused before anything is written.
 
-stop RUN ... stops each RUNNING run whose process logs it in lab.py's with
-block, on this host: it sends the process SIGTERM, whose handler stops the
-processes it started and ends the run KILLED, waits until the runs have ended,
-at most a minute, and prints how each did. A run of rec run has no process that
-the lab knows: stop its work, then rec end it.
+stop RUN ... stops each RUNNING run, RUN as end takes it, whose process logs
+it in lab.py's with block, on this host: it sends the process SIGTERM, whose
+handler stops the processes it started and ends the run KILLED, waits until
+the runs have ended, at most a minute, and prints how each did. A run of rec
+run has no process that the lab knows: stop its work, then rec end it.
 """
 import argparse
 import contextlib
@@ -308,7 +309,7 @@ def run_end(lab: Lab, a: argparse.Namespace) -> None:
     not be before its start."""
     run = lab.run_by_id(a.id)
     experiment, name, status, start = lab.db.execute("SELECT experiment, name, status, start_time FROM runs"
-                                                     " WHERE id = ?", (a.id,)).fetchone()
+                                                     " WHERE id = ?", (run.id,)).fetchone()
     end = ms(a.at) or now()
     if status != "RUNNING":
         raise ValueError(f"run {name} in {experiment} has ended, {status}")
@@ -327,7 +328,7 @@ def run_stop(lab: Lab, a: argparse.Namespace) -> None:
     """Sends SIGTERM to the process of each RUNNING run given, whose handler
     in lab.py stops the processes it started and ends the run KILLED, and
     prints how each run ended (print_ended)."""
-    pids = {rid: stoppable(lab, rid) for rid in a.ids}
+    pids = {rid: stoppable(lab, rid) for rid in (lab.run_by_id(given).id for given in a.ids)}
     for pid in {pid for pid in pids.values() if pid is not None}:
         os.kill(pid, signal.SIGTERM)
     print_ended(lab, pids)
@@ -355,7 +356,6 @@ def stoppable(lab: Lab, rid: str) -> int | None:
     ValueError if rec cannot stop it: a run with no process (rec run), one of
     another host, or a pid whose process does not have this lab's lab.db open,
     as a with block's does, so that it may be another process now."""
-    lab.run_by_id(rid)
     name, experiment, status, where, pid = lab.db.execute(
         "SELECT name, experiment, status, host, pid FROM runs WHERE id = ?", (rid,)).fetchone()
     if status != "RUNNING":

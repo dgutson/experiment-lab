@@ -3,8 +3,9 @@ table records in lab.db. rec and any script add and change them here, so the
 same rules hold: a record needs a text, a new question is open and any other
 record closed unless a status is given, and a record that answers an open
 question closes it. Evidence items are run:<run id>, file:<path>, sql:<query
-over the views> or record:<id>, the run, record or file existing; a file: item
-cites a copy of its file or folder (with_copies). Only the standard library, as
+over the views> or record:<id>, the run, record or file existing; a run: item
+may give the start of its run's id, and keeps the whole id; a file: item cites
+a copy of its file or folder (with_copies). Only the standard library, as
 lab.py.
 """
 import hashlib
@@ -94,6 +95,20 @@ def check_evidence(lab: Lab, items: Iterable[str]) -> None:
             raise ValueError(f"evidence {item!r}: there is no {kind} {value}")
         if kind == "file" and not Path(value).expanduser().exists():
             raise ValueError(f"evidence {item!r}: there is no file {value}")
+
+
+def with_run_ids(lab: Lab, items: Iterable[str]) -> Evidence:
+    """items, each run: item's id, whole or its start, made whole (Lab.run_id),
+    so that the record keeps citing that run when a later run's id starts the
+    same."""
+    return [whole_run_id(lab, item) if item.startswith("run:") else item for item in items]
+
+
+def whole_run_id(lab: Lab, item: str) -> str:
+    try:
+        return f"run:{lab.run_id(item.removeprefix('run:'))}"
+    except ValueError as e:
+        raise ValueError(f"evidence {item!r}: {e}") from None
 
 
 def with_copies(lab: Lab, items: Iterable[str]) -> Evidence:
@@ -221,10 +236,11 @@ def add(lab: Lab, experiment: str, kind: str, title: str, *, text: str, label: s
     """Adds a record to an existing experiment; returns it, and the question
     it closed if any. text (Markdown) may not be empty. The id is chosen in
     the write, so that another writer cannot take it before the record is
-    saved, which would replace that writer's record. A file: item of
-    evidence is replaced by one citing a copy of its file (with_copies)."""
+    saved, which would replace that writer's record. A run: item of
+    evidence gets the run's whole id (with_run_ids), and a file: item is
+    replaced by one citing a copy of its file (with_copies)."""
     lab.check_experiment(experiment)
-    evidence = with_copies(lab, evidence)
+    evidence = with_copies(lab, with_run_ids(lab, evidence))
     with lab.write() as db:
         question = answered(lab, answers)
         r = Record(id=free_id(lab, rid, title), experiment=experiment, label=label or experiment, kind=kind,
@@ -245,10 +261,11 @@ def change(lab: Lab, rid: str, **fields: str | Evidence) -> Record:
     """Sets fields of the record, which must be in the project the lab works
     in (columns of records; evidence a list), and checks them, not the fields
     it keeps; returns it. The record is read in the write, so that a change
-    by another writer is kept. A file: item of evidence is replaced by one
-    citing a copy of its file (with_copies)."""
+    by another writer is kept. A run: item of evidence gets the run's whole
+    id (with_run_ids), and a file: item is replaced by one citing a copy of
+    its file (with_copies)."""
     if isinstance(evidence := fields.get("evidence"), list):
-        fields = {**fields, "evidence": with_copies(lab, evidence)}
+        fields = {**fields, "evidence": with_copies(lab, with_run_ids(lab, evidence))}
     with lab.write() as db:
         r = get(lab, rid)
         if r is None:

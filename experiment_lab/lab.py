@@ -33,7 +33,8 @@ block's process was killed otherwise (SIGKILL, a restart) is ended KILLED by
 the next Lab opened on its host, at its last metric's time, else its start.
 For work that runs elsewhere, a run started before it (rec run, or lab.run
 without with) is ended by another process: lab.run_by_id(run_id).end(),
-end(at=...) for an earlier end, or rec end. A time (lab.run's start,
+end(at=...) for an earlier end, or rec end. run_by_id, file and json take a
+run's id or its first 8 characters or more. A time (lab.run's start,
 log_metrics's and end's at) is milliseconds since 1970, a datetime, or text as
 rec takes it: ISO 8601, as "2026-09-10 12:00", local unless it ends in Z or an
 offset. Several processes may write at once without a server: the database is
@@ -269,6 +270,7 @@ def check_folder(db: sqlite3.Connection, name: str, folder: str | None) -> None:
 
 
 LONGEST_NAME = 32  # of a new experiment, which every q filter, --in and sql: item retypes
+SHORTEST_ID = 8  # characters of the start of a run id that names its run
 
 
 def check_name(name: str) -> None:
@@ -505,13 +507,29 @@ class Lab:
         return run
 
     def run_by_id(self, rid: str) -> "Run":
-        """The run of that id, for a process other than the one that started
-        it; it must be in the project the lab works in."""
-        found = self.db.execute("SELECT experiment FROM runs WHERE id = ?", (rid,)).fetchone()
-        if found is None:
-            raise ValueError(f"no run {rid}")
-        self.check_experiment(found[0])
+        """The run of that id or of an id it starts (run_id), for a process
+        other than the one that started it; it must be in the project the lab
+        works in."""
+        rid = self.run_id(rid)
+        self.check_experiment(self.db.execute("SELECT experiment FROM runs WHERE id = ?", (rid,)).fetchone()[0])
         return Run(self, rid)
+
+    def run_id(self, given: str) -> str:
+        """The whole id of the run whose id is given or starts with given, of
+        at least SHORTEST_ID characters; a ValueError for an empty id, one
+        shorter, and one that starts no run's id or several."""
+        if not given:
+            raise ValueError("the run id is empty, as a shell variable is when the command that set it failed")
+        if len(given) < SHORTEST_ID:
+            raise ValueError(f"run id {given} is shorter than {SHORTEST_ID} characters")
+        found = self.db.execute("SELECT id, name, experiment FROM runs WHERE substr(id, 1, length(:given)) = :given"
+                                " ORDER BY id", {"given": given}).fetchall()
+        if not found:
+            raise ValueError(f"no run {given}")
+        if len(found) > 1:
+            raise ValueError(f"run id {given} starts the ids of {len(found)} runs: "
+                             + "; ".join(f"{rid} ({name} in {experiment})" for rid, name, experiment in found))
+        return str(found[0][0])
 
     def runs(self, experiment: str, *, status: str | None = "FINISHED", params: Mapping[str, object] | None = None,
              tags: Mapping[str, object] | None = None, has_metric: str | None = None,
@@ -544,7 +562,9 @@ class Lab:
     def file(self, rid: str, name: str) -> Path:
         """The copy of the file that the run logged as name: files/<run id>/<name>
         in the data folder. Names on stderr the records that cite the run, any
-        of which may correct what the file holds (tell_citing)."""
+        of which may correct what the file holds (tell_citing). rid is the run's
+        id or its start (run_id)."""
+        rid = self.run_id(rid)
         self.tell_citing(rid)
         return self.data / "files" / rid / name
 
