@@ -24,6 +24,8 @@ An experiment, in order:
 5. `rec add finding "TITLE" --in NAME --text "what the runs showed" --evidence run:<run id>`, with
    `--answers <question id>` when step 3 wrote one.
 6. If the idea failed, `rec experiment NAME --dead-end`, and the finding says why.
+7. When a change that a record describes is undone, or a later result shows the record wrong, `rec set
+   ID status=superseded`, and the record that says so cites it, `--evidence record:ID`.
 
 - Run `q`, `rec` and `lab.py` in the project's folder or one below it; they work in that project. If
   `q` is not on the PATH, ask the owner where experiment-lab is.

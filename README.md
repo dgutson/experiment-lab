@@ -229,7 +229,8 @@ than 20). The file or folder of a `file:` item is copied into the data folder, a
 copy, so that it shows later what it cited; one over 100 MB is cited where it is, with a warning. rec
 warns about a run id in the text that the evidence does not cite. A
 new question is open and any other record closed unless a status is given, and a record that answers
-an open question closes it. A prediction, the outcome expected before an experiment's first run, is
+an open question closes it. A record whose change was undone, or that a later result shows wrong, is
+set superseded, and the record that says so cites it as `record:<id>`. A prediction, the outcome expected before an experiment's first run, is
 written as a question, which the finding that checks it answers, so that it stays open until
 checked. `rec add` and `rec set` print the records they changed, then, when
 they changed how many of the project's records are open, how many are; `rec open` lists them. With

@@ -1,0 +1,28 @@
+schema_version: "1.1"
+name: undone-change
+description: Told to undo the change a finding describes and note it in the lab, the agent marks that finding superseded.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    The 512-sample frames click at frame edges. Put encoder.py back to 1024-sample frames, and note it in the lab.
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  - name: marked-superseded
+    type: tool_used
+    tool: Bash
+    input_match: 'rec set .{0,80}status=superseded'
+  - name: undone-recorded
+    type: llm
+    focus: trace
+    criteria: |
+      PASS if encoder.py was set back to 1024-sample frames and the agent filed a record in the lab (a `rec add`
+      command whose output shows the new record, not an error) that says the frames are back to 1024 samples
+      because 512-sample frames click. FAIL if encoder.py still uses 512-sample frames, no such record was filed,
+      or rec printed an error for it.
