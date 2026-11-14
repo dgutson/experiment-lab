@@ -660,16 +660,41 @@ def watch_sigterm() -> None:
 
 
 def stopped(signum: int, _: FrameType | None) -> None:
-    """The SIGTERM handler: ends KILLED the runs of entered(), rolling back the
-    write their lab may be in, which the process would lose anyway, then ends
-    the process by the signal, as without the handler."""
-    for run in entered():
+    """The SIGTERM handler: sends the signal to the processes this process
+    started and theirs, which are the runs' work too, ends KILLED the runs of
+    entered(), rolling back the write their lab may be in, which the process
+    would lose anyway, then ends the process by the signal, as without the
+    handler. The processes are stopped first, since a SIGKILL may follow soon
+    (Claude Code's TaskStop sends one 1.5 s after SIGTERM) and a write may wait
+    for lab.db. A process forked in a with block, which has the handler and no
+    runs of its own, ends as without it."""
+    runs = entered()
+    for pid in descendants(os.getpid()) if runs else []:
+        with contextlib.suppress(ProcessLookupError):
+            os.kill(pid, signum)
+    for run in runs:
         with contextlib.suppress(sqlite3.Error):  # a connection of another thread, or lab.db locked for a minute
             if run.lab.db.in_transaction:
                 run.lab.db.execute("ROLLBACK")
             run.end("KILLED")
     signal.signal(signum, signal.SIG_DFL)
     signal.raise_signal(signum)
+
+
+def descendants(pid: int) -> list[int]:
+    """The processes that pid started and those they started, by the parent
+    pid of /proc/PID/stat; none where there is no /proc."""
+    children: dict[int, list[int]] = {}
+    for stat in Path("/proc").glob("[0-9]*/stat"):
+        with contextlib.suppress(OSError, IndexError, ValueError):  # a process gone since the glob
+            children.setdefault(int(stat.read_text().rsplit(")", 1)[1].split()[1]), []).append(int(stat.parent.name))
+    found: list[int] = []
+    todo = [pid]
+    while todo:
+        below = children.get(todo.pop(), [])
+        found += below
+        todo += below
+    return found
 
 
 if __name__ == "__main__":  # for lab-server and query.attach: makes or upgrades lab.db; --delete PROJECT deletes one
