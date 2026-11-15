@@ -7,17 +7,20 @@ plugin VERSION; experiment-lab VERSION; Claude Code 2.1.316; claude-sonnet-5-5
 
 ## The lab in this session
 
-12 lab commands of 18 tool calls: 6 rec, 5 q, 1 other; 4 failed; they printed 4.9 kB, about 1,234 tokens.
+18 lab commands of 24 tool calls: 10 rec, 7 q, 1 other; 6 failed; they printed 5.2 kB, about 1,307 tokens.
 
 ## Lab commands that failed
 
 - `q "SELECT * FROM runz"`: `error: Catalog Error: Table with name runz does not exist!`; not done later
 - `rec add finding "<text>" --in "experiment-b" --text "<text>" --evidence run:run-a`: `error: no run run-a: rec run prints a run's id` (2 tries); done 2 turns later by `rec add finding "<text>" --in "experiment-b" --text "<text>"`
 - `PYTHONPATH=~/experiment-lab python3 - <<'EOF' ⏎ <text> ⏎ EOF`: `KeyError: '<text>'`; not done later
+- `R=$(rec run "experiment-a" "<text>"); rec end $R --metric accuracy=<n>`: `error: the run id is empty, as a shell variable is when the command that set it failed`; done 1 turn later by `rec end 0123abcd --metric accuracy=<n>`
+- `rec add rule "<text>" --in "experiment-a" --text "<text>"`: `error: kind '<text>' is not one of question, decision, protocol, finding`; done 1 turn later by `rec add protocol "<text>" --in "experiment-a" --text "<text>"`
 
 ## Searches that found nothing, run again
 
 - `q "SELECT id, title FROM records WHERE holds_words(title || ' ' || text, '<text>')"`: no rows; found 1 turn later by `q "SELECT kind, id FROM experiments_runs_records WHERE holds_words(title || ' ' || text, '<text>')"`
+- `q "SELECT id FROM records WHERE kind = 'question'"`: no rows; found 5 turns later by `q "SELECT name FROM runs"; q "SELECT name FROM runs WHERE status = '<text>'"`
 
 ## Run more than once
 
@@ -42,17 +45,20 @@ plugin VERSION; experiment-lab VERSION; Claude Code 2.1.316; claude-sonnet-5-5
 
 ## The lab in this session
 
-12 lab commands of 18 tool calls: 6 rec, 5 q, 1 other; 4 failed; they printed 4.9 kB, about 1,234 tokens.
+18 lab commands of 24 tool calls: 10 rec, 7 q, 1 other; 6 failed; they printed 5.2 kB, about 1,307 tokens.
 
 ## Lab commands that failed
 
 - `q "SELECT * FROM runz"`: `error: Catalog Error: Table with name runz does not exist!`; not done later
 - `rec add finding "Dither helps" --in "16-bit output" --text "Better at 44100 Hz." --evidence run:0123456789abcdef0123456789abcdef`: `error: no run 0123456789abcdef0123456789abcdef: rec run prints a run's id` (2 tries); done 2 turns later by `rec add finding "Dither helps" --in "16-bit output" --text "Better at 44100 Hz."`
 - `PYTHONPATH=~/experiment-lab python3 - <<'EOF' ⏎ from experiment_lab.lab import Lab ⏎ print(Lab().runs('noise gate')[0].metrics['snr']) ⏎ EOF`: `KeyError: 'snr'`; not done later
+- `R=$(rec run "sample rate sweep" "48k again"); rec end $R --metric accuracy=0.9`: `error: the run id is empty, as a shell variable is when the command that set it failed`; done 1 turn later by `rec end 0123abcd --metric accuracy=0.9`
+- `rec add rule "One setup" --in "sample rate sweep" --text "Same machine."`: `error: kind 'rule' is not one of question, decision, protocol, finding`; done 1 turn later by `rec add protocol "One setup" --in "sample rate sweep" --text "Same machine."`
 
 ## Searches that found nothing, run again
 
 - `q "SELECT id, title FROM records WHERE holds_words(title || ' ' || text, 'sample rate')"`: no rows; found 1 turn later by `q "SELECT kind, id FROM experiments_runs_records WHERE holds_words(title || ' ' || text, 'rate')"`
+- `q "SELECT id FROM records WHERE kind = 'question'"`: no rows; found 5 turns later by `q "SELECT name FROM runs"; q "SELECT name FROM runs WHERE status = 'RUNNING'"`
 
 ## Run more than once
 
@@ -67,6 +73,23 @@ plugin VERSION; experiment-lab VERSION; Claude Code 2.1.316; claude-sonnet-5-5
 
 - `~/.claude/plugins/cache/experiment-lab-marketplace/experiment-lab/0.2.40/skills/experiment-db/references/runs.md`
 - `rec experiment --help`
+[exit 0]
+$ draft --session 0e0e0e0e-0000-4000-8000-000000000000 --plugin ROOT/plugin
+FOLDER/lab-data/feedback/TIME.md
+
+## Versions
+
+plugin VERSION; experiment-lab VERSION; Claude Code 2.1.316; claude-sonnet-5-5
+
+## The lab in this session
+
+This session sent a report before, #7; this one covers only what came after it.
+
+2 lab commands of 2 tool calls: 0 rec, 2 q, 0 other; 1 failed; they printed 0.1 kB, about 21 tokens.
+
+## Lab commands that failed
+
+- `q "SELECT nosuch FROM runs"`: `error: Binder Error: Referenced column "<text>" not found`; not done later
 [exit 0]
 $ draft --session none
 error: no transcript of the session none in FOLDER/claude/projects or FOLDER/home/.claude/projects
