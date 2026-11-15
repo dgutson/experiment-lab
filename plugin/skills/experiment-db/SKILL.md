@@ -19,8 +19,10 @@ An experiment, in order:
 3. When a protocol rule asks for a prediction, `rec add question "Will ...?" --in NAME --text
    "the outcome expected, and why"` before the first run.
 4. The work, inside `with lab.run(...)` (below), so that the lab measures how long each run took.
-   For work that runs elsewhere (a background job, an agent trial, another tool), read
-   [references/runs-elsewhere.md](references/runs-elsewhere.md) before it starts.
+   Work that runs elsewhere (a background job, an agent trial, another tool) starts with `rec run
+   EXPERIMENT NAME --note T`, which prints the run's id, then, on stderr, how to end the run with its
+   results; for times earlier than now, or results that a script computes, read
+   [references/runs-elsewhere.md](references/runs-elsewhere.md).
 5. `rec add finding "TITLE" --in NAME --text "what the runs showed" --evidence run:<run id>`, with
    `--answers <question id>` when step 3 wrote one.
 6. If the idea failed, `rec experiment NAME --dead-end`, and the finding says why.
