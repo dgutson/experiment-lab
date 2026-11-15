@@ -51,6 +51,52 @@ CREATE MACRO latest_runs(experiment_name, keys) AS TABLE
     SELECT * FROM runs WHERE experiment = experiment_name AND status = 'FINISHED'
     QUALIFY row_number() OVER (PARTITION BY [params[k] FOR k IN keys] ORDER BY start_time DESC, run DESC) = 1;
 
+-- One row per item of each message of a Claude Code transcript, the JSONL file
+-- or files of path (a glob, as '~/.claude/projects/*/*/subagents/*.jsonl'):
+-- file, line, time, role (user or assistant), kind (text, thinking, tool_use,
+-- tool_result, image), tool (the call's tool), call (the tool call's id),
+-- input (the call's input, JSON), text (of a text, thinking or tool_result),
+-- error (whether the call failed), message (an API call's id), model, and the
+-- API call's tokens on its first row only, so that sum() counts each call once:
+-- context_tokens (input, cache read and cache creation) and output_tokens.
+-- tool and error are on both rows of a tool call, its tool_use and its
+-- tool_result. output_tokens is NULL where the call has no stop_reason, as in
+-- claude -p's stream-json output, which counts them before the call ends; a
+-- session's own transcript has them all.
+CREATE MACRO transcript(path) AS TABLE
+WITH texts AS (
+    SELECT filename AS file, string_split(content, chr(10)) AS lines FROM read_text(path)
+), entries AS (
+    SELECT file, generate_subscripts(lines, 1) AS line,
+        CASE WHEN json_valid(unnest(lines)) THEN json(unnest(lines)) END AS e
+    FROM texts
+), items AS (
+    SELECT file, line, e,
+        unnest(CASE WHEN json_type(e, '$.message.content') = 'ARRAY' THEN json_extract(e, '$.message.content[*]')
+            ELSE [json_object('type', 'text', 'text', e ->> '$.message.content')] END) AS c,
+        generate_subscripts(CASE WHEN json_type(e, '$.message.content') = 'ARRAY'
+            THEN json_extract(e, '$.message.content[*]') ELSE [NULL::json] END, 1) AS item
+    FROM entries WHERE (e ->> '$.type') IN ('user', 'assistant') AND json_type(e, '$.message') = 'OBJECT'
+), parts AS (
+    SELECT file, line, item, e ->> '$.timestamp' AS time, e ->> '$.type' AS role, c ->> 'type' AS kind,
+        coalesce(c ->> 'id', c ->> 'tool_use_id') AS call, c ->> 'name' AS tool, c -> 'input' AS input,
+        CASE WHEN (c ->> 'type') <> 'tool_result' THEN coalesce(c ->> 'text', c ->> 'thinking')
+            WHEN json_type(c, '$.content') = 'ARRAY'
+            THEN array_to_string(json_extract_string(c, '$.content[*].text'), chr(10))
+            ELSE c ->> 'content' END AS text,
+        (c ->> 'is_error')::boolean AS error, e ->> '$.message.id' AS message, e ->> '$.message.model' AS model,
+        e -> '$.message.usage' AS usage, e ->> '$.message.stop_reason' AS stop_reason,
+        role = 'assistant' AND row_number() OVER (PARTITION BY file, message ORDER BY line, item) = 1 AS first
+    FROM items
+)
+SELECT file, line, time, role, kind, max(tool) OVER (PARTITION BY file, call) AS tool, call, input, text,
+    bool_or(error) OVER (PARTITION BY file, call) AS error,
+    message, model,
+    CASE WHEN first THEN (usage ->> 'input_tokens')::bigint + coalesce((usage ->> 'cache_read_input_tokens')::bigint, 0)
+        + coalesce((usage ->> 'cache_creation_input_tokens')::bigint, 0) END AS context_tokens,
+    CASE WHEN first AND stop_reason IS NOT NULL THEN (usage ->> 'output_tokens')::bigint END AS output_tokens
+FROM parts ORDER BY file, line, item;
+
 -- One row per file logged for a run: run, experiment, project, name (which may
 -- hold folders), bytes and path, the absolute path of the copy, files/<run>/<name>
 -- in the data folder (the macro data_folder(), which query.attach makes).

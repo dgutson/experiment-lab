@@ -13,3 +13,12 @@ alike, is ISO 8601 text, local unless it ends in `Z` or an offset: `"2026-09-10 
 `2026-09-10T10:00Z` as it is, with no conversion by hand; in Python it may be a `datetime` too. A
 run logged after the work without its times shows a duration of seconds, which the pages count as
 measured.
+
+An agent trial logs the agent's transcript with its run, as `transcript.jsonl` (`rec end <run id>
+--file <transcript>=transcript.jsonl`, or `run.log_file(<transcript>, "transcript.jsonl")`), so that
+a later question about its tool calls or tokens starts from the run, with q's `transcript()`.
+Claude Code (`~/.claude`, or `$CLAUDE_CONFIG_DIR` when set) keeps a subagent's transcript at
+`~/.claude/projects/*/*/subagents/agent-<agentId>.jsonl`, the agentId being the one in the Agent
+tool's result, and a session's at `~/.claude/projects/<its folder, with each / and . as ->/<session
+id>.jsonl` (`claude -p --output-format json` prints its `session_id`). Log that file, not the output
+of `--output-format stream-json`, whose output tokens are counted before each call ends.

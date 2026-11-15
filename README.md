@@ -277,7 +277,7 @@ a record a text; `rec`, `lab.py` and `records.py` refuse one without. A run's no
 | `experiment_lab/` | the package; its `__init__.py` lists what each module holds |
 | `experiment_lab/schema.sql` | the tables of `lab.db` |
 | `experiment_lab/read.sql` | the SQLite SQL with which `lab.py` reads runs back |
-| `experiment_lab/lab.sql` | the views `experiments`, `runs`, `files`, `records` and `experiments_runs_records`, which q and the pages query, and the macros `local_time`, `holds_words` and `latest_runs` |
+| `experiment_lab/lab.sql` | the views `experiments`, `runs`, `files`, `records` and `experiments_runs_records`, which q and the pages query, and the macros `local_time`, `holds_words`, `latest_runs` and `transcript` |
 | `experiment_lab/lab.py` | logging projects, experiments and runs from Python, and reading runs back, with the standard library only |
 | `bin/start.sh` | starts the pages' server, `lab-server`, in the background |
 | `bin/restart.sh` | stops the `lab-server` on the port, waits for it to end, and runs `start.sh` |
@@ -460,6 +460,19 @@ q "SELECT name, params, metrics FROM latest_runs('rate test', ['rate'])"
 
 A later run changes what it returns, so a record's evidence cites the runs it returned
 (`run:<run id>`), not the query.
+
+An agent trial is a run that logs the agent's transcript, as `transcript.jsonl`. The macro
+`transcript(path)` gives a Claude Code transcript (a JSONL file, or the files of a glob) as rows, one
+per item of a message: file, line, time, role, kind (text, thinking, tool_use, tool_result), tool,
+call, input, text, error, message, model, and each API call's `context_tokens` (input, cache read
+and cache creation) and `output_tokens`, on its first row only, so that `sum()` counts each call
+once. A session's transcript, under `~/.claude/projects`, has every call's tokens; the output of
+`claude -p --output-format stream-json` counts output tokens before each call ends, and the macro
+leaves them NULL there:
+
+```sh
+q "SELECT sum(output_tokens) FROM transcript(data_folder() || '/files/<run id>/transcript.jsonl')"
+```
 
 A report script reads runs back through `lab.py` too, with no DuckDB. `lab.runs(experiment)` gives
 the experiment's FINISHED runs, oldest first, each with `id`, `name`, `status`, `start_time`,

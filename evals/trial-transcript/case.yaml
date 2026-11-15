@@ -1,0 +1,26 @@
+schema_version: "1.1"
+name: trial-transcript
+description: Asked about two agent trials whose transcripts their runs logged, the agent lists one trial's failed commands and each trial's output tokens.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    Which Bash commands failed in the v2 changelog trial, and how many output tokens did the v1 and v2 agents
+    spend in all?
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  - name: answered
+    type: llm
+    focus: trace
+    criteria: |
+      The v2 agent's failed Bash commands are `python3 tools/make_changelog.py --from v1.2`, `npm run changelog` and
+      `python3 tools/make_changelog.py --since v1.2` (the one without `> CHANGELOG.md`). The v1 agent spent 1732
+      output tokens and the v2 agent 2319. PASS if the agent's final answer names those three commands, and no
+      other, as v2's failures, and gives 1732 and 2319. FAIL if it gives other numbers (such as 3336 and 5304,
+      which count an API call once per line of the transcript) or misses or adds a command.
