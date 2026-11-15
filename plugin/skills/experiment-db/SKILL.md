@@ -1,6 +1,6 @@
 ---
 name: experiment-db
-description: "Experiment data kept in the lab's database, lab.db: projects with their experiment trees, runs, parameters, metrics, decisions, findings, protocol rules and open questions. Use it to find past experiments by their text and answer any question about an experiment's state or numbers, or about a project's views, with one SQL call (q), to record a decision, finding, rule or question (rec), and to log runs from Python and read them back in a script (experiment_lab.lab), before writing a script over result files."
+description: "Experiment data kept in the lab's database, lab.db: projects with their experiment trees, runs (agent trials among them, with their transcripts), parameters, metrics, decisions, findings, protocol rules and open questions. Use it to find past experiments by their text and answer any question about an experiment's state or numbers, or about a project's views, with one SQL call (q), to record a decision, finding, rule or question (rec), and to log runs from Python and read them back in a script (experiment_lab.lab), before writing a script over result files."
 ---
 
 # Experiment database
@@ -19,7 +19,7 @@ An experiment, in order:
 3. When a protocol rule asks for a prediction, `rec add question "Will ...?" --in NAME --text
    "the outcome expected, and why"` before the first run.
 4. The work, inside `with lab.run(...)` (below), so that the lab measures how long each run took.
-   For work that runs elsewhere (a background job or agent, another tool), read
+   For work that runs elsewhere (a background job, an agent trial, another tool), read
    [references/runs-elsewhere.md](references/runs-elsewhere.md) before it starts.
 5. `rec add finding "TITLE" --in NAME --text "what the runs showed" --evidence run:<run id>`, with
    `--answers <question id>` when step 3 wrote one.
@@ -120,6 +120,10 @@ An experiment, in order:
 `holds_words(text, words)` is true when text holds every word of words, in any letter case.
 `latest_runs(experiment_name, keys)` is the experiment's latest FINISHED run, by start time, for
 each combination of the values of the params named in the list keys, as rows of `runs`.
+`transcript(path)` is a Claude Code transcript (JSONL; a glob reads several) as rows, one per item of
+a message: file, line, time, role, kind (text, thinking, tool_use, tool_result), tool, call, input
+(JSON), text, error (the call failed), message, model, and each API call's context_tokens and
+output_tokens, on its first row only, so that `sum()` counts each call once.
 
 The project's own view files are listed in its row of `lab.experiments`, column `views`; read
 those files for what each view holds. A query asked again and again goes in a view file
@@ -132,4 +136,5 @@ SELECT id, kind, status, title FROM records WHERE status = 'open' OR kind = 'dec
 SELECT experiment, count(*) AS runs FROM runs GROUP BY ALL ORDER BY 2 DESC;
 SELECT name, params['rate'] AS rate, metrics['accuracy'] AS accuracy FROM latest_runs('rate test', ['rate']);
 SELECT key, step, value FROM lab.metrics WHERE run = '<run id>' ORDER BY key, step;
+SELECT f.experiment, f.run, t.input ->> 'command' FROM transcript(data_folder() || '/files/*/transcript.jsonl') t JOIN files f ON f.path = t.file WHERE t.tool = 'Bash' AND t.kind = 'tool_use' AND t.error;
 ```

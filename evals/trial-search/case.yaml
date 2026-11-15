@@ -1,0 +1,25 @@
+schema_version: "1.1"
+name: trial-search
+description: Asked which of a project's agent trials had a git push rejected, the agent searches the transcripts that the trials' runs logged and names the one trial.
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: |
+    Which of the audio-codec agent trials had a git push rejected? Name the experiment and the run.
+  allowed_tools: [Read, Glob, Grep, Skill]
+  max_turns: 30
+  timeout_seconds: 600
+graders:
+  - name: skill-used
+    type: tool_used
+    tool: Skill
+    input_match: experiment-db
+  - name: answered
+    type: llm
+    focus: trace
+    criteria: |
+      One audio-codec agent trial had a git push rejected: the run "trial v2" of the experiment "release trials".
+      The project vision's run "trial v1" of "label trials" had one too. PASS if the agent's final answer names
+      release trials and its run trial v2, by its name or by the run id the trace shows for it, as the audio-codec
+      trial, and gives no other run as an audio-codec trial with a rejected push; naming vision's run as well
+      passes only if the answer says it is vision's. FAIL otherwise.
