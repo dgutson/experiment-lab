@@ -274,6 +274,7 @@ with tempfile.TemporaryDirectory() as folder:
                PYTHONUNBUFFERED="1", COLUMNS="100", NO_COLOR="1", LC_ALL="C.UTF-8",  # the same output anywhere
                PYTHONPATH=os.pathsep.join([str(ROOT / "checks" / "sql_trace"), *os.environ.get("PYTHONPATH", "").split(
                    os.pathsep)]).rstrip(os.pathsep), SQL_TRACE=f"{folder}/sql.jsonl")
+    env.pop("CLAUDE_CONFIG_DIR", None)  # rec run prints it
     out = []
     for command in COMMANDS:
         done = subprocess.run(["bash", "-c", command], cwd=f"{folder}/home/audio-codec", env=env, text=True,
