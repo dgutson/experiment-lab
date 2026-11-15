@@ -44,8 +44,8 @@ TRIALS = {
 }
 
 
-def transcript(calls: list, session: str) -> list[dict]:
-    """The lines of a session transcript of the API calls given."""
+def transcript(calls: list, session: str, prompt: str = "Write CHANGELOG.md for the changes since v1.2.") -> list[dict]:
+    """The lines of a session transcript of the API calls given, after the prompt."""
     lines: list[dict] = [{"type": "permission-mode", "permissionMode": "default", "sessionId": session}]
     parent = None
     clock = 0
@@ -60,7 +60,7 @@ def transcript(calls: list, session: str) -> list[dict]:
         parent = entry["uuid"]
         lines.append(entry)
 
-    add("user", {"role": "user", "content": "Write CHANGELOG.md for the changes since v1.2."})
+    add("user", {"role": "user", "content": prompt})
     context = BASE
     for thinking, work, output in calls:
         usage = {"input_tokens": 3, "cache_creation_input_tokens": 900, "cache_read_input_tokens": context - 903,
@@ -84,19 +84,20 @@ def transcript(calls: list, session: str) -> list[dict]:
                                "interrupted": False})
             lines.append({"type": "attachment", "attachment": {"type": "todo_reminder"}, "sessionId": session})
         context += 900 + output + sum(len(r) // 3 for _, r, _ in work)
-    lines.append({"type": "last-prompt", "lastPrompt": "Write CHANGELOG.md", "sessionId": session})
+    lines.append({"type": "last-prompt", "lastPrompt": prompt, "sessionId": session})
     return lines
 
 
-lab = Lab(project="audio-codec")
-lab.experiment("changelog trials", "Agent trials of the prompt that asks an agent to write CHANGELOG.md, one run per"
-               " version of the prompt; each run logs the agent's transcript and its score.")
-with tempfile.TemporaryDirectory() as folder:
-    for n, (version, calls) in enumerate(TRIALS.items()):
-        path = Path(folder) / f"{version}.jsonl"
-        path.write_text("".join(json.dumps(line) + "\n" for line in transcript(calls, str(uuid.uuid4()))))
-        with lab.run("changelog trials", f"trial {version}", params={"prompt": version},
-                     start=f"2026-11-10 1{4 + n}:00") as run:
-            run.log_metrics({"score": (0.8, 0.9)[n]})
-            run.log_file(path, "transcript.jsonl")
-lab.close()
+if __name__ == "__main__":
+    lab = Lab(project="audio-codec")
+    lab.experiment("changelog trials", "Agent trials of the prompt that asks an agent to write CHANGELOG.md, one run per"
+                   " version of the prompt; each run logs the agent's transcript and its score.")
+    with tempfile.TemporaryDirectory() as folder:
+        for n, (version, calls) in enumerate(TRIALS.items()):
+            path = Path(folder) / f"{version}.jsonl"
+            path.write_text("".join(json.dumps(line) + "\n" for line in transcript(calls, str(uuid.uuid4()))))
+            with lab.run("changelog trials", f"trial {version}", params={"prompt": version},
+                         start=f"2026-11-10 1{4 + n}:00") as run:
+                run.log_metrics({"score": (0.8, 0.9)[n]})
+                run.log_file(path, "transcript.jsonl")
+    lab.close()

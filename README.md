@@ -474,6 +474,15 @@ leaves them NULL there:
 q "SELECT sum(output_tokens) FROM transcript(data_folder() || '/files/<run id>/transcript.jsonl')"
 ```
 
+The path is a constant: DuckDB refuses a column of another table there (`files f, transcript(f.path)`).
+A project's trials are every run's transcript, read by a glob and joined with the view `files`, which
+holds the current project's runs only:
+
+```sh
+q "SELECT f.experiment, f.run, t.input ->> 'command' FROM transcript(data_folder() || '/files/*/transcript.jsonl') t
+   JOIN files f ON f.path = t.file WHERE t.tool = 'Bash' AND t.kind = 'tool_use' AND t.error"
+```
+
 A report script reads runs back through `lab.py` too, with no DuckDB. `lab.runs(experiment)` gives
 the experiment's FINISHED runs, oldest first, each with `id`, `name`, `status`, `start_time`,
 `end_time`, `params`, `tags`, `metrics` and `note`: params and tags as text, and each metric's

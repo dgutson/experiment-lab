@@ -136,5 +136,5 @@ SELECT id, kind, status, title FROM records WHERE status = 'open' OR kind = 'dec
 SELECT experiment, count(*) AS runs FROM runs GROUP BY ALL ORDER BY 2 DESC;
 SELECT name, params['rate'] AS rate, metrics['accuracy'] AS accuracy FROM latest_runs('rate test', ['rate']);
 SELECT key, step, value FROM lab.metrics WHERE run = '<run id>' ORDER BY key, step;
-SELECT input ->> 'command' FROM transcript(data_folder() || '/files/<run id>/transcript.jsonl') WHERE tool = 'Bash' AND kind = 'tool_use' AND error;
+SELECT f.experiment, f.run, t.input ->> 'command' FROM transcript(data_folder() || '/files/*/transcript.jsonl') t JOIN files f ON f.path = t.file WHERE t.tool = 'Bash' AND t.kind = 'tool_use' AND t.error;
 ```
