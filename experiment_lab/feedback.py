@@ -9,10 +9,11 @@ python3 -m experiment_lab.feedback draft --session ID [--plugin DIR] [--real]
     prints its path and its text: the versions; how many lab commands (rec, q,
     lab-server and Python that uses experiment_lab) the session ran, how many
     failed and how much they printed; each lab command that failed, with its
-    error and the command that next did the same work without failing; each
+    error and the command that next did some of its work without failing; each
     q that printed no rows, with the q that next printed some; the commands
     run more than once; those that printed much; and the help, skill
-    files and lab code the session read. Without --real, the lab's project,
+    files and lab code the session read. In a session that sent a report
+    before, it lists only what came after the last one. Without --real, the lab's project,
     experiment and record names, run ids, paths, numbers and quoted texts are
     replaced with neutral ones. ID is the session's, whose transcript is in
     the projects folder of Claude Code's config folder ($CLAUDE_CONFIG_DIR,
@@ -54,7 +55,8 @@ ENDS = set(";&|()\n")  # the shell's characters that end a simple command
 # The words before a command's own: the shell's keywords and the commands that run another.
 BEFORE = {"do", "then", "else", "elif", "if", "while", "until", "!", "{", "env", "time", "exec", "nohup", "setsid"}
 ASSIGNMENT = re.compile(r"\w+=.*", re.S)
-EMPTY = re.compile(r"^\(0 rows\)$", re.M)  # what q prints for no rows
+ROWS = re.compile(r"^\((\d+) rows\)$", re.M)  # what q prints after a SELECT's rows
+SENT = re.compile(rf"github\.com/{re.escape(REPO)}/issues/(\d+)")  # what send prints for the issue it opened
 FAILED = re.compile(r"^(?:error:|Traceback \(most recent call last\))|command not found", re.M)
 WRONG = re.compile(r"^error:|command not found|denied|No such file")  # a line that says what went wrong
 HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1([^\n]*)\n.*?\n\2(?=\n|$)", re.S)
@@ -71,9 +73,11 @@ WORDS = {"tree", "project", "experiment", "add", "set", "open", "run", "end", "r
 
 
 class ToolCall(NamedTuple):
-    """A tool call: the assistant message it is in, counted from 0; the tool;
-    its command, path or skill; what it printed; whether it failed."""
+    """A tool call: the assistant message it is in, counted from 0; when it
+    was made (ISO 8601, UTC); the tool; its command, path or skill; what it
+    printed; whether it failed."""
     turn: int
+    time: str
     tool: str
     text: str
     output: str
@@ -82,7 +86,7 @@ class ToolCall(NamedTuple):
 
 class Friction(NamedTuple):
     """A lab command that failed or found nothing, how many tries did, and the
-    call that next did the same work, if any."""
+    call that next did some of its work, if any."""
     first: ToolCall
     tries: int
     done: ToolCall | None
@@ -96,8 +100,9 @@ class LabName(NamedTuple):
 
 
 class ToolUse(NamedTuple):
-    """A tool call whose result has not come yet: its turn, tool and text."""
+    """A tool call whose result has not come yet: its turn, time, tool and text."""
     turn: int
+    time: str
     tool: str
     text: str
 
@@ -105,6 +110,8 @@ class ToolUse(NamedTuple):
 type Unanswered = dict[str, ToolUse]  # by the tool call's id
 type Misses = list[ToolCall]
 type Words = list[str]  # a simple command's, as the shell splits them
+type Works = tuple[str, ...]  # what a shell command's lab commands do, in order
+type Work = frozenset[str]  # what a lab command that missed was doing, to be done again
 
 
 class Transcript(NamedTuple):
@@ -141,13 +148,13 @@ def result_text(content: object) -> str:
     return str(content or "")
 
 
-def note_tool_uses(message: dict[str, Any], turn: int, unanswered: Unanswered) -> None:
+def note_tool_uses(message: dict[str, Any], turn: int, time: str, unanswered: Unanswered) -> None:
     """Notes the tool calls of an assistant message, by id, until their results come."""
     for block in message["content"]:
         if block.get("type") == "tool_use":
             given = block.get("input", {})
             text = given.get("command") or given.get("file_path") or given.get("skill") or ""
-            unanswered[block["id"]] = ToolUse(turn, block["name"], str(text))
+            unanswered[block["id"]] = ToolUse(turn, time, block["name"], str(text))
 
 
 def add_tool_results(message: dict[str, Any], unanswered: Unanswered, calls: list[ToolCall]) -> None:
@@ -172,7 +179,8 @@ def read_transcript(path: Path, transcript: Transcript) -> None:
             continue
         if entry.get("type") == "assistant":
             transcript.models.add(message.get("model") or "")
-            note_tool_uses(message, turns.setdefault(message.get("id", len(turns)), len(turns)), unanswered)
+            note_tool_uses(message, turns.setdefault(message.get("id", len(turns)), len(turns)),
+                           entry.get("timestamp") or "", unanswered)
         add_tool_results(message, unanswered, transcript.calls)
 
 
@@ -243,32 +251,55 @@ def reads_lab_docs(call: ToolCall) -> bool:
     return bool(LAB_FILES.search(call.text)) or call.tool == "Bash" and "--help" in call.text and is_lab_command(call)
 
 
-def lab_work(command: str) -> str:
-    """What a lab command does, to match one that failed with the next that did
-    the same work: rec and its command, q, lab-server, or Python."""
+def first_tool(command: str) -> str:
+    """The first lab command a shell command runs: rec, q or lab-server, else Python."""
+    return next((tool(words) for words in simple_commands(command) if tool(words) in LAB_TOOLS), "python")
+
+
+def lab_works(command: str) -> Works:
+    """What each lab command of a shell command does, in order, each once: rec
+    and its command, q, lab-server, or Python that uses the lab. Printing help
+    is no work."""
+    works: list[str] = []
     for words in simple_commands(command):
-        if tool(words) == "rec" and len(words) > 1 and not words[1].startswith("-"):
-            return f"rec {words[1]}"
-        if tool(words) in LAB_TOOLS:
-            return tool(words)
-    return "python"
+        name = tool(words)
+        if "--help" in words or "-h" in words:
+            continue
+        if name == "rec" and len(words) > 1 and not words[1].startswith("-"):
+            works.append(f"rec {words[1]}")
+        elif name in LAB_TOOLS:
+            works.append(name)
+        elif name.startswith("python") and PYTHON_LAB.search(command):
+            works.append("python")
+    return tuple(dict.fromkeys(works))
+
+
+def all_works(call: ToolCall) -> Work:
+    return frozenset(lab_works(call.text))
 
 
 def found_no_rows(call: ToolCall) -> bool:
-    """Whether call is a q that printed no rows."""
-    return lab_work(call.text) == "q" and bool(EMPTY.search(call.output))
+    """Whether call ran q and every SELECT it ran printed no rows."""
+    counts = set(ROWS.findall(call.output))
+    return counts == {"0"} and "q" in lab_works(call.text)
 
 
-def frictions(calls: list[ToolCall], missed: Callable[[ToolCall], bool]) -> list[Friction]:
-    """Each run of lab commands of the same work that missed (failed, or found
-    nothing), with the call that next did that work, in the order they
-    began."""
-    failing: dict[str, Misses] = {}
+def frictions(calls: list[ToolCall], missed: Callable[[ToolCall], bool],
+              work: Callable[[ToolCall], Work]) -> list[Friction]:
+    """Each run of lab commands that missed (failed, or found nothing) at the
+    same work, with the call that next did some of that work without missing,
+    in the order they began. A shell command that runs several lab commands
+    does the work of each; what one that failed printed seldom says which of
+    them failed, and the call that does it again often does only that one."""
+    failing: dict[Work, Misses] = {}
     found: list[Friction] = []
     for call in calls:
         if missed(call):
-            failing.setdefault(lab_work(call.text), []).append(call)
-        elif (tries := failing.pop(lab_work(call.text), None)) is not None:
+            failing.setdefault(work(call), []).append(call)
+            continue
+        done = all_works(call)
+        for missing in [missing for missing in failing if missing & done]:
+            tries = failing.pop(missing)
             found.append(Friction(tries[0], len(tries), call))
     found += [Friction(tries[0], len(tries), None) for tries in failing.values()]
     return sorted(found, key=lambda friction: friction.first.turn)
@@ -408,7 +439,7 @@ def turns_text(n: int) -> str:
 
 def friction_line(friction: Friction, what: str, done: str, neutralizer: Neutralizer) -> str:
     """friction as a line of the report: the command, what it printed, its
-    tries, and the call that next did the same work."""
+    tries, and the call that next did some of its work."""
     tries = f" ({friction.tries} tries)" if friction.tries > 1 else ""
     later = (f"; {done} {turns_text(friction.done.turn - friction.first.turn)} later by"
              f" {inline_code(neutralizer.rewrite(friction.done.text))}" if friction.done else f"; not {done} later")
@@ -417,15 +448,18 @@ def friction_line(friction: Friction, what: str, done: str, neutralizer: Neutral
 
 def failure_lines(calls: list[ToolCall], neutralizer: Neutralizer) -> list[str]:
     return [friction_line(friction, inline_code(neutralizer.rewrite(error_line(friction.first.output))), "done", neutralizer)
-            for friction in frictions(calls, lambda call: call.failed)]
+            for friction in frictions(calls, lambda call: call.failed, all_works)]
 
 
 def search_lines(calls: list[ToolCall], neutralizer: Neutralizer) -> list[str]:
     """Each q that printed no rows and that a later q, which printed some,
     searched again; a q of no rows that nothing searched again checked that
-    something was not there."""
+    something was not there. A search is a q whose output shows how many rows
+    it found: not one whose output went to a variable or was cut."""
+    searches = [call for call in calls if not call.failed and ROWS.search(call.output)]
     return [friction_line(friction, "no rows", "found", neutralizer)
-            for friction in frictions([call for call in calls if not call.failed], found_no_rows) if friction.done]
+            for friction in frictions(searches, found_no_rows,
+                                      lambda _: frozenset({"q"})) if friction.done]
 
 
 def counted_lines(texts: list[str], neutralizer: Neutralizer, least: int) -> list[str]:
@@ -438,17 +472,38 @@ def counted_lines(texts: list[str], neutralizer: Neutralizer, least: int) -> lis
 def usage_line(calls: list[ToolCall], every: int) -> str:
     """How many lab commands of every tool call, of what kind, how many failed
     and how much they printed."""
-    kinds = Counter(lab_work(call.text).split()[0] for call in calls)
+    kinds = Counter(first_tool(call.text) for call in calls)
     size = sum(len(call.output) for call in calls)
     return (f"{len(calls)} lab commands of {every} tool calls: {kinds['rec']} rec, {kinds['q']} q,"
             f" {len(calls) - kinds['rec'] - kinds['q']} other; {sum(call.failed for call in calls)} failed;"
             f" they printed {size / 1000:.1f} kB, about {size // 4:,} tokens.")
 
 
+class Since(NamedTuple):
+    """The tool calls a report covers, and the line that says so when it
+    covers only what came after the session's last report."""
+    calls: list[ToolCall]
+    line: list[str]
+
+
+def since_last_report(calls: list[ToolCall]) -> Since:
+    """The calls after the last one that sent a report and opened its issue,
+    and a line naming that issue; all of them if none did."""
+    sent = max((call for call in calls if "experiment_lab.feedback send" in call.text and SENT.search(call.output)),
+               key=lambda call: call.time, default=None)
+    if sent is None:
+        return Since(calls, [])
+    return Since([call for call in calls if call.time > sent.time],
+                 [f"This session sent a report before, #{SENT.findall(sent.output)[-1]}; this one covers only what"
+                  " came after it.\n"])
+
+
 def report_text(transcript: Transcript, plugin: Path | None, neutralizer: Neutralizer) -> str:
-    calls = [call for call in transcript.calls if is_lab_command(call)]
-    head = [f"## Versions\n\n{versions_line(transcript, plugin)}\n", "## The lab in this session\n",
-            usage_line(calls, len(transcript.calls))]
+    """The report of the session's tool calls after the last report it sent."""
+    after, line = since_last_report(transcript.calls)
+    calls = [call for call in after if is_lab_command(call)]
+    head = [f"## Versions\n\n{versions_line(transcript, plugin)}\n", "## The lab in this session\n", *line,
+            usage_line(calls, len(after))]
     much = [f"{inline_code(neutralizer.rewrite(call.text))}: {len(call.output) / 1000:.1f} kB" for call in calls
             if len(call.output) > LONG]
     return "\n".join([*head, *section("Lab commands that failed", failure_lines(calls, neutralizer)),
@@ -456,7 +511,7 @@ def report_text(transcript: Transcript, plugin: Path | None, neutralizer: Neutra
                       *section("Run more than once", counted_lines([call.text for call in calls], neutralizer, 2)),
                       *section("Printed much", much),
                       *section("Help, skill files and lab code read",
-                             counted_lines([call.text for call in transcript.calls if reads_lab_docs(call)], neutralizer, 1))]) + "\n"
+                             counted_lines([call.text for call in after if reads_lab_docs(call)], neutralizer, 1))]) + "\n"
 
 
 def report_path(folder: Path) -> Path:

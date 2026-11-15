@@ -375,7 +375,8 @@ open the issue by hand. A session that does not run the command has nothing more
 
 `experiment_lab/feedback.py` writes most of the report: it reads the session's transcript, lists
 each lab command that failed, ran more than once or printed much, and each search that found nothing
-and was run again, and makes the names neutral. The
+and was run again, and makes the names neutral. In a session that sent a report before, it lists only
+what came after the last one. The
 agent adds only what it alone knows, such as what the work was and what the lab lacked, so the
 report costs it few tokens.
 
