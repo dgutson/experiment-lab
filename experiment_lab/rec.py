@@ -85,8 +85,9 @@ the project's records are open, as add does; with --quiet, only its id.
 open lists the project's open records.
 
 run EXPERIMENT NAME starts a run, RUNNING, in an existing experiment, for work
-that runs outside the Python that logs it, and prints its id. --note is the
-run's note, and --start its start, now unless given.
+that runs outside the Python that logs it, and prints its id, then, on stderr,
+how to end it and where an agent trial's transcript is. --note is the run's
+note, and --start its start, now unless given.
 
 end RUN, a run's id or its first 8 characters or more, ends a RUNNING run,
 FINISHED unless --status says FAILED or KILLED, at --at, now unless given,
@@ -301,7 +302,15 @@ def run_set(lab: Lab, a: argparse.Namespace) -> None:
 
 
 def run_run(lab: Lab, a: argparse.Namespace) -> None:
-    print(lab.run(a.experiment, a.name, note=a.note, start=ms(a.start)).id)
+    """Prints the new run's id, then, on stderr, how to end it, so that the
+    id alone goes to R=$(rec run ...)."""
+    run_id = lab.run(a.experiment, a.name, note=a.note, start=ms(a.start)).id
+    print(run_id, flush=True)
+    claude = os.environ.get("CLAUDE_CONFIG_DIR", "~/.claude")
+    print(f"end it with rec end {run_id} [--metric K=V ...] [--tag K=V ...] [--file PATH[=NAME] ...] [--status"
+          f" FAILED|KILLED], which logs those results first; an agent trial logs the agent's transcript, --file"
+          f" PATH=transcript.jsonl: a subagent's at {claude}/projects/*/*/subagents/agent-<agentId>.jsonl, a"
+          f" session's at {claude}/projects/*/<session id>.jsonl", file=sys.stderr)
 
 
 def run_end(lab: Lab, a: argparse.Namespace) -> None:

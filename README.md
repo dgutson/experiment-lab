@@ -435,7 +435,8 @@ later SIGKILL, so a run of a task it stops ends KILLED only if the handler's wri
 
 Work that runs outside the Python that logs it, such as a background job, another tool or a person,
 is timed by a run opened before it starts and ended by another process. `rec run EXPERIMENT NAME
-[--note T] [--start T]` starts the run and prints its id. When the work ends, `rec end RUN
+[--note T] [--start T]` starts the run and prints its id, then, on stderr, how to end it and where an
+agent trial's transcript is. When the work ends, `rec end RUN
 [--status FINISHED|FAILED|KILLED] [--at T] [--metric K=V ...] [--tag K=V ...] [--file PATH[=NAME] ...]`
 logs its metrics (at step 0), tags and files (copied as NAME, the file's own name unless given),
 then ends it. It refuses a wrong item before it writes anything, a run that has ended and an end
